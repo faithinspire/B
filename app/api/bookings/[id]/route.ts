@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
 export async function GET(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Validate request method (already handled by Next.js routing)
+    if (request.method !== 'GET') {
+      return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+    }
+
     const serviceSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
