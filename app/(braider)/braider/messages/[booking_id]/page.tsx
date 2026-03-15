@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraiderPageLayout } from '@/app/components/BraiderPageLayout';
 import { supabase } from '@/lib/supabase';
-import { Send, MapPin, AlertCircle, CheckCheck, Check } from 'lucide-react';
+import { Send, MapPin, CheckCheck, Check } from 'lucide-react';
 import { useBraiderLocationTracking } from '@/app/hooks/useBraiderLocationTracking';
 import { useBraiderSubscription } from '@/app/hooks/useBraiderSubscription';
 import { BraiderLocationMap } from '@/app/components/BraiderLocationMap';
@@ -39,7 +39,7 @@ export default function BraiderChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [sending, setSending] = useState(false);
   const [showLocationMap, setShowLocationMap] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected'>('connected');
@@ -69,7 +69,11 @@ export default function BraiderChatPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        setError(null);
+        setError(undefined);
+
+        if (!supabase) {
+          throw new Error('Supabase not initialized');
+        }
 
         // Fetch conversation
         const { data: convData, error: convErr } = await supabase
@@ -116,11 +120,11 @@ export default function BraiderChatPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !conversation) return;
+    if (!newMessage.trim() || !user || !conversation || !supabase) return;
 
     try {
       setSending(true);
-      setError(null);
+      setError(undefined);
 
       const { error: err } = await supabase.from('messages').insert({
         conversation_id: conversation.id,
@@ -191,7 +195,7 @@ export default function BraiderChatPage() {
       title={conversation.customer_name || 'Customer'}
       subtitle="Chat with customer"
       error={error}
-      onErrorDismiss={() => setError(null)}
+      onErrorDismiss={() => setError(undefined)}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chat Section */}
