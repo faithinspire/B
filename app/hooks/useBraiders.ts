@@ -75,29 +75,36 @@ export function useBraiders() {
     fetchBraiders();
 
     // Set up real-time subscription to braider_profiles table
-    if (!supabase) return;
+    if (!supabase) {
+      console.log('Supabase not configured, skipping real-time subscription');
+      return;
+    }
 
-    const subscription = supabase
-      .channel('braider_profiles_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'braider_profiles',
-        },
-        (payload) => {
-          console.log('Real-time update received:', payload);
-          // Refetch braiders when changes occur
-          fetchBraiders();
-        }
-      )
-      .subscribe();
+    try {
+      const subscription = supabase
+        .channel('braider_profiles_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+            schema: 'public',
+            table: 'braider_profiles',
+          },
+          (payload) => {
+            console.log('Real-time update received:', payload);
+            // Refetch braiders when changes occur
+            fetchBraiders();
+          }
+        )
+        .subscribe();
 
-    // Cleanup subscription on unmount
-    return () => {
-      subscription.unsubscribe();
-    };
+      // Cleanup subscription on unmount
+      return () => {
+        subscription.unsubscribe();
+      };
+    } catch (err) {
+      console.error('Error setting up real-time subscription:', err);
+    }
   }, []);
 
   return { braiders, loading, error };

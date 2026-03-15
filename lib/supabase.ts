@@ -4,12 +4,21 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-// Create clients only if keys are available
-export const supabase = supabaseUrl && supabaseAnonKey 
+// Helper to check if URL is valid
+const isValidUrl = (url: string): boolean => {
+  try {
+    return url.startsWith('http://') || url.startsWith('https://');
+  } catch {
+    return false;
+  }
+};
+
+// Create clients only if keys are available and URL is valid
+export const supabase = supabaseUrl && supabaseAnonKey && isValidUrl(supabaseUrl)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey
+export const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey && isValidUrl(supabaseUrl)
   ? createClient(supabaseUrl, supabaseServiceRoleKey)
   : null;
 
