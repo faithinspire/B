@@ -117,7 +117,7 @@ export default function BraiderSignupPage() {
       });
       
       // Call signup API
-      const response = await signupUser({
+      await signupUser({
         email: validated.email,
         password: validated.password,
         full_name: validated.full_name,
