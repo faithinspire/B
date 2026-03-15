@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
 
     if (verification.status === 'approved') {
       // Update user profile
+      if (!supabaseAdmin) {
+        throw new Error('Supabase admin client not initialized');
+      }
+
       await supabaseAdmin
         .from('profiles')
         .update({
