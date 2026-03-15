@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
-import { BottomNav } from './components/BottomNav';
 import { BackgroundImageProvider } from './components/BackgroundImageProvider';
 import './globals.css';
 
@@ -36,12 +35,11 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className="font-sans bg-white text-gray-900 pb-16 md:pb-0">
+      <body className="font-sans bg-white text-gray-900">
         <BackgroundImageProvider>
           <AuthInitializer />
           <Navigation />
           {children}
-          <BottomNav />
         </BackgroundImageProvider>
       </body>
     </html>

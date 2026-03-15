@@ -218,22 +218,23 @@ export function Navigation() {
         )}
       </nav>
 
-      {/* Bottom Navigation Bar (Mobile Only) */}
+      {/* Bottom Navigation Bar - International Standard Design */}
       {user && bottomNavItems.length > 0 && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl">
-          <div className="flex items-center justify-around h-20 px-2">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl md:hidden">
+          <div className="flex items-center justify-around h-20 px-1">
             {bottomNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 flex-1 ${
+                className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all duration-300 flex-1 h-full ${
                   isActive(item.href)
                     ? 'text-primary-600 bg-primary-50'
                     : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
                 }`}
+                title={item.label}
               >
                 <item.icon className="w-6 h-6" />
-                <span className="text-xs font-semibold">{item.label}</span>
+                <span className="text-xs font-semibold leading-tight">{item.label}</span>
               </Link>
             ))}
           </div>
