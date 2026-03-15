@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraiderPageLayout } from '@/app/components/BraiderPageLayout';
-import { Plus, Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface PortfolioItem {
