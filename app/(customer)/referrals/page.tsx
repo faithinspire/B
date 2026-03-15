@@ -9,6 +9,14 @@ export default function ReferralsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
 
+  const referralLink = user ? `${typeof window !== 'undefined' ? window.location.origin : ''}/signup/customer?ref=${user.id}` : '';
+
+  const handleCopy = () => {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink);
+    }
+  };
+
   useEffect(() => {
     // Wait for auth to initialize
     if (authLoading) return;
