@@ -3,9 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { usePaymentStore } from '@/store/supabasePaymentStore';
-import { useLocationStore } from '@/store/supabaseLocationStore';
-import { useChatStore } from '@/store/supabaseChatStore';
 import { supabase } from '@/lib/supabase';
 import {
   DollarSign,
@@ -45,9 +42,6 @@ interface AdminStats {
 export default function AdminDashboard() {
   const router = useRouter();
   const { user } = useSupabaseAuthStore();
-  const { getPaymentsByBooking, releasePayment } = usePaymentStore();
-  const { getTracking } = useLocationStore();
-  const { getConversations: _getConversations } = useChatStore();
 
   const [stats, setStats] = useState<AdminStats>({
     totalBookings: 0,
@@ -135,8 +129,23 @@ export default function AdminDashboard() {
     setSelectedBooking(booking);
     
     // Load tracking data
-    const tracking = await getTracking(booking.id);
-    setTrackingData(tracking);
+    try {
+      if (!supabase) {
+        throw new Error('Supabase not initialized');
+      }
+      
+      const { data } = await supabase
+        .from('location_tracking')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      setTrackingData(data);
+    } catch (err) {
+      console.error('Error loading tracking data:', err);
+    }
   };
 
   const handleReleasePayment = async (paymentId: string) => {
