@@ -1,16 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { Menu, X, LogOut, Home, Search, User, Settings, LayoutDashboard, MessageSquare, Wallet, Image } from 'lucide-react';
+import { Menu, X, LogOut, Home, Search, User, Settings, LayoutDashboard, MessageSquare, Wallet, Image, Bell, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle } from 'lucide-react';
+
+const BACKGROUND_IMAGES = [
+  '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
+  '/images/braiding-styles/gemini-3-pro-image-preview-2k_b_Hero_Background_Imag.png',
+  '/images/braiding-styles/b_Professional_photo_o.png',
+];
 
 export function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useSupabaseAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % BACKGROUND_IMAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [mobileMenuOpen]);
 
   const handleLogout = async () => {
     await signOut();
@@ -20,305 +35,226 @@ export function Navigation() {
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
-  const navLinkClass = (path: string) =>
-    `px-3 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
-      isActive(path)
-        ? 'bg-primary-100 text-primary-600 font-semibold shadow-md'
-        : 'text-gray-700 hover:bg-gray-100'
-    }`;
+  const getBottomNavItems = () => {
+    if (!user) return [];
+
+    if (user.role === 'customer') {
+      return [
+        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { href: '/booking', icon: Zap, label: 'Book' },
+        { href: '/messages', icon: MessageSquare, label: 'Messages' },
+        { href: '/favorites', icon: Heart, label: 'Favorites' },
+        { href: '/profile', icon: User, label: 'Profile' },
+      ];
+    }
+
+    if (user.role === 'braider') {
+      return [
+        { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
+        { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
+        { href: '/braider/services', icon: Settings, label: 'Services' },
+        { href: '/braider/wallet', icon: Wallet, label: 'Wallet' },
+      ];
+    }
+
+    if (user.role === 'admin') {
+      return [
+        { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+        { href: '/admin/users', icon: Users, label: 'Users' },
+        { href: '/admin/payments', icon: DollarSign, label: 'Payments' },
+        { href: '/admin/conversations', icon: MessageCircle, label: 'Chats' },
+        { href: '/admin/disputes', icon: BarChart3, label: 'Disputes' },
+      ];
+    }
+
+    return [];
+  };
+
+  const bottomNavItems = getBottomNavItems();
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">B</span>
+    <>
+      {/* Top Navigation */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center shadow-md">
+                <span className="text-white font-bold text-sm">B</span>
+              </div>
+              <span className="font-serif font-bold text-lg hidden sm:inline text-gray-900">Braidly</span>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-2">
+              {!user ? (
+                <>
+                  <Link href="/" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
+                    Home
+                  </Link>
+                  <Link href="/search" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
+                    Browse
+                  </Link>
+                  <Link href="/login" className="ml-4 px-6 py-2 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 font-semibold">
+                    Sign In
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
+                    Home
+                  </Link>
+                  <Link href="/search" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
+                    Browse
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="ml-4 px-6 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-300 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </>
+              )}
             </div>
-            <span className="font-serif font-bold text-lg hidden sm:inline">Braidly</span>
-          </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1">
-            {!user ? (
-              <>
-                <Link href="/" className={navLinkClass('/')}>
-                  <Home className="w-4 h-4 inline mr-1" />
-                  Home
-                </Link>
-                <Link href="/search" className={navLinkClass('/search')}>
-                  <Search className="w-4 h-4 inline mr-1" />
-                  Browse
-                </Link>
-                <Link href="/login" className="ml-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth">
-                  Sign In
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/" className={navLinkClass('/')}>
-                  <Home className="w-4 h-4 inline mr-1" />
-                  Home
-                </Link>
-                <Link href="/search" className={navLinkClass('/search')}>
-                  <Search className="w-4 h-4 inline mr-1" />
-                  Browse
-                </Link>
-
-                {user.role === 'customer' && (
-                  <>
-                    <Link href="/dashboard" className={navLinkClass('/dashboard')}>
-                      <LayoutDashboard className="w-4 h-4 inline mr-1" />
-                      Dashboard
-                    </Link>
-                    <Link href="/profile" className={navLinkClass('/profile')}>
-                      <User className="w-4 h-4 inline mr-1" />
-                      Profile
-                    </Link>
-                  </>
-                )}
-
-                {user.role === 'braider' && (
-                  <>
-                    <Link href="/braider/dashboard" className={navLinkClass('/braider/dashboard')}>
-                      <LayoutDashboard className="w-4 h-4 inline mr-1" />
-                      Dashboard
-                    </Link>
-                    <Link href="/braider/services" className={navLinkClass('/braider/services')}>
-                      <Settings className="w-4 h-4 inline mr-1" />
-                      Services
-                    </Link>
-                    <Link href="/braider/portfolio" className={navLinkClass('/braider/portfolio')}>
-                      <Image className="w-4 h-4 inline mr-1" />
-                      Portfolio
-                    </Link>
-                    <Link href="/braider/wallet" className={navLinkClass('/braider/wallet')}>
-                      <Wallet className="w-4 h-4 inline mr-1" />
-                      Wallet
-                    </Link>
-                    <Link href="/braider/messages" className={navLinkClass('/braider/messages')}>
-                      <MessageSquare className="w-4 h-4 inline mr-1" />
-                      Messages
-                    </Link>
-                  </>
-                )}
-
-                {user.role === 'admin' && (
-                  <>
-                    <Link href="/admin" className={navLinkClass('/admin')}>
-                      <LayoutDashboard className="w-4 h-4 inline mr-1" />
-                      Admin
-                    </Link>
-                    <Link href="/admin/users" className={navLinkClass('/admin/users')}>
-                      <User className="w-4 h-4 inline mr-1" />
-                      Users
-                    </Link>
-                  </>
-                )}
-
-                <button
-                  onClick={handleLogout}
-                  className="ml-4 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-smooth flex items-center gap-1"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              </>
-            )}
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg transition-all duration-300 hover:bg-gray-100"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-primary-600" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-700" />
+              )}
+            </button>
           </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-3 rounded-lg transition-all duration-300 transform hover:scale-110 relative"
-          style={{
-            background: mobileMenuOpen 
-              ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(147, 51, 234, 0.2) 50%, rgba(236, 72, 153, 0.15) 100%)'
-              : 'transparent'
-          }}
-        >
-          {mobileMenuOpen && (
-            <div 
-              className="absolute inset-0 rounded-lg opacity-30 animate-pulse"
-              style={{
-                background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%)',
-                backgroundSize: '200% 200%',
-                animation: 'gradient 3s ease infinite'
-              }}
-            />
-          )}
-          <div className="relative z-10">
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6 text-primary-600 transition-transform duration-300 rotate-90" />
-            ) : (
-              <Menu className="w-6 h-6 text-gray-700 transition-transform duration-300" />
-            )}
-          </div>
-        </button>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 py-4 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300 bg-gradient-to-b from-white to-gray-50">
-            {!user ? (
-              <>
-                <Link
-                  href="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/search"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                >
-                  Browse Braiders
-                </Link>
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg font-bold"
-                >
-                  Sign In
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/search"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                >
-                  Browse
-                </Link>
+          <div className="md:hidden fixed inset-0 top-16 z-50 overflow-hidden">
+            {/* Animated Background */}
+            <div className="absolute inset-0">
+              {BACKGROUND_IMAGES.map((img, idx) => (
+                <div
+                  key={idx}
+                  className="absolute inset-0 transition-opacity duration-1000"
+                  style={{
+                    backgroundImage: `url(${img})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    opacity: idx === currentImageIndex ? 0.15 : 0,
+                  }}
+                />
+              ))}
+              <div className="absolute inset-0 bg-gradient-to-b from-orange-50 via-purple-50 to-pink-50" />
+            </div>
 
-                {user.role === 'customer' && (
+            {/* Menu Content */}
+            <div className="relative h-full overflow-y-auto">
+              <div className="p-4 space-y-2">
+                {!user ? (
                   <>
                     <Link
-                      href="/dashboard"
+                      href="/"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
+                      className="block px-4 py-3 rounded-xl font-semibold text-gray-900 hover:bg-white/80 transition-all duration-300 backdrop-blur-sm"
                     >
-                      Dashboard
+                      Home
                     </Link>
                     <Link
-                      href="/profile"
+                      href="/search"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
+                      className="block px-4 py-3 rounded-xl font-semibold text-gray-900 hover:bg-white/80 transition-all duration-300 backdrop-blur-sm"
                     >
-                      Profile
+                      Browse Braiders
                     </Link>
                     <Link
-                      href="/messages"
+                      href="/login"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
+                      className="block px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 font-bold text-center"
                     >
-                      Messages
+                      Sign In
                     </Link>
                   </>
-                )}
-
-                {user.role === 'braider' && (
+                ) : (
                   <>
-                    <Link
-                      href="/braider/dashboard"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
+                    <div className="px-4 py-3 rounded-xl bg-white/60 backdrop-blur-sm mb-4">
+                      <p className="text-sm text-gray-600">Welcome back!</p>
+                      <p className="font-semibold text-gray-900">{user.full_name}</p>
+                    </div>
+
+                    {bottomNavItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-300 backdrop-blur-sm ${
+                          isActive(item.href)
+                            ? 'bg-white text-primary-600 shadow-md'
+                            : 'text-gray-900 hover:bg-white/80'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        {item.label}
+                      </Link>
+                    ))}
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50/80 rounded-xl transition-all duration-300 font-bold backdrop-blur-sm mt-4"
                     >
-                      Dashboard
-                    </Link>
-                    <Link
-                      href="/braider/services"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Services
-                    </Link>
-                    <Link
-                      href="/braider/portfolio"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Portfolio
-                    </Link>
-                    <Link
-                      href="/braider/messages"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Messages
-                    </Link>
+                      <LogOut className="w-5 h-5" />
+                      Logout
+                    </button>
                   </>
                 )}
-
-                {user.role === 'admin' && (
-                  <>
-                    <Link
-                      href="/admin"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      href="/admin/users"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Users
-                    </Link>
-                    <Link
-                      href="/admin/conversations"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Conversations
-                    </Link>
-                    <Link
-                      href="/admin/payments"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 font-semibold text-gray-900 hover:bg-primary-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md"
-                    >
-                      Payments
-                    </Link>
-                  </>
-                )}
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-300 transform hover:translate-x-1 hover:shadow-md font-bold"
-                >
-                  Logout
-                </button>
-              </>
-            )}
+              </div>
+            </div>
           </div>
         )}
+      </nav>
 
-        <style jsx>{`
-          @keyframes gradient {
-            0% {
-              background-position: 0% 50%;
-            }
-            50% {
-              background-position: 100% 50%;
-            }
-            100% {
-              background-position: 0% 50%;
-            }
+      {/* Bottom Navigation Bar (Mobile Only) */}
+      {user && bottomNavItems.length > 0 && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl">
+          <div className="flex items-center justify-around h-20 px-2">
+            {bottomNavItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 flex-1 ${
+                  isActive(item.href)
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
+                }`}
+              >
+                <item.icon className="w-6 h-6" />
+                <span className="text-xs font-semibold">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Spacer for bottom nav */}
+      {user && bottomNavItems.length > 0 && <div className="md:hidden h-20" />}
+
+      <style jsx>{`
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
           }
-        `}</style>
-      </div>
-    </nav>
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </>
   );
 }
