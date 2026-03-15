@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 // GET /api/admin/dashboard - Get dashboard statistics
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // Use service role client to bypass RLS
     const serviceSupabase = createClient(
