@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraiderPageLayout } from '@/app/components/BraiderPageLayout';
 import { MessageCircle, Search, AlertCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
 interface Conversation {
   id: string;
@@ -30,7 +29,7 @@ export default function BraiderMessagesPage() {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   // Fetch conversations
@@ -38,7 +37,7 @@ export default function BraiderMessagesPage() {
     if (!user) return;
 
     try {
-      setError(null);
+      setError(undefined);
       const response = await fetch(
         `/api/conversations?user_id=${user.id}&role=braider`,
         { method: 'GET' }
@@ -109,7 +108,7 @@ export default function BraiderMessagesPage() {
       subtitle="Communicate with your customers"
       loading={loading}
       error={error}
-      onErrorDismiss={() => setError(null)}
+      onErrorDismiss={() => setError(undefined)}
     >
       <div className="max-w-4xl mx-auto">
         {/* Search */}
