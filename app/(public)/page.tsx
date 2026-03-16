@@ -112,7 +112,7 @@ export default function LandingPage(): JSX.Element {
 
           {/* Search Bar */}
           <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-8 mb-8 sm:mb-12 animate-slide-up animate-delay-200">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
               <div className="relative">
                 <MapPin className="absolute left-4 top-3 sm:top-4 text-primary-600 w-5 h-5" />
                 <input
@@ -144,6 +144,12 @@ export default function LandingPage(): JSX.Element {
                 <span className="hidden sm:inline">Find Braiders</span>
                 <span className="sm:hidden">Search</span>
               </button>
+              <Link
+                href="/signup/braider"
+                className="bg-secondary-600 text-white rounded-xl font-semibold hover:bg-secondary-700 hover:shadow-lg transition-smooth flex items-center justify-center gap-2 py-2 sm:py-3 text-sm sm:text-base"
+              >
+                <span>Become a Braider</span>
+              </Link>
             </div>
           </div>
 
@@ -164,15 +170,7 @@ export default function LandingPage(): JSX.Element {
             ))}
           </div>
 
-          {/* Become Braider CTA */}
-          <div className="text-center mb-4 animate-slide-up animate-delay-400">
-            <Link
-              href="/signup/braider"
-              className="inline-block px-6 py-2 bg-secondary-600 text-white rounded-full font-semibold hover:bg-secondary-700 transition-smooth text-sm sm:text-base"
-            >
-              Become a Braider
-            </Link>
-          </div>
+
         </div>
       </section>
 
@@ -242,7 +240,7 @@ export default function LandingPage(): JSX.Element {
                     const displayImage = braider.avatar_url || BRAIDER_FEATURED_IMAGES[idx % BRAIDER_FEATURED_IMAGES.length].src;
                     
                     return (
-                      <div key={braider.email || braider.id} className="w-full sm:w-1/2 lg:w-1/4 flex-shrink-0 px-2 sm:px-3">
+                      <div key={braider.email || braider.id} className="w-1/2 sm:w-1/2 lg:w-1/4 flex-shrink-0 px-2 sm:px-3">
                         <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full flex flex-col">
                           <div className="w-full h-40 sm:h-48 bg-gradient-to-br from-primary-300 to-accent-300 flex items-center justify-center relative overflow-hidden">
                             {displayImage ? (
