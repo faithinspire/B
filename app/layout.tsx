@@ -20,7 +20,12 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: 'Braidly - Premium Braiding Marketplace',
   description: 'Connect with verified braiders for premium braiding services',
-  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
