@@ -5,6 +5,10 @@ import { Navigation } from './components/Navigation';
 import { PageBackground } from './components/PageBackground';
 import './globals.css';
 
+// Force dynamic rendering for all routes
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-serif',
