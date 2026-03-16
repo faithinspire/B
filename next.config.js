@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    unoptimized: true, // Required for Netlify static export
+    unoptimized: true, // Required for Netlify
     remotePatterns: [
       {
         protocol: 'https',
@@ -13,13 +13,14 @@ const nextConfig = {
       },
     ],
   },
-  // Remove experimental features that might cause issues
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true, // Temporary - fix TypeScript errors later
+    ignoreBuildErrors: true,
   },
+  // Ensure we're not doing static export
+  output: undefined,
 };
 
 module.exports = nextConfig;
