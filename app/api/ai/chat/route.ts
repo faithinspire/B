@@ -32,7 +32,19 @@ function generateAIResponse(message: string): { response: string; actions?: Arra
       response: '🔍 I can help you find the perfect braider! You can search by:\n• Location (city or zip code)\n• Braiding style (box braids, knotless, cornrows, etc.)\n• Price range\n• Rating\n\nWhere are you located?',
       actions: [
         { label: '📍 Use My Location', action: 'location' },
+        { label: '🗺️ View Map', action: 'location' },
         { label: '🔍 Browse All', action: 'browse' },
+      ],
+    };
+  }
+
+  // MAPS & LOCATION
+  if (lowerMessage.includes('map') || lowerMessage.includes('location') || lowerMessage.includes('near')) {
+    return {
+      response: '📍 Map View:\nI can show you braiders on an interactive map with:\n• Real-time location\n• Distance to braiders\n• Ratings & reviews\n• Quick booking\n\nLet me open the map for you!',
+      actions: [
+        { label: '🗺️ Open Map', action: 'location' },
+        { label: '📍 Use My Location', action: 'location' },
       ],
     };
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Loader, Download } from 'lucide-react';
+import { MessageCircle, X, Send, Loader, Download, MapPin, GripVertical } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -9,6 +9,11 @@ interface Message {
   sender: 'user' | 'ai';
   timestamp: Date;
   actions?: Array<{ label: string; action: string }>;
+}
+
+interface Position {
+  x: number;
+  y: number;
 }
 
 export function AIAssistant() {
@@ -30,7 +35,13 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [buttonPosition, setButtonPosition] = useState<Position>({ x: 24, y: 24 });
+  const [showMapModal, setShowMapModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
 
   // PWA Install Prompt
   useEffect(() => {
@@ -51,11 +62,62 @@ export function AIAssistant() {
     scrollToBottom();
   }, [messages]);
 
+  // Handle button drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
+    setIsDragging(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    setDragOffset({ x: buttonPosition.x, y: buttonPosition.y });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - dragStartPos.current.x;
+      const deltaY = e.clientY - dragStartPos.current.y;
+
+      const newX = Math.max(0, Math.min(window.innerWidth - 56, dragOffset.x + deltaX));
+      const newY = Math.max(0, Math.min(window.innerHeight - 56, dragOffset.y + deltaY));
+
+      setButtonPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
   const handleAction = (action: string) => {
     const actionMap: { [key: string]: string } = {
       search: 'I want to find braiders near me',
       book: 'I want to book a braider',
       support: 'I need help with my account',
+      location: 'Show me braiders on the map',
+      browse: 'Show me all available braiders',
+      help: 'Tell me more about booking',
+      security: 'How is my payment secure?',
+      pricing: 'What are the pricing details?',
+      bookings: 'Show my bookings',
+      safety: 'Tell me about safety features',
+      braider: 'I want to become a braider',
+      dispute: 'I want to file a dispute',
+      review: 'I want to leave a review',
+      settings: 'Take me to settings',
+      profile: 'Show my profile',
+      referral: 'Show my referral link',
+      earnings: 'Show my earnings',
+      email: 'Contact support via email',
     };
     setInputValue(actionMap[action] || '');
   };
@@ -127,7 +189,7 @@ export function AIAssistant() {
     <>
       {/* PWA Install Prompt */}
       {showPWAPrompt && (
-        <div className="fixed bottom-24 right-6 z-50 bg-white rounded-2xl shadow-2xl p-4 sm:p-6 max-w-xs animate-scale-in">
+        <div className="fixed bottom-32 right-6 z-50 bg-white rounded-2xl shadow-2xl p-4 sm:p-6 max-w-xs animate-scale-in">
           <div className="flex items-start justify-between mb-3">
             <div>
               <h4 className="font-semibold text-gray-900">Install Braidly</h4>
@@ -150,10 +212,47 @@ export function AIAssistant() {
         </div>
       )}
 
-      {/* Floating Button */}
+      {/* Map Modal */}
+      {showMapModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                <h3 className="font-semibold">Braiders Near You</h3>
+              </div>
+              <button
+                onClick={() => setShowMapModal(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-smooth"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 bg-gray-100 flex items-center justify-center">
+              <div className="text-center">
+                <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-semibold">Map View</p>
+                <p className="text-sm text-gray-500 mt-2">Showing braiders in your area</p>
+                <p className="text-xs text-gray-400 mt-4">Map integration coming soon</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draggable Floating Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95"
+        ref={buttonRef}
+        onMouseDown={handleMouseDown}
+        onClick={() => !isDragging && setIsOpen(!isOpen)}
+        style={{
+          position: 'fixed',
+          left: `${buttonPosition.x}px`,
+          top: `${buttonPosition.y}px`,
+          zIndex: 50,
+          cursor: isDragging ? 'grabbing' : 'grab',
+        }}
+        className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95"
         aria-label="Open AI Assistant"
       >
         {isOpen ? (
@@ -163,17 +262,33 @@ export function AIAssistant() {
         )}
       </button>
 
-      {/* Chat Window - Mobile Optimized */}
+      {/* Chat Window - International Standard Size */}
       {isOpen && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 z-50 w-full h-full sm:w-96 sm:h-[600px] bg-white rounded-none sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in">
-          {/* Header */}
+        <div className="fixed z-50 w-full sm:w-[420px] h-[70vh] sm:h-[600px] bg-white rounded-none sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in"
+          style={{
+            bottom: 0,
+            right: 0,
+            left: 0,
+            top: 'auto',
+          }}
+        >
+          {/* Header with Drag Handle */}
           <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white p-4 flex items-center justify-between flex-shrink-0">
-            <div>
-              <h3 className="font-semibold text-base sm:text-lg">Braidly AI</h3>
-              <p className="text-xs sm:text-sm opacity-90">Always here to help</p>
+            <div className="flex items-center gap-2 flex-1">
+              <div
+                data-no-drag="true"
+                className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/20 rounded"
+              >
+                <GripVertical className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base sm:text-lg">Braidly AI</h3>
+                <p className="text-xs sm:text-sm opacity-90">Always here to help</p>
+              </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
+              data-no-drag="true"
               className="p-2 hover:bg-white/20 rounded-lg transition-smooth"
               aria-label="Close chat"
             >
@@ -199,7 +314,7 @@ export function AIAssistant() {
                         <button
                           key={idx}
                           onClick={() => handleAction(action.action)}
-                          className="w-full px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs font-semibold hover:bg-primary-200 transition-smooth"
+                          className="w-full px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs font-semibold hover:bg-primary-200 transition-smooth active:scale-95"
                         >
                           {action.label}
                         </button>
@@ -235,7 +350,7 @@ export function AIAssistant() {
               <button
                 onClick={handleSendMessage}
                 disabled={isLoading || !inputValue.trim()}
-                className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0"
+                className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 active:scale-95"
                 aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
