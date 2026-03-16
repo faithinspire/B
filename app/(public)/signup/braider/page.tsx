@@ -32,11 +32,17 @@ export default function BraiderSignupPage() {
     travel_radius_miles: '10',
     is_mobile: true,
     salon_address: '',
+    cities: [] as string[],
     
     // Step 4: Pricing
     service_name: '',
     service_price: '',
     service_duration: '60',
+    
+    // Step 5: Verification
+    id_document_url: '',
+    selfie_url: '',
+    background_check_consent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -50,6 +56,38 @@ export default function BraiderSignupPage() {
     'Wig Installation',
     'Hair Treatment',
   ];
+
+  const cityOptions = [
+    'New York',
+    'Los Angeles',
+    'Chicago',
+    'Houston',
+    'Phoenix',
+    'Philadelphia',
+    'San Antonio',
+    'San Diego',
+    'Dallas',
+    'San Jose',
+    'Austin',
+    'Jacksonville',
+    'Fort Worth',
+    'Columbus',
+    'Charlotte',
+    'San Francisco',
+    'Indianapolis',
+    'Seattle',
+    'Denver',
+    'Boston',
+  ];
+
+  const toggleCity = (city: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cities: prev.cities.includes(city)
+        ? prev.cities.filter(c => c !== city)
+        : [...prev.cities, city]
+    }));
+  };
 
   const toggleSpecialty = (specialty: string) => {
     setFormData(prev => ({
@@ -81,11 +119,17 @@ export default function BraiderSignupPage() {
     if (stepNum === 3) {
       if (!formData.travel_radius_miles) newErrors.travel_radius_miles = 'Travel radius is required';
       if (!formData.is_mobile && !formData.salon_address) newErrors.salon_address = 'Salon address is required';
+      if (formData.cities.length === 0) newErrors.cities = 'Select at least one city';
     }
 
     if (stepNum === 4) {
       if (!formData.service_name) newErrors.service_name = 'Service name is required';
       if (!formData.service_price) newErrors.service_price = 'Price is required';
+    }
+
+    if (stepNum === 5) {
+      if (!formData.id_document_url) newErrors.id_document_url = 'ID document is required';
+      if (!formData.selfie_url) newErrors.selfie_url = 'Selfie is required';
     }
 
     setErrors(newErrors);
@@ -105,7 +149,7 @@ export default function BraiderSignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep(4)) return;
+    if (!validateStep(5)) return;
 
     setLoading(true);
     setError(null);
@@ -159,13 +203,13 @@ export default function BraiderSignupPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-600 to-accent-600 px-8 py-6 animate-slide-down">
             <h1 className="text-3xl font-serif font-bold text-white mb-2">Join as Braider</h1>
-            <p className="text-primary-100">Step {step} of 4 - Start your earning journey</p>
+            <p className="text-primary-100">Step {step} of 5 - Start your earning journey</p>
           </div>
 
           {/* Progress Bar */}
           <div className="px-8 pt-6">
             <div className="flex gap-2">
-              {[1, 2, 3, 4].map((s) => (
+              {[1, 2, 3, 4, 5].map((s) => (
                 <div
                   key={s}
                   className={`flex-1 h-2 rounded-full transition-all ${
@@ -362,6 +406,28 @@ export default function BraiderSignupPage() {
                     {errors.salon_address && <p className="text-xs text-red-600 mt-1">{errors.salon_address}</p>}
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Service Coverage Cities *</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    {cityOptions.map((city) => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => toggleCity(city)}
+                        className={`p-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                          formData.cities.includes(city)
+                            ? 'border-primary-600 bg-primary-50 text-primary-600'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                        }`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.cities && <p className="text-xs text-red-600 mt-2">{errors.cities}</p>}
+                  <p className="text-xs text-gray-600 mt-2">Selected: {formData.cities.length} cities</p>
+                </div>
               </div>
             )}
 
@@ -418,6 +484,92 @@ export default function BraiderSignupPage() {
               </div>
             )}
 
+            {/* Step 5: Verification */}
+            {step === 5 && (
+              <div className="space-y-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-blue-700 font-semibold mb-2">Verification Required</p>
+                  <p className="text-xs text-blue-600">
+                    We verify all braiders to ensure platform safety. Your documents are encrypted and secure.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">ID Document *</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setFormData({ ...formData, id_document_url: event.target?.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="id-upload"
+                    />
+                    <label htmlFor="id-upload" className="cursor-pointer">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">
+                        {formData.id_document_url ? '✓ ID Uploaded' : 'Upload ID Document'}
+                      </p>
+                      <p className="text-xs text-gray-500">Driver's License, Passport, or National ID</p>
+                    </label>
+                  </div>
+                  {errors.id_document_url && <p className="text-xs text-red-600 mt-1">{errors.id_document_url}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Selfie *</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setFormData({ ...formData, selfie_url: event.target?.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="selfie-upload"
+                    />
+                    <label htmlFor="selfie-upload" className="cursor-pointer">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">
+                        {formData.selfie_url ? '✓ Selfie Uploaded' : 'Upload Selfie'}
+                      </p>
+                      <p className="text-xs text-gray-500">Clear photo of your face</p>
+                    </label>
+                  </div>
+                  {errors.selfie_url && <p className="text-xs text-red-600 mt-1">{errors.selfie_url}</p>}
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="background-check"
+                    checked={formData.background_check_consent}
+                    onChange={(e) => setFormData({ ...formData, background_check_consent: e.target.checked })}
+                    className="mt-1"
+                  />
+                  <label htmlFor="background-check" className="text-sm text-gray-700">
+                    <span className="font-semibold">Optional: Background Check</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Customers trust verified braiders more. A background check increases your bookings.
+                    </p>
+                  </label>
+                </div>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="flex gap-4 mt-8">
               {step > 1 && (
@@ -431,7 +583,7 @@ export default function BraiderSignupPage() {
                 </button>
               )}
 
-              {step < 4 ? (
+              {step < 5 ? (
                 <button
                   type="button"
                   onClick={handleNext}

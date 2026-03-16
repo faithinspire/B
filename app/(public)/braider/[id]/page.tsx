@@ -18,6 +18,7 @@ interface BraiderProfile {
   travel_radius_miles: number;
   is_mobile: boolean;
   salon_address: string | null;
+  cities: string[];
   full_name: string;
   avatar_url: string | null;
   services: Array<{
@@ -69,6 +70,7 @@ export default function BraiderProfilePage() {
           travel_radius_miles,
           is_mobile,
           salon_address,
+          cities,
           full_name,
           avatar_url,
           email
@@ -115,6 +117,7 @@ export default function BraiderProfilePage() {
         travel_radius_miles: foundBraider.travel_radius_miles || 10,
         is_mobile: foundBraider.is_mobile || false,
         salon_address: foundBraider.salon_address,
+        cities: foundBraider.cities || [],
         full_name: foundBraider.full_name || 'Braider',
         avatar_url: foundBraider.avatar_url,
         services: services || [],
@@ -221,6 +224,19 @@ export default function BraiderProfilePage() {
                   <span>{braider.is_mobile ? 'Mobile Service' : 'Salon Based'}</span>
                 </div>
               </div>
+
+              {braider.cities && braider.cities.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Service Coverage Cities</p>
+                  <div className="flex flex-wrap gap-2">
+                    {braider.cities.map((city) => (
+                      <span key={city} className="px-3 py-1 bg-primary-100 text-primary-700 text-xs sm:text-sm rounded-full font-medium">
+                        {city}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
