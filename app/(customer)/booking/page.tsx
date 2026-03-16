@@ -150,9 +150,16 @@ export default function BookingPage() {
   const selectedService = selectedBraider?.services.find((s) => s.id === formData.service_id);
 
   const handleNext = () => {
-    if (step === 1 && formData.braider_id) setStep(2);
-    else if (step === 2 && formData.service_id) setStep(3);
-    else if (step === 3 && formData.appointment_date && formData.appointment_time) setStep(4);
+    if (step === 1 && formData.braider_id) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (step === 2 && formData.service_id) {
+      setStep(3);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (step === 3 && formData.appointment_date && formData.appointment_time) {
+      setStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleBack = () => {
@@ -213,19 +220,19 @@ export default function BookingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-16 z-40">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pt-20">
+      {/* Header - Fixed at top */}
+      <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 w-full">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-semibold mb-4 transition-smooth"
+            className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-semibold mb-3 transition-smooth"
           >
             <ArrowLeft className="w-5 h-5" />
             Back
           </button>
-          <h1 className="text-3xl font-serif font-bold">Book a Braider</h1>
-          <p className="text-gray-600 mt-1">Step {step} of 4</p>
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold">Book a Braider</h1>
+          <p className="text-gray-600 text-sm mt-1">Step {step} of 4</p>
         </div>
       </div>
 

@@ -111,22 +111,22 @@ export default function LandingPage(): JSX.Element {
           </div>
 
           {/* Search Bar */}
-          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 mb-12 animate-slide-up animate-delay-200">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-8 mb-8 sm:mb-12 animate-slide-up animate-delay-200">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div className="relative">
-                <MapPin className="absolute left-4 top-4 text-primary-600 w-5 h-5" />
+                <MapPin className="absolute left-4 top-3 sm:top-4 text-primary-600 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Enter location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 transition-smooth text-base"
+                  className="w-full pl-12 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 transition-smooth text-sm sm:text-base"
                 />
               </div>
               <select
                 value={style}
                 onChange={(e) => setStyle(e.target.value)}
-                className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 transition-smooth text-base"
+                className="px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 transition-smooth text-sm sm:text-base"
               >
                 <option value="">Select braiding style</option>
                 <option value="box_braids">Box Braids</option>
@@ -138,16 +138,17 @@ export default function LandingPage(): JSX.Element {
               </select>
               <button
                 onClick={handleSearch}
-                className="bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold hover:shadow-lg transition-smooth flex items-center justify-center gap-2 py-3"
+                className="bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold hover:shadow-lg transition-smooth flex items-center justify-center gap-2 py-2 sm:py-3 text-sm sm:text-base"
               >
-                <Search className="w-5 h-5" />
-                Find Braiders
+                <Search className="w-4 sm:w-5 h-4 sm:h-5" />
+                <span className="hidden sm:inline">Find Braiders</span>
+                <span className="sm:hidden">Search</span>
               </button>
             </div>
           </div>
 
           {/* Category Pills */}
-          <div className="flex flex-wrap gap-3 justify-center mb-8 animate-slide-up animate-delay-300">
+          <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mb-6 sm:mb-8 animate-slide-up animate-delay-300">
             {categories.map((cat, idx) => (
               <button
                 key={cat.value}
@@ -155,12 +156,22 @@ export default function LandingPage(): JSX.Element {
                   setStyle(cat.value);
                   setTimeout(handleSearch, 100);
                 }}
-                className="px-5 py-2 bg-white border-2 border-gray-200 rounded-full font-medium text-gray-700 hover:border-primary-600 hover:text-primary-600 hover:shadow-md transition-smooth"
+                className="px-3 sm:px-5 py-1.5 sm:py-2 bg-white border-2 border-gray-200 rounded-full font-medium text-xs sm:text-sm text-gray-700 hover:border-primary-600 hover:text-primary-600 hover:shadow-md transition-smooth"
                 style={{ animationDelay: `${idx * 50}ms` }}
               >
                 {cat.name}
               </button>
             ))}
+          </div>
+
+          {/* Become Braider CTA */}
+          <div className="text-center mb-4 animate-slide-up animate-delay-400">
+            <Link
+              href="/signup/braider"
+              className="inline-block px-6 py-2 bg-secondary-600 text-white rounded-full font-semibold hover:bg-secondary-700 transition-smooth text-sm sm:text-base"
+            >
+              Become a Braider
+            </Link>
           </div>
         </div>
       </section>
@@ -218,9 +229,9 @@ export default function LandingPage(): JSX.Element {
               >
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <div key={i} className="w-full sm:w-1/2 lg:w-1/4 flex-shrink-0 px-3">
-                      <div className="bg-white rounded-2xl p-6 animate-pulse">
-                        <div className="w-full h-48 bg-gray-200 rounded-xl mb-4" />
+                    <div key={i} className="w-full sm:w-1/2 lg:w-1/4 flex-shrink-0 px-2 sm:px-3">
+                      <div className="bg-white rounded-2xl p-4 sm:p-6 animate-pulse">
+                        <div className="w-full h-40 sm:h-48 bg-gray-200 rounded-xl mb-4" />
                         <div className="h-4 bg-gray-200 rounded mb-3" />
                         <div className="h-3 bg-gray-200 rounded w-2/3" />
                       </div>
@@ -228,13 +239,12 @@ export default function LandingPage(): JSX.Element {
                   ))
                 ) : featuredBraiders.length > 0 ? (
                   featuredBraiders.map((braider, idx) => {
-                    // Use fallback featured image if no avatar
                     const displayImage = braider.avatar_url || BRAIDER_FEATURED_IMAGES[idx % BRAIDER_FEATURED_IMAGES.length].src;
                     
                     return (
-                      <div key={braider.email || braider.id} className="w-full sm:w-1/2 lg:w-1/4 flex-shrink-0 px-3">
+                      <div key={braider.email || braider.id} className="w-full sm:w-1/2 lg:w-1/4 flex-shrink-0 px-2 sm:px-3">
                         <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full flex flex-col">
-                          <div className="w-full h-48 bg-gradient-to-br from-primary-300 to-accent-300 flex items-center justify-center relative overflow-hidden">
+                          <div className="w-full h-40 sm:h-48 bg-gradient-to-br from-primary-300 to-accent-300 flex items-center justify-center relative overflow-hidden">
                             {displayImage ? (
                               <img 
                                 src={displayImage} 
@@ -243,7 +253,7 @@ export default function LandingPage(): JSX.Element {
                                 loading="lazy"
                               />
                             ) : (
-                              <div className="text-4xl">💇</div>
+                              <div className="text-3xl sm:text-4xl">💇</div>
                             )}
                             {braider.verification_status === 'unverified' && (
                               <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-semibold">
@@ -251,18 +261,18 @@ export default function LandingPage(): JSX.Element {
                               </div>
                             )}
                           </div>
-                          <div className="p-6 flex-1 flex flex-col">
-                            <h3 className="font-semibold text-lg mb-2 text-gray-900">{braider.full_name}</h3>
-                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{braider.bio}</p>
-                            <div className="flex items-center gap-2 mb-4">
+                          <div className="p-4 sm:p-6 flex-1 flex flex-col">
+                            <h3 className="font-semibold text-base sm:text-lg mb-2 text-gray-900 line-clamp-1">{braider.full_name}</h3>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">{braider.bio}</p>
+                            <div className="flex items-center gap-2 mb-4 text-xs sm:text-sm">
                               <div className="flex items-center gap-1">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                <span className="text-sm font-semibold text-gray-900">{braider.rating_avg?.toFixed(1) || '5.0'}</span>
+                                <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
+                                <span className="font-semibold text-gray-900">{braider.rating_avg?.toFixed(1) || '5.0'}</span>
                               </div>
-                              <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
+                              <span className="text-gray-500">({braider.rating_count || 0})</span>
                             </div>
                             {braider.verification_status !== 'unverified' && (
-                              <div className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold mb-4">
+                              <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold mb-4 w-fit">
                                 <CheckCircle className="w-3 h-3" />
                                 Verified
                               </div>
@@ -270,7 +280,7 @@ export default function LandingPage(): JSX.Element {
                             <div className="mt-auto">
                               <Link
                                 href={`/braider/${braider.user_id || braider.id}`}
-                                className="block w-full text-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-sm"
+                                className="block w-full text-center px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-xs sm:text-sm"
                               >
                                 View Profile
                               </Link>
@@ -296,19 +306,19 @@ export default function LandingPage(): JSX.Element {
               <>
                 <button
                   onClick={handlePrevCarousel}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 sm:-translate-x-6 z-10 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:bg-primary-50"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 sm:-translate-x-6 z-10 bg-white rounded-full p-1.5 sm:p-2 shadow-lg hover:shadow-xl transition-all hover:bg-primary-50"
                   aria-label="Previous braiders"
                 >
-                  <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 sm:w-6 h-5 sm:h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
                 <button
                   onClick={handleNextCarousel}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 sm:translate-x-6 z-10 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:bg-primary-50"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 sm:translate-x-6 z-10 bg-white rounded-full p-1.5 sm:p-2 shadow-lg hover:shadow-xl transition-all hover:bg-primary-50"
                   aria-label="Next braiders"
                 >
-                  <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 sm:w-6 h-5 sm:h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -317,13 +327,13 @@ export default function LandingPage(): JSX.Element {
 
             {/* Carousel Dots */}
             {featuredBraiders.length > 4 && (
-              <div className="flex justify-center gap-2 mt-8">
+              <div className="flex justify-center gap-2 mt-6 sm:mt-8">
                 {Array(Math.ceil(featuredBraiders.length / 4)).fill(0).map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setCurrentCarouselIndex(idx)}
                     className={`w-2 h-2 rounded-full transition-all ${
-                      idx === currentCarouselIndex ? 'bg-primary-600 w-8' : 'bg-gray-300'
+                      idx === currentCarouselIndex ? 'bg-primary-600 w-6 sm:w-8' : 'bg-gray-300'
                     }`}
                     aria-label={`Go to carousel page ${idx + 1}`}
                   />
