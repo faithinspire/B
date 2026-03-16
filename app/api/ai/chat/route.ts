@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, conversationHistory } = await request.json();
+    const { message } = await request.json();
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -11,41 +11,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build conversation context
-    const conversationContext = conversationHistory
-      .map((msg: any) => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
-      .join('\n');
-
-    const systemPrompt = `You are Braidly's AI Assistant, a helpful customer service bot for a braiding marketplace platform. 
-
-Your responsibilities:
-1. Answer questions about Braidly services, booking process, and features
-2. Help customers find braiders and make bookings
-3. Assist braiders with their dashboard and earnings
-4. Handle common issues like cancellations, refunds, and disputes
-5. Provide safety information and emergency support guidance
-6. Be friendly, professional, and solution-oriented
-
-Key Information:
-- Braidly is a verified braiding marketplace with secure escrow payments
-- Customers can book braiders for various styles (box braids, knotless, cornrows, locs, twists, kids)
-- All braiders are ID-verified and background-checked
-- Payments are held in escrow until service completion
-- 48-hour auto-release policy for completed services
-- SOS emergency button available during appointments
-- Full refund guarantee if issues arise
-
-Always:
-- Be empathetic and helpful
-- Provide clear, concise answers
-- Suggest contacting support for complex issues
-- Maintain professional boundaries
-- Never share sensitive user information`;
-
-    const userMessage = `${conversationContext}\nUser: ${message}`;
+    // Build conversation context (for future use with external AI APIs)
+    // const conversationContext = conversationHistory
+    //   .map((msg: any) => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
+    //   .join('\n');
 
     // Use a simple AI response generator (can be replaced with OpenAI/Claude API)
-    const response = generateAIResponse(message, conversationHistory);
+    const response = generateAIResponse(message);
 
     return NextResponse.json({ response });
   } catch (error) {
@@ -57,7 +29,7 @@ Always:
   }
 }
 
-function generateAIResponse(message: string, history: any[]): string {
+function generateAIResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
 
   // Booking-related queries
