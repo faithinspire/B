@@ -52,10 +52,10 @@ CREATE TABLE IF NOT EXISTS referral_rewards (
   UNIQUE(referrer_id, referred_id)
 );
 
--- Incident reports for safety (FIXED: booking_id must be TEXT to match bookings.id type)
+-- Incident reports for safety (booking_id is TEXT to match bookings.id type)
 CREATE TABLE IF NOT EXISTS incident_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL,
   reported_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   incident_type TEXT NOT NULL CHECK (incident_type IN ('emergency', 'safety_concern', 'harassment', 'property_damage', 'other')),
   description TEXT NOT NULL,
@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS incident_reports (
   admin_notes TEXT,
   resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT fk_incident_reports_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
 -- User blocks/reports

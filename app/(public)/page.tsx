@@ -9,7 +9,6 @@ import { Search, MapPin, Star, Shield, Clock, Users, Zap, CheckCircle } from 'lu
 import { useBraiders } from '@/app/hooks/useBraiders';
 import { BackgroundAnimator } from '@/app/components/BackgroundAnimator';
 import { BraidingStylesGallery } from '@/app/components/BraidingStylesGallery';
-import { AIAssistant } from '@/app/components/AIAssistant';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 
 export default function LandingPage(): JSX.Element {
@@ -77,7 +76,6 @@ export default function LandingPage(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-white">
-      <AIAssistant />
       {/* Hero Section */}
       <section className="relative overflow-hidden py-12 sm:py-24 lg:py-32" style={{
         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(236, 72, 153, 0.1) 100%)',

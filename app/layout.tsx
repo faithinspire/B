@@ -3,6 +3,7 @@ import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
 import { PageBackground } from './components/PageBackground';
+import { AIAssistant } from './components/AIAssistant';
 import './globals.css';
 
 // Force dynamic rendering for all routes
@@ -47,6 +48,7 @@ export default function RootLayout({
       <body className="font-sans bg-transparent text-gray-900">
         <PageBackground />
         <AuthInitializer />
+        <AIAssistant />
         
         {/* Fixed container that holds everything */}
         <div className="fixed inset-0 flex flex-col" style={{ margin: 0, padding: 0 }}>

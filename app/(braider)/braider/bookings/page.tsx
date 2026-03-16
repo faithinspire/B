@@ -98,8 +98,8 @@ export default function BraiderBookingsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      {/* Header - Fixed positioning relative to scrollable content */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 w-full">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <h1 className="text-3xl font-serif font-bold text-gray-900">My Bookings</h1>
           <p className="text-gray-600 mt-1">Manage your appointments and bookings</p>
