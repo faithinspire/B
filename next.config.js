@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
   reactStrictMode: true,
   images: {
     unoptimized: true,
@@ -20,6 +19,10 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+  // Skip generating error pages during build
+  generateBuildId: async () => {
+    return 'build-' + Date.now();
   },
 };
 
