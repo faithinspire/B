@@ -1,9 +1,10 @@
 -- Add missing tables for critical features
+-- IMPORTANT: All foreign keys must reference UUID columns with UUID type
 
 -- Availability slots for braiders
 CREATE TABLE IF NOT EXISTS availability_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  braider_id UUID REFERENCES braider_profiles(id) ON DELETE CASCADE NOT NULL,
+  braider_id UUID NOT NULL REFERENCES braider_profiles(id) ON DELETE CASCADE,
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
@@ -41,8 +42,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- Referral rewards tracking
 CREATE TABLE IF NOT EXISTS referral_rewards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referrer_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  referred_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  referrer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  referred_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   reward_amount NUMERIC(10,2),
   reward_type TEXT CHECK (reward_type IN ('credit', 'commission_reduction')) DEFAULT 'credit',
   is_claimed BOOLEAN DEFAULT false,
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS referral_rewards (
 -- Incident reports for safety
 CREATE TABLE IF NOT EXISTS incident_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE NOT NULL,
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   reported_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   incident_type TEXT NOT NULL CHECK (incident_type IN ('emergency', 'safety_concern', 'harassment', 'property_damage', 'other')),
   description TEXT NOT NULL,
@@ -70,8 +71,8 @@ CREATE TABLE IF NOT EXISTS incident_reports (
 -- User blocks/reports
 CREATE TABLE IF NOT EXISTS user_blocks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  blocker_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  blocked_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  blocker_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  blocked_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   reason TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(blocker_id, blocked_id)
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS user_blocks (
 -- Payment methods for customers
 CREATE TABLE IF NOT EXISTS payment_methods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   stripe_payment_method_id TEXT NOT NULL,
   card_last_four TEXT,
   card_brand TEXT,
