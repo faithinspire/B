@@ -20,15 +20,13 @@ export default function FinancialsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16 pb-24">
-      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-6 sm:py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold mb-1 sm:mb-2">Financials</h1>
-          <p className="text-primary-100 text-sm sm:text-base">Platform revenue and analytics</p>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">Financials</h1>
+          <p className="text-gray-600">Platform revenue and analytics</p>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-smooth">
             <div className="flex items-center justify-between">

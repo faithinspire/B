@@ -187,16 +187,13 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16 pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-serif font-bold mb-2">Admin Dashboard</h1>
-          <p className="text-primary-100">Real-time platform monitoring and management</p>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24" style={{ paddingTop: 0, marginTop: 0 }}>
+      <div className="max-w-7xl mx-auto px-4" style={{ paddingTop: '2rem' }}>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Real-time platform monitoring and management</p>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 animate-slide-up">

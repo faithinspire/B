@@ -9,7 +9,7 @@ import { BackgroundAnimator } from '@/app/components/BackgroundAnimator';
 import { BraidingStylesGallery } from '@/app/components/BraidingStylesGallery';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 
-export default function LandingPage() {
+export default function LandingPage(): JSX.Element {
   const router = useRouter();
   const { braiders, loading } = useBraiders();
   const [location, setLocation] = useState('');

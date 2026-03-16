@@ -106,7 +106,7 @@ export default function CustomerDashboard() {
   // Show loading while auth is initializing
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
         <div className="text-center">
           <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading dashboard...</p>
@@ -118,21 +118,21 @@ export default function CustomerDashboard() {
   const specialties = ['Box Braids', 'Knotless', 'Cornrows', 'Locs', 'Twists', 'Kids Braids'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24" style={{ paddingTop: 0, marginTop: 0 }}>
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-12 px-4">
+      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-6 sm:py-8 md:py-12 px-3 sm:px-4" style={{ marginTop: 0 }}>
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-serif font-bold mb-2">Welcome, {user.full_name}!</h1>
-          <p className="text-primary-100 text-lg">Find and book your perfect braider</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold mb-1 sm:mb-2">Welcome, {user.full_name}!</h1>
+          <p className="text-primary-100 text-xs sm:text-sm md:text-lg">Find and book your perfect braider</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {/* Tab Navigation */}
-        <div className="flex gap-4 mb-8 border-b border-gray-200">
+        <div className="flex gap-3 sm:gap-4 mb-6 sm:mb-8 border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('browse')}
-            className={`px-6 py-3 font-semibold transition-smooth border-b-2 ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 font-semibold transition-smooth border-b-2 text-xs sm:text-sm md:text-base whitespace-nowrap ${
               activeTab === 'browse'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
@@ -142,13 +142,13 @@ export default function CustomerDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`px-6 py-3 font-semibold transition-smooth border-b-2 flex items-center gap-2 ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 font-semibold transition-smooth border-b-2 flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm md:text-base whitespace-nowrap ${
               activeTab === 'bookings'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Calendar className="w-5 h-5" />
+            <Calendar className="w-3.5 sm:w-5 h-3.5 sm:h-5" />
             My Bookings {myBookings.length > 0 && `(${myBookings.length})`}
           </button>
         </div>
@@ -157,30 +157,30 @@ export default function CustomerDashboard() {
         {activeTab === 'browse' && (
           <>
             {/* Search & Filters */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            <div className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg p-3 sm:p-4 md:p-6 mb-6 sm:mb-8 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4">
                 {/* Search */}
                 <div className="lg:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Search</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Search</label>
                   <div className="relative">
-                    <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-3 sm:left-4 top-2.5 sm:top-3.5 w-4 sm:w-5 h-4 sm:h-5 text-gray-400" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search by name or specialty..."
-                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 transition-smooth"
+                      className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:border-primary-600 transition-smooth text-xs sm:text-sm md:text-base"
                     />
                   </div>
                 </div>
 
                 {/* Specialty */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Specialty</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Specialty</label>
                   <select
                     value={selectedSpecialty}
                     onChange={(e) => setSelectedSpecialty(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:border-primary-600 text-xs sm:text-sm md:text-base"
                   >
                     <option value="">All Specialties</option>
                     {specialties.map((s: string) => (
@@ -193,11 +193,11 @@ export default function CustomerDashboard() {
 
                 {/* Rating */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Min Rating</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Min Rating</label>
                   <select
                     value={minRating}
                     onChange={(e) => setMinRating(parseFloat(e.target.value))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:border-primary-600 text-xs sm:text-sm md:text-base"
                   >
                     <option value="0">All ratings</option>
                     <option value="3">3+ stars</option>
@@ -208,18 +208,18 @@ export default function CustomerDashboard() {
 
                 {/* Price */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Max Price</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Max Price</label>
                   <input
                     type="number"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(parseInt(e.target.value))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:border-primary-600 text-xs sm:text-sm md:text-base"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs sm:text-sm text-gray-600">
                   {loading ? 'Filtering...' : `Found ${filteredBraiders.length} braiders`}
                 </p>
                 <button
@@ -229,7 +229,7 @@ export default function CustomerDashboard() {
                     setMinRating(0);
                     setMaxPrice(500);
                   }}
-                  className="text-primary-600 hover:text-primary-700 font-semibold text-sm"
+                  className="text-primary-600 hover:text-primary-700 font-semibold text-xs sm:text-sm"
                 >
                   Clear Filters
                 </button>
@@ -238,27 +238,27 @@ export default function CustomerDashboard() {
 
             {/* Results */}
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader className="w-8 h-8 text-primary-600 animate-spin" />
+              <div className="flex items-center justify-center py-8 sm:py-12">
+                <Loader className="w-6 sm:w-8 h-6 sm:h-8 text-primary-600 animate-spin" />
               </div>
             ) : filteredBraiders.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
-                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg mb-4">No braiders found matching your criteria</p>
-                <Link href="/search" className="text-primary-600 font-semibold hover:text-primary-700">
+              <div className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg p-6 sm:p-8 md:p-12 text-center">
+                <AlertCircle className="w-10 sm:w-12 h-10 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-3 sm:mb-4">No braiders found matching your criteria</p>
+                <Link href="/search" className="text-primary-600 font-semibold hover:text-primary-700 text-xs sm:text-sm md:text-base">
                   Browse all braiders →
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
                 {filteredBraiders.map((braider, idx) => (
                   <div
                     key={braider.id}
-                    className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-xl transition-smooth animate-slide-up"
+                    className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg overflow-hidden hover:shadow-xl transition-smooth animate-slide-up"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     {/* Image */}
-                    <div className="relative h-48 bg-gradient-to-br from-primary-200 to-accent-200">
+                    <div className="relative h-32 sm:h-40 md:h-48 bg-gradient-to-br from-primary-200 to-accent-200">
                       {braider.avatar_url && (
                         <img
                           src={braider.avatar_url}
@@ -268,10 +268,10 @@ export default function CustomerDashboard() {
                       )}
                       <button
                         onClick={() => toggleFavorite(braider.id)}
-                        className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-smooth"
+                        className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-smooth"
                       >
                         <Heart
-                          className={`w-5 h-5 ${
+                          className={`w-4 sm:w-5 h-4 sm:h-5 ${
                             favorites.includes(braider.id)
                               ? 'fill-red-500 text-red-500'
                               : 'text-gray-400'
@@ -281,34 +281,34 @@ export default function CustomerDashboard() {
                     </div>
 
                     {/* Content */}
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-2">
-                    <div>
-                          <h3 className="text-xl font-semibold text-gray-900">{braider.full_name}</h3>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-medium">{braider.rating_avg.toFixed(1)}</span>
+                    <div className="p-3 sm:p-4 md:p-6">
+                      <div className="flex items-start justify-between mb-1.5 sm:mb-2">
+                        <div>
+                          <h3 className="text-sm sm:text-base md:text-xl font-semibold text-gray-900">{braider.full_name}</h3>
+                          <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
+                            <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-xs sm:text-sm font-medium">{braider.rating_avg.toFixed(1)}</span>
                             <span className="text-xs text-gray-500">({braider.rating_count})</span>
                           </div>
                         </div>
                         {braider.verification_status !== 'unverified' && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full whitespace-nowrap">
                             ✓ Verified
                           </span>
                         )}
                       </div>
 
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{braider.bio}</p>
+                      <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{braider.bio}</p>
 
-                      <div className="space-y-2 mb-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4" />
+                      <div className="space-y-1 sm:space-y-1.5 mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <MapPin className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
                           <span>{braider.travel_radius_miles} miles radius</span>
                         </div>
                         {braider.specialties.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-0.5 sm:gap-1">
                             {braider.specialties.slice(0, 2).map((specialty: string) => (
-                              <span key={specialty} className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full">
+                              <span key={specialty} className="px-1.5 sm:px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
                                 {specialty}
                               </span>
                             ))}
@@ -317,24 +317,24 @@ export default function CustomerDashboard() {
                       </div>
 
                       {braider.services.length > 0 && (
-                        <div className="mb-4 pb-4 border-t border-gray-200">
-                          <p className="text-xs font-semibold text-gray-700 mb-2">Services from:</p>
-                          <p className="text-lg font-bold text-primary-600">
+                        <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-t border-gray-200">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Services from:</p>
+                          <p className="text-base sm:text-lg font-bold text-primary-600">
                             ${Math.min(...braider.services.map((service: any) => service.price)).toFixed(2)}
                           </p>
                         </div>
                       )}
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5 sm:gap-2">
                         <Link
                           href={`/braider/${braider.user_id || braider.id}`}
-                          className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-sm"
+                          className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-xs sm:text-sm"
                         >
                           View Profile
                         </Link>
                         <Link
                           href={`/braider/${braider.user_id || braider.id}`}
-                          className="px-4 py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-sm"
+                          className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-xs sm:text-sm"
                         >
                           Book
                         </Link>
@@ -349,12 +349,12 @@ export default function CustomerDashboard() {
 
         {/* Bookings Tab */}
         {activeTab === 'bookings' && (
-          <div className="space-y-4">
+          <div className="space-y-2 sm:space-y-3 md:space-y-4">
             {myBookings.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg mb-4">No bookings yet</p>
-                <Link href="/booking" className="text-primary-600 font-semibold hover:text-primary-700">
+              <div className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg p-6 sm:p-8 md:p-12 text-center">
+                <Calendar className="w-12 sm:w-16 h-12 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-3 sm:mb-4">No bookings yet</p>
+                <Link href="/booking" className="text-primary-600 font-semibold hover:text-primary-700 text-xs sm:text-sm md:text-base">
                   Book your first appointment →
                 </Link>
               </div>
@@ -362,7 +362,7 @@ export default function CustomerDashboard() {
               myBookings.map((booking, idx) => (
                 <div
                   key={booking.id}
-                  className={`bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-smooth animate-slide-up border-l-4 ${
+                  className={`bg-white rounded-lg sm:rounded-2xl shadow-lg p-3 sm:p-4 md:p-6 hover:shadow-xl transition-smooth animate-slide-up border-l-4 ${
                     booking.status === 'confirmed'
                       ? 'border-green-500'
                       : booking.status === 'completed'
@@ -373,13 +373,13 @@ export default function CustomerDashboard() {
                   }`}
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between mb-2 sm:mb-3 md:mb-4 flex-wrap gap-2">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{booking.braider_name}</h3>
-                      <p className="text-sm text-gray-600">{booking.service_name}</p>
+                      <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">{booking.braider_name}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">{booking.service_name}</p>
                     </div>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                         booking.status === 'confirmed'
                           ? 'bg-green-100 text-green-700'
                           : booking.status === 'completed'
@@ -393,37 +393,37 @@ export default function CustomerDashboard() {
                     </span>
                   </div>
 
-                  <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                  <div className="space-y-1 sm:space-y-1.5 text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Calendar className="w-3.5 sm:w-4 h-3.5 sm:h-4 flex-shrink-0" />
                       <span>{booking.appointment_date}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Clock className="w-3.5 sm:w-4 h-3.5 sm:h-4 flex-shrink-0" />
                       <span>{booking.appointment_date} • ${booking.service_price.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <MapPin className="w-3.5 sm:w-4 h-3.5 sm:h-4 flex-shrink-0" />
                       <span>{booking.location_address}</span>
                     </div>
                     {booking.notes && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                      <div className="mt-1.5 sm:mt-2 p-1.5 sm:p-2 bg-gray-50 rounded text-xs">
                         <p className="font-semibold text-gray-700">Notes:</p>
                         <p>{booking.notes}</p>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-2 pt-4 border-t border-gray-200">
+                  <div className="flex gap-1.5 sm:gap-2 pt-2 sm:pt-3 md:pt-4 border-t border-gray-200 flex-wrap">
                     <Link
                       href="/braider/messages"
-                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-sm"
+                      className="flex-1 min-w-[120px] px-2 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-xs sm:text-sm"
                     >
                       Message Braider
                     </Link>
                     {booking.status === 'pending' && (
                       <button
-                        className="px-4 py-2 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition-smooth font-semibold text-sm"
+                        className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition-smooth font-semibold text-xs sm:text-sm"
                       >
                         Cancel
                       </button>

@@ -131,7 +131,7 @@ export default function BookingPage() {
 
   if (authLoading || braiderLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
         <div className="text-center">
           <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading booking system...</p>

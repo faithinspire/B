@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
-import { BackgroundImageProvider } from './components/BackgroundImageProvider';
+import { PageBackground } from './components/PageBackground';
 import './globals.css';
 
 const playfair = Playfair_Display({
@@ -35,12 +35,22 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className="font-sans bg-white text-gray-900">
-        <BackgroundImageProvider>
-          <AuthInitializer />
-          <Navigation />
-          {children}
-        </BackgroundImageProvider>
+      <body className="font-sans bg-transparent text-gray-900">
+        <PageBackground />
+        <AuthInitializer />
+        
+        {/* Fixed container that holds everything */}
+        <div className="fixed inset-0 flex flex-col" style={{ margin: 0, padding: 0 }}>
+          {/* Fixed Navigation at top */}
+          <div className="flex-shrink-0">
+            <Navigation />
+          </div>
+          
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ margin: 0, padding: 0 }}>
+            {children}
+          </div>
+        </div>
       </body>
     </html>
   );

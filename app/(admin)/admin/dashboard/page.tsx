@@ -83,7 +83,7 @@ export default function AdminDashboardPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
         <div className="text-center">
           <div className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
           <p className="text-gray-600 font-semibold">Loading...</p>
@@ -97,8 +97,8 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16 pb-24">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24" style={{ paddingTop: 0, marginTop: 0 }}>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4" style={{ paddingTop: '1.5rem' }}>
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -147,103 +147,103 @@ export default function AdminDashboardPage() {
         ) : stats ? (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
               {/* Total Users */}
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Total Users</h3>
-                  <Users className="w-5 h-5 text-primary-600" />
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Total Users</h3>
+                  <Users className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                   {stats.totalBraiders} braiders, {stats.totalCustomers} customers
                 </p>
               </div>
 
               {/* Total Conversations */}
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Conversations</h3>
-                  <MessageSquare className="w-5 h-5 text-accent-600" />
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Conversations</h3>
+                  <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-accent-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalConversations}</p>
-                <p className="text-sm text-green-600 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalConversations}</p>
+                <p className="text-xs sm:text-sm text-green-600 mt-1 sm:mt-2">
                   {stats.activeConversations} active
                 </p>
               </div>
 
               {/* Total Bookings */}
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Bookings</h3>
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Bookings</h3>
+                  <BarChart3 className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
-                <p className="text-sm text-gray-500 mt-2">All time</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">All time</p>
               </div>
 
               {/* Total Revenue */}
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-600 font-semibold">Revenue</h3>
-                  <DollarSign className="w-5 h-5 text-green-600" />
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Revenue</h3>
+                  <DollarSign className="w-4 sm:w-5 h-4 sm:h-5 text-green-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                   {stats.pendingPayments} pending
                 </p>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               <button
                 onClick={() => router.push('/admin/conversations')}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
                     View Conversations
                   </h3>
-                  <MessageSquare className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                  <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
                 </div>
-                <p className="text-sm text-gray-600">Monitor all customer-braider chats</p>
+                <p className="text-xs sm:text-sm text-gray-600">Monitor all customer-braider chats</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/payments')}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
                     View Payments
                   </h3>
-                  <DollarSign className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                  <DollarSign className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
                 </div>
-                <p className="text-sm text-gray-600">Track transactions and revenue</p>
+                <p className="text-xs sm:text-sm text-gray-600">Track transactions and revenue</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/users')}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
                     Manage Users
                   </h3>
-                  <Users className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                  <Users className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
                 </div>
-                <p className="text-sm text-gray-600">View and manage user accounts</p>
+                <p className="text-xs sm:text-sm text-gray-600">View and manage user accounts</p>
               </button>
             </div>
 
             {/* Activity Summary */}
-            <div className="mt-8 bg-white rounded-lg shadow p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-5 h-5 text-primary-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Activity Summary</h3>
+            <div className="mt-6 sm:mt-8 bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6">
+                <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600" />
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Activity Summary</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <p className="text-sm text-gray-600 mb-2">User Distribution</p>
                   <div className="space-y-2">

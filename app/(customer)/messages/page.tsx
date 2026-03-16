@@ -82,7 +82,7 @@ export default function MessagesPage() {
   // Show loading while auth is initializing
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
         <div className="text-center">
           <div className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
           <p className="text-gray-600 font-semibold">Loading messages...</p>
@@ -100,7 +100,7 @@ export default function MessagesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

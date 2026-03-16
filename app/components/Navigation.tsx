@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { Menu, X, LogOut, Home, Search, User, Settings, LayoutDashboard, MessageSquare, Wallet, Image, Bell, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle } from 'lucide-react';
+import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -75,8 +75,8 @@ export function Navigation() {
 
   return (
     <>
-      {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      {/* Top Navigation - Remove sticky, it's now in a fixed container */}
+      <nav className="bg-white border-b border-gray-200 shadow-sm z-40" style={{ margin: 0, padding: 0 }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -240,9 +240,6 @@ export function Navigation() {
           </div>
         </div>
       )}
-
-      {/* Spacer for bottom nav */}
-      {user && bottomNavItems.length > 0 && <div className="md:hidden h-20" />}
 
       <style jsx>{`
         @keyframes slideUp {

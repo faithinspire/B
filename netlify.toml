@@ -1,16 +1,20 @@
 [build]
   command = "npm run build"
-  functions = "netlify/functions"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
-  NODE_ENV = "production"
+  NPM_FLAGS = "--legacy-peer-deps"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/:splat"
   status = 200
+  force = false
 
 [[headers]]
   for = "/*"
@@ -19,7 +23,6 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(self), microphone=(self), camera=(self)"
 
 [[headers]]
   for = "/api/*"

@@ -48,7 +48,7 @@ export default function FavoritesPage() {
   // Show loading while auth is initializing
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 mt-16">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
         <div className="text-center">
           <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading favorites...</p>
@@ -66,7 +66,7 @@ export default function FavoritesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-8 px-4 mt-16">
+      <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-serif font-bold mb-2">Favorite Braiders</h1>
           <p className="text-primary-100">Your saved braiders</p>
