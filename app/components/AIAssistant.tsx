@@ -62,20 +62,27 @@ export function AIAssistant() {
     scrollToBottom();
   }, [messages]);
 
-  // Handle button drag
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Handle button drag (mouse and touch)
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
-    setIsDragging(true);
-    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    
+    dragStartPos.current = { x: clientX, y: clientY };
     setDragOffset({ x: buttonPosition.x, y: buttonPosition.y });
+    setIsDragging(true);
   };
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
+    if (!isDragging) return;
 
-      const deltaX = e.clientX - dragStartPos.current.x;
-      const deltaY = e.clientY - dragStartPos.current.y;
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+
+      const deltaX = clientX - dragStartPos.current.x;
+      const deltaY = clientY - dragStartPos.current.y;
 
       const newX = Math.max(0, Math.min(window.innerWidth - 56, dragOffset.x + deltaX));
       const newY = Math.max(0, Math.min(window.innerHeight - 56, dragOffset.y + deltaY));
@@ -83,27 +90,34 @@ export function AIAssistant() {
       setButtonPosition({ x: newX, y: newY });
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       setIsDragging(false);
     };
 
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchend', handleEnd);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchend', handleEnd);
     };
-  }, [isDragging, dragOffset]);
+  }, [isDragging, dragOffset, buttonPosition]);
 
   const handleAction = (action: string) => {
+    // Handle map modal separately
+    if (action === 'location') {
+      setShowMapModal(true);
+      return;
+    }
+
     const actionMap: { [key: string]: string } = {
       search: 'I want to find braiders near me',
       book: 'I want to book a braider',
       support: 'I need help with my account',
-      location: 'Show me braiders on the map',
       browse: 'Show me all available braiders',
       help: 'Tell me more about booking',
       security: 'How is my payment secure?',
@@ -243,7 +257,8 @@ export function AIAssistant() {
       {/* Draggable Floating Button */}
       <button
         ref={buttonRef}
-        onMouseDown={handleMouseDown}
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
         onClick={() => !isDragging && setIsOpen(!isOpen)}
         style={{
           position: 'fixed',
@@ -342,7 +357,7 @@ export function AIAssistant() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Ask me anything..."
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 text-xs sm:text-sm"
                 disabled={isLoading}

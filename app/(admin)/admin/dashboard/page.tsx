@@ -13,6 +13,7 @@ import {
   TrendingUp,
   AlertCircle,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -197,45 +198,61 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+            {/* Navigation Buttons - Styled Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+              <button
+                onClick={() => router.push('/admin')}
+                className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold">Overview</h3>
+                  <BarChart3 className="w-4 sm:w-5 h-4 sm:h-5 text-white/80" />
+                </div>
+                <p className="text-xs sm:text-sm text-white/90">Dashboard</p>
+              </button>
+
               <button
                 onClick={() => router.push('/admin/conversations')}
-                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-gradient-to-br from-accent-600 to-accent-700 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
               >
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
-                    View Conversations
-                  </h3>
-                  <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold">Bookings</h3>
+                  <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-white/80" />
                 </div>
-                <p className="text-xs sm:text-sm text-gray-600">Monitor all customer-braider chats</p>
+                <p className="text-xs sm:text-sm text-white/90">Monitor</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/payments')}
-                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-gradient-to-br from-green-600 to-green-700 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
               >
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
-                    View Payments
-                  </h3>
-                  <DollarSign className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold">Payments</h3>
+                  <DollarSign className="w-4 sm:w-5 h-4 sm:h-5 text-white/80" />
                 </div>
-                <p className="text-xs sm:text-sm text-gray-600">Track transactions and revenue</p>
+                <p className="text-xs sm:text-sm text-white/90">Revenue</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/users')}
-                className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 hover:shadow-lg transition-shadow text-left group"
+                className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
               >
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-sm sm:text-base text-gray-900 font-semibold group-hover:text-primary-600 transition-colors">
-                    Manage Users
-                  </h3>
-                  <Users className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold">Users</h3>
+                  <Users className="w-4 sm:w-5 h-4 sm:h-5 text-white/80" />
                 </div>
-                <p className="text-xs sm:text-sm text-gray-600">View and manage user accounts</p>
+                <p className="text-xs sm:text-sm text-white/90">Manage</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/disputes')}
+                className="bg-gradient-to-br from-red-600 to-red-700 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold">Disputes</h3>
+                  <AlertTriangle className="w-4 sm:w-5 h-4 sm:h-5 text-white/80" />
+                </div>
+                <p className="text-xs sm:text-sm text-white/90">Issues</p>
               </button>
             </div>
 

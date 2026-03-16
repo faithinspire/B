@@ -5,8 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { supabase } from '@/lib/supabase';
-import { Search, MoreVertical, AlertCircle } from 'lucide-react';
+import { Search, Trash2, Eye, AlertCircle, X } from 'lucide-react';
 
 interface User {
   id: string;
@@ -16,6 +15,11 @@ interface User {
   created_at: string;
 }
 
+interface UserDetailsModal {
+  isOpen: boolean;
+  user: User | null;
+}
+
 export default function UsersPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
@@ -23,6 +27,8 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailsModal, setDetailsModal] = useState<UserDetailsModal>({ isOpen: false, user: null });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -37,18 +43,19 @@ export default function UsersPage() {
       setLoading(true);
       setError(null);
 
-      if (!supabase) {
+      const supabaseModule = await import('@/lib/supabase');
+      const supabaseClient = supabaseModule.supabase;
+      
+      if (!supabaseClient) {
         throw new Error('Supabase not configured');
       }
 
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseClient.auth.getSession();
       
       if (!session?.access_token) {
         throw new Error('No session token available');
       }
 
-      // Call the API endpoint instead of querying Supabase directly
       const response = await fetch('/api/admin/users', {
         method: 'GET',
         headers: {
@@ -78,10 +85,53 @@ export default function UsersPage() {
 
     fetchUsers();
 
-    // Refresh every 30 seconds
     const interval = setInterval(fetchUsers, 30000);
     return () => clearInterval(interval);
   }, [user, authLoading, fetchUsers]);
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeletingId(userId);
+      const supabaseModule = await import('@/lib/supabase');
+      const supabaseClient = supabaseModule.supabase;
+      
+      if (!supabaseClient) {
+        throw new Error('Supabase not configured');
+      }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No session token available');
+      }
+
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+
+      setUsers(users.filter(u => u.id !== userId));
+      setDetailsModal({ isOpen: false, user: null });
+      alert('User deleted successfully');
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -185,9 +235,23 @@ export default function UsersPage() {
                         {new Date(u.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-2 sm:px-3 md:px-6 py-2 sm:py-3">
-                        <button className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-smooth">
-                          <MoreVertical className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-gray-400" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setDetailsModal({ isOpen: true, user: u })}
+                            className="p-1.5 sm:p-2 hover:bg-blue-100 rounded-lg transition-smooth text-blue-600"
+                            title="View details"
+                          >
+                            <Eye className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            disabled={deletingId === u.id}
+                            className="p-1.5 sm:p-2 hover:bg-red-100 rounded-lg transition-smooth text-red-600 disabled:opacity-50"
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -197,6 +261,72 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {/* User Details Modal */}
+      {detailsModal.isOpen && detailsModal.user && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-primary-600 to-accent-600 text-white p-4 sm:p-6 flex items-center justify-between sticky top-0">
+              <h3 className="text-lg sm:text-xl font-semibold">User Details</h3>
+              <button
+                onClick={() => setDetailsModal({ isOpen: false, user: null })}
+                className="p-1 hover:bg-white/20 rounded-lg transition-smooth"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="text-xs sm:text-sm font-semibold text-gray-600">Full Name</label>
+                <p className="text-sm sm:text-base text-gray-900 mt-1">{detailsModal.user.full_name}</p>
+              </div>
+
+              <div>
+                <label className="text-xs sm:text-sm font-semibold text-gray-600">Email</label>
+                <p className="text-sm sm:text-base text-gray-900 mt-1 break-all">{detailsModal.user.email}</p>
+              </div>
+
+              <div>
+                <label className="text-xs sm:text-sm font-semibold text-gray-600">Role</label>
+                <p className="text-sm sm:text-base text-gray-900 mt-1 capitalize">{detailsModal.user.role}</p>
+              </div>
+
+              <div>
+                <label className="text-xs sm:text-sm font-semibold text-gray-600">User ID</label>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 break-all font-mono">{detailsModal.user.id}</p>
+              </div>
+
+              <div>
+                <label className="text-xs sm:text-sm font-semibold text-gray-600">Joined Date</label>
+                <p className="text-sm sm:text-base text-gray-900 mt-1">
+                  {new Date(detailsModal.user.created_at).toLocaleString()}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-gray-200 space-y-2">
+                <button
+                  onClick={() => handleDeleteUser(detailsModal.user!.id)}
+                  disabled={deletingId === detailsModal.user.id}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-smooth disabled:opacity-50 font-semibold text-sm flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {deletingId === detailsModal.user.id ? 'Deleting...' : 'Delete User'}
+                </button>
+                <button
+                  onClick={() => setDetailsModal({ isOpen: false, user: null })}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-smooth font-semibold text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
