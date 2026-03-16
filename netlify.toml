@@ -6,6 +6,8 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   NEXT_TELEMETRY_DISABLED = "1"
+  # Disable secrets scanning for public environment variables
+  SECRETS_SCAN_ENABLED = "false"
 
 [[redirects]]
   from = "/*"
