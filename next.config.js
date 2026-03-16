@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
   images: {
-    unoptimized: true, // Required for Netlify
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,8 +20,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Ensure we're not doing static export
-  output: undefined,
 };
 
 module.exports = nextConfig;
