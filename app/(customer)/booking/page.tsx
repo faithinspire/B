@@ -261,7 +261,10 @@ export default function BookingPage() {
           {/* Step 1: Select Braider */}
           {step === 1 && (
             <div className="bg-white rounded-3xl shadow-lg p-8 animate-fade-in">
-              <h2 className="text-2xl font-serif font-bold mb-6">Select a Braider</h2>
+              <h2 className="text-2xl font-serif font-bold mb-2">Select a Braider</h2>
+              {formData.braider_id && (
+                <p className="text-sm text-green-600 font-semibold mb-6">✓ Braider selected - Click Next to continue</p>
+              )}
               {braiders.length === 0 ? (
                 <div className="p-8 text-center">
                   <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -273,11 +276,14 @@ export default function BookingPage() {
                     <button
                       key={braider.user_id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, braider_id: braider.user_id, service_id: '' })}
-                      className={`w-full p-4 rounded-xl border-2 transition-smooth text-left ${
+                      onClick={() => {
+                        setFormData({ ...formData, braider_id: braider.user_id, service_id: '' });
+                        console.log('Selected braider:', braider.user_id);
+                      }}
+                      className={`w-full p-4 rounded-xl border-2 transition-smooth text-left cursor-pointer ${
                         formData.braider_id === braider.user_id
-                          ? 'border-primary-600 bg-primary-50'
-                          : 'border-gray-200 hover:border-primary-300'
+                          ? 'border-primary-600 bg-primary-50 ring-2 ring-primary-200'
+                          : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -296,13 +302,17 @@ export default function BookingPage() {
                             <span>{braider.services.length} services</span>
                           </div>
                         </div>
-                        <input
-                          type="radio"
-                          name="braider"
-                          checked={formData.braider_id === braider.user_id}
-                          onChange={() => {}}
-                          className="mt-1"
-                        />
+                        <div className="flex-shrink-0 ml-4">
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                            formData.braider_id === braider.user_id
+                              ? 'border-primary-600 bg-primary-600'
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.braider_id === braider.user_id && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -314,7 +324,11 @@ export default function BookingPage() {
           {/* Step 2: Select Service */}
           {step === 2 && selectedBraider && (
             <div className="bg-white rounded-3xl shadow-lg p-8 animate-fade-in">
-              <h2 className="text-2xl font-serif font-bold mb-6">Select a Service</h2>
+              <h2 className="text-2xl font-serif font-bold mb-2">Select a Service</h2>
+              <p className="text-sm text-gray-600 mb-6">From <span className="font-semibold text-primary-600">{selectedBraider.full_name}</span></p>
+              {formData.service_id && (
+                <p className="text-sm text-green-600 font-semibold mb-6">✓ Service selected - Click Next to continue</p>
+              )}
               {selectedBraider.services.length === 0 ? (
                 <div className="p-8 text-center">
                   <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -326,11 +340,14 @@ export default function BookingPage() {
                     <button
                       key={service.id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, service_id: service.id })}
-                      className={`w-full p-4 rounded-xl border-2 transition-smooth text-left ${
+                      onClick={() => {
+                        setFormData({ ...formData, service_id: service.id });
+                        console.log('Selected service:', service.id);
+                      }}
+                      className={`w-full p-4 rounded-xl border-2 transition-smooth text-left cursor-pointer ${
                         formData.service_id === service.id
-                          ? 'border-primary-600 bg-primary-50'
-                          : 'border-gray-200 hover:border-primary-300'
+                          ? 'border-primary-600 bg-primary-50 ring-2 ring-primary-200'
+                          : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -344,15 +361,17 @@ export default function BookingPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0 ml-4">
                           <p className="text-2xl font-bold text-primary-600">${service.price.toFixed(2)}</p>
-                          <input
-                            type="radio"
-                            name="service"
-                            checked={formData.service_id === service.id}
-                            onChange={() => {}}
-                            className="mt-2"
-                          />
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mt-2 mx-auto ${
+                            formData.service_id === service.id
+                              ? 'border-primary-600 bg-primary-600'
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.service_id === service.id && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -484,7 +503,7 @@ export default function BookingPage() {
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-4">
             {step > 1 && (
               <button
                 type="button"
@@ -506,9 +525,15 @@ export default function BookingPage() {
                   (step === 2 && !formData.service_id) ||
                   (step === 3 && (!formData.appointment_date || !formData.appointment_time))
                 }
-                className="flex-1 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex-1 px-6 py-3 rounded-lg transition-smooth font-semibold text-white ${
+                  (step === 1 && formData.braider_id) ||
+                  (step === 2 && formData.service_id) ||
+                  (step === 3 && formData.appointment_date && formData.appointment_time)
+                    ? 'bg-gradient-to-r from-primary-600 to-accent-600 hover:shadow-lg'
+                    : 'bg-gray-300 cursor-not-allowed'
+                }`}
               >
-                Next
+                {loading ? 'Loading...' : 'Next'}
               </button>
             )}
           </div>
