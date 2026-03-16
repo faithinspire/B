@@ -11,15 +11,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build conversation context (for future use with external AI APIs)
-    // const conversationContext = conversationHistory
-    //   .map((msg: any) => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
-    //   .join('\n');
-
-    // Use a simple AI response generator (can be replaced with OpenAI/Claude API)
     const response = generateAIResponse(message);
 
-    return NextResponse.json({ response });
+    return NextResponse.json(response);
   } catch (error) {
     console.error('AI Chat Error:', error);
     return NextResponse.json(
@@ -29,50 +23,136 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateAIResponse(message: string): string {
+function generateAIResponse(message: string): { response: string; actions?: Array<{ label: string; action: string }> } {
   const lowerMessage = message.toLowerCase();
 
-  // Booking-related queries
-  if (lowerMessage.includes('book') || lowerMessage.includes('booking')) {
-    return 'To book a braider on Braidly:\n1. Search for braiders by location and style\n2. View their profile, ratings, and availability\n3. Select your preferred date and time\n4. Choose your service and review the price\n5. Complete payment (funds held securely)\n6. Receive confirmation and braider details\n\nYour payment is protected in escrow until the service is complete. Need help with a specific booking?';
+  // BOOKING & SEARCH
+  if (lowerMessage.includes('find') || lowerMessage.includes('search') || lowerMessage.includes('braider')) {
+    return {
+      response: '🔍 I can help you find the perfect braider! You can search by:\n• Location (city or zip code)\n• Braiding style (box braids, knotless, cornrows, etc.)\n• Price range\n• Rating\n\nWhere are you located?',
+      actions: [
+        { label: '📍 Use My Location', action: 'location' },
+        { label: '🔍 Browse All', action: 'browse' },
+      ],
+    };
   }
 
+  if (lowerMessage.includes('book') || lowerMessage.includes('appointment') || lowerMessage.includes('schedule')) {
+    return {
+      response: '📅 Ready to book! Here\'s how it works:\n1. Select a braider\n2. Choose your service & style\n3. Pick date & time\n4. Secure payment (funds held safely)\n5. Get confirmation\n\nLet\'s get started!',
+      actions: [
+        { label: '📅 Book Now', action: 'book' },
+        { label: '❓ Learn More', action: 'help' },
+      ],
+    };
+  }
+
+  // PAYMENTS & PRICING
+  if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
+    return {
+      response: '💳 Payment Information:\n• Service cost (set by braider)\n• Platform fee: 15-25%\n• Taxes (varies by location)\n\nYour payment is held securely in escrow until the service is complete. You\'re fully protected!\n\nAccepted: Credit/Debit cards, Apple Pay, Google Pay',
+      actions: [
+        { label: '🔒 Security Info', action: 'security' },
+        { label: '💰 Pricing Details', action: 'pricing' },
+      ],
+    };
+  }
+
+  // CANCELLATION & REFUNDS
   if (lowerMessage.includes('cancel') || lowerMessage.includes('refund')) {
-    return 'You can cancel a booking anytime before the appointment:\n1. Go to your bookings\n2. Select the booking to cancel\n3. Click "Cancel Booking"\n4. Provide a reason (optional)\n5. Receive full refund within 2-3 business days\n\nIf you\'ve already completed the service, you can file a dispute within 7 days. Would you like help with a specific cancellation?';
+    return {
+      response: '❌ Cancellation & Refunds:\n• Cancel anytime before appointment → Full refund\n• Cancel within 24 hours → 50% refund\n• After service → File a dispute\n\nRefunds processed within 2-3 business days.',
+      actions: [
+        { label: '📋 My Bookings', action: 'bookings' },
+        { label: '💬 Contact Support', action: 'support' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('payment') || lowerMessage.includes('price')) {
-    return 'Braidly pricing includes:\n- Service cost (set by braider)\n- Platform fee (15-25% of service cost)\n- Taxes (varies by location)\n\nYour total is shown before payment. We accept all major credit/debit cards, Apple Pay, and Google Pay. All payments are secure and encrypted. Questions about a specific service?';
+  // VERIFICATION & SAFETY
+  if (lowerMessage.includes('verify') || lowerMessage.includes('verification') || lowerMessage.includes('safe') || lowerMessage.includes('safety')) {
+    return {
+      response: '✅ Safety & Verification:\n• All braiders are ID-verified\n• Government ID + Live selfie verification\n• Optional background checks (Tier 2)\n• Verified badge on profile\n• SOS button during appointments\n• 24/7 support team',
+      actions: [
+        { label: '🛡️ Safety Features', action: 'safety' },
+        { label: '👤 Become a Braider', action: 'braider' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('verify') || lowerMessage.includes('verification')) {
-    return 'All Braidly braiders are verified through:\n1. Government ID verification\n2. Live selfie capture (face match)\n3. Address confirmation\n4. Optional background check (Tier 2)\n\nVerified braiders display a blue checkmark badge. This ensures your safety and quality service. Need to verify your own account?';
-  }
-
-  if (lowerMessage.includes('emergency') || lowerMessage.includes('sos') || lowerMessage.includes('safety')) {
-    return 'Braidly Safety Features:\n- SOS Emergency Button: Available during appointments for immediate support\n- Location Tracking: Real-time location sharing with support team\n- Incident Reporting: Report safety concerns anytime\n- 24/7 Support: Contact us immediately for emergencies\n\nIf you\'re in immediate danger, call 911. For Braidly emergencies, use the SOS button in your active booking. Are you experiencing an issue right now?';
-  }
-
+  // EARNINGS & BRAIDER INFO
   if (lowerMessage.includes('earn') || lowerMessage.includes('braider') || lowerMessage.includes('income')) {
-    return 'As a Braidly Braider:\n- Set your own rates and availability\n- Receive bookings from verified customers\n- Earn $50-$200+ per appointment\n- Get paid within 2-3 days after service\n- Access analytics and customer reviews\n- Build your professional profile\n\nCommission: 15-25% platform fee. Payouts via bank transfer or instant transfer (fee applies). Ready to join as a braider?';
+    return {
+      response: '💰 Braider Earnings:\n• Set your own rates\n• Earn $50-$200+ per appointment\n• Get paid within 2-3 days\n• Platform fee: 15-25%\n• Access analytics & reviews\n• Build your professional profile\n\nReady to join?',
+      actions: [
+        { label: '👤 Sign Up as Braider', action: 'braider_signup' },
+        { label: '📊 View Earnings', action: 'earnings' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('dispute') || lowerMessage.includes('issue') || lowerMessage.includes('problem')) {
-    return 'If you have an issue with a booking:\n1. Contact the braider first to resolve\n2. If unresolved, file a dispute within 7 days\n3. Provide evidence (photos, messages, etc.)\n4. Our team reviews and makes a decision\n5. Refund or resolution within 5-7 business days\n\nCommon issues: Quality concerns, no-show, safety issues. What\'s your specific concern?';
+  // DISPUTES & ISSUES
+  if (lowerMessage.includes('dispute') || lowerMessage.includes('issue') || lowerMessage.includes('problem') || lowerMessage.includes('complaint')) {
+    return {
+      response: '⚠️ Having an issue?\n1. Contact the braider first\n2. If unresolved, file a dispute within 7 days\n3. Provide evidence (photos, messages)\n4. Our team reviews & decides\n5. Resolution within 5-7 business days\n\nWe\'ve got your back!',
+      actions: [
+        { label: '📝 File Dispute', action: 'dispute' },
+        { label: '💬 Chat Support', action: 'support' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('rating') || lowerMessage.includes('review')) {
-    return 'After your appointment:\n1. You\'ll receive a review request\n2. Rate the braider 1-5 stars\n3. Write optional comments\n4. Submit your review\n\nReviews help other customers and help braiders improve. Honest feedback is appreciated! Have you completed a booking?';
+  // REVIEWS & RATINGS
+  if (lowerMessage.includes('review') || lowerMessage.includes('rating')) {
+    return {
+      response: '⭐ Reviews & Ratings:\n• Rate braiders 1-5 stars\n• Leave detailed comments\n• Help other customers\n• Honest feedback appreciated\n• Reviews appear on braider profile\n\nYour feedback matters!',
+      actions: [
+        { label: '⭐ Leave Review', action: 'review' },
+        { label: '📊 View Ratings', action: 'ratings' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('profile') || lowerMessage.includes('account')) {
-    return 'Manage your Braidly profile:\n- Update personal information\n- Add/change profile photo\n- Manage payment methods\n- View booking history\n- Check earnings (braiders)\n- Update preferences\n\nGo to your dashboard and click "Profile" or "Settings". Need help with a specific profile update?';
+  // ACCOUNT & PROFILE
+  if (lowerMessage.includes('profile') || lowerMessage.includes('account') || lowerMessage.includes('settings')) {
+    return {
+      response: '👤 Account Management:\n• Update personal info\n• Change profile photo\n• Manage payment methods\n• View booking history\n• Update preferences\n• Download data\n\nGo to your dashboard → Profile/Settings',
+      actions: [
+        { label: '⚙️ Settings', action: 'settings' },
+        { label: '👤 My Profile', action: 'profile' },
+      ],
+    };
   }
 
-  if (lowerMessage.includes('help') || lowerMessage.includes('support') || lowerMessage.includes('contact')) {
-    return 'Braidly Support:\n- Email: support@braidly.com\n- Chat: Available 24/7 in app\n- Phone: 1-800-BRAIDLY\n- Help Center: braidly.com/help\n\nFor urgent issues, use the SOS button or call our emergency line. How can we help you today?';
+  // REFERRALS
+  if (lowerMessage.includes('refer') || lowerMessage.includes('referral') || lowerMessage.includes('invite')) {
+    return {
+      response: '🎁 Referral Program:\n• Share your unique link\n• Get $10 credit per referral\n• Braiders get 3 months reduced commission\n• Unlimited referrals!\n• Track your earnings\n\nStart earning today!',
+      actions: [
+        { label: '🔗 Get Referral Link', action: 'referral' },
+        { label: '💰 My Earnings', action: 'earnings' },
+      ],
+    };
   }
 
-  // Default response
-  return 'I\'m here to help! You can ask me about:\n- Booking a braider\n- Cancellations and refunds\n- Payments and pricing\n- Braider verification\n- Safety features\n- Earning as a braider\n- Disputes and issues\n- Account management\n\nWhat would you like to know?';
+  // HELP & SUPPORT
+  if (lowerMessage.includes('help') || lowerMessage.includes('support') || lowerMessage.includes('contact') || lowerMessage.includes('question')) {
+    return {
+      response: '📞 Braidly Support:\n• Email: support@braidly.com\n• Chat: 24/7 in app\n• Phone: 1-800-BRAIDLY\n• Help Center: braidly.com/help\n\nFor emergencies during appointments, use the SOS button!',
+      actions: [
+        { label: '💬 Chat Support', action: 'support' },
+        { label: '📧 Email Us', action: 'email' },
+      ],
+    };
+  }
+
+  // DEFAULT - MAIN MENU
+  return {
+    response: 'Welcome to Braidly! 👋 I can help you with:\n• Finding & booking braiders\n• Payments & refunds\n• Safety & verification\n• Account management\n• Disputes & issues\n• Referrals & earnings\n\nWhat would you like to do?',
+    actions: [
+      { label: '🔍 Find Braiders', action: 'search' },
+      { label: '📅 Book Now', action: 'book' },
+      { label: '💬 Contact Support', action: 'support' },
+    ],
+  };
 }

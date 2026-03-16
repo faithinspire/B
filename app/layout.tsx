@@ -4,6 +4,7 @@ import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
 import { PageBackground } from './components/PageBackground';
 import { AIAssistant } from './components/AIAssistant';
+import { ServiceWorkerRegister } from './components/ServiceWorkerRegister';
 import './globals.css';
 
 // Force dynamic rendering for all routes
@@ -42,12 +43,20 @@ export default function RootLayout({
     <html lang="en" className={`${playfair.variable} ${dmSans.variable}`}>
       <head>
         <meta name="theme-color" content="#9333ea" />
+        <meta name="description" content="Connect with verified braiders for premium braiding services" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Braidly" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-sans bg-transparent text-gray-900">
         <PageBackground />
         <AuthInitializer />
+        <ServiceWorkerRegister />
         <AIAssistant />
         
         {/* Fixed container that holds everything */}
