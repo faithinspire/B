@@ -4,8 +4,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
-import { Send, Check, CheckCheck } from 'lucide-react';
+import { Send, Check, CheckCheck, MapPin } from 'lucide-react';
 import { useConversationSubscription } from '@/app/hooks/useConversationSubscription';
+import { CustomerLocationMap } from '@/app/components/CustomerLocationMap';
 
 interface Message {
   id: string;
@@ -39,6 +40,7 @@ export default function CustomerChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected'>('connected');
+  const [showLocationMap, setShowLocationMap] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { isConnected } = useConversationSubscription(
@@ -174,7 +176,7 @@ export default function CustomerChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="p-4 flex items-center justify-between">
             <button
@@ -195,75 +197,111 @@ export default function CustomerChatPage() {
                 )}
               </p>
             </div>
-            <div className="w-8"></div>
+            <button
+              onClick={() => setShowLocationMap(!showLocationMap)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="View location"
+            >
+              <MapPin className="w-5 h-5 text-primary-600" />
+            </button>
           </div>
         </div>
 
-        <div className="p-4 space-y-4 min-h-[calc(100vh-200px)]">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-gray-500">No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs px-4 py-2 rounded-lg ${
-                    msg.sender_id === user.id
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-200 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm">{msg.content}</p>
-                  <div className="flex items-center gap-1 mt-1 text-xs opacity-70">
-                    <span>
-                      {new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    {msg.sender_id === user.id && (
-                      msg.is_read ? (
-                        <CheckCheck className="w-3 h-3" />
-                      ) : (
-                        <Check className="w-3 h-3" />
-                      )
-                    )}
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+          {/* Chat Section */}
+          <div className="lg:col-span-2 flex flex-col h-[600px] bg-white rounded-lg shadow">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">No messages yet. Start the conversation!</p>
                 </div>
-              </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+              ) : (
+                messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-xs px-4 py-2 rounded-lg ${
+                        msg.sender_id === user.id
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-200 text-gray-900'
+                      }`}
+                    >
+                      <p className="text-sm">{msg.content}</p>
+                      <div className="flex items-center gap-1 mt-1 text-xs opacity-70">
+                        <span>
+                          {new Date(msg.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {msg.sender_id === user.id && (
+                          msg.is_read ? (
+                            <CheckCheck className="w-3 h-3" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-          <div className="max-w-2xl mx-auto">
-            {error && (
-              <div className="mb-2 p-2 bg-red-50 text-red-700 text-sm rounded">
-                {error}
+            {/* Input */}
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
+              {error && (
+                <div className="mb-2 p-2 bg-red-50 text-red-700 text-sm rounded">
+                  {error}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  disabled={sending}
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !newMessage.trim()}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Location Section */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Location Map */}
+            {showLocationMap && (
+              <div className="bg-white rounded-lg shadow p-4 h-[300px]">
+                <CustomerLocationMap braiderName={conversation.braider_name} />
               </div>
             )}
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                disabled={sending}
-              />
-              <button
-                type="submit"
-                disabled={sending || !newMessage.trim()}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+
+            {/* Booking Info */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Booking Info</h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <p className="text-gray-600">Booking ID</p>
+                  <p className="font-mono text-gray-900">{booking_id}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Status</p>
+                  <p className="capitalize text-gray-900">{conversation.status}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

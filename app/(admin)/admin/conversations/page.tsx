@@ -183,66 +183,80 @@ export default function AdminConversationsPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Booking ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Customer</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Braider</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Messages</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Last Message</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredConversations.map((conv) => (
-                    <tr key={conv.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-mono text-gray-900">{conv.booking_id}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{conv.customer_name || 'Unknown'}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{conv.braider_name || 'Unknown'}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            conv.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : conv.status === 'completed'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {conv.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{conv.message_count || 0}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 line-clamp-1">
-                        {conv.last_message || 'No messages'}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <button
-                          onClick={() => setSelectedConversation(selectedConversation === conv.id ? null : conv.id)}
-                          className="text-primary-600 hover:text-primary-700 font-semibold flex items-center gap-1"
-                        >
-                          {selectedConversation === conv.id ? (
-                            <>
-                              <EyeOff className="w-4 h-4" />
-                              Hide
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-4 h-4" />
-                              View
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {filteredConversations.map((conv) => (
+              <div
+                key={conv.id}
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 md:p-6 flex flex-col"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600 mb-1">Booking ID</p>
+                    <p className="text-sm font-mono text-gray-900">{conv.booking_id.substring(0, 12)}</p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                      conv.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : conv.status === 'completed'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {conv.status}
+                  </span>
+                </div>
+
+                {/* Card Info */}
+                <div className="space-y-3 mb-4 flex-1">
+                  <div>
+                    <p className="text-xs text-gray-600">Customer</p>
+                    <p className="text-sm text-gray-900">{conv.customer_name || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Braider</p>
+                    <p className="text-sm text-gray-900">{conv.braider_name || 'Unknown'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-600">Messages</p>
+                      <p className="text-lg font-bold text-gray-900">{conv.message_count || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Started</p>
+                      <p className="text-gray-900">{new Date(conv.started_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  {conv.last_message && (
+                    <div>
+                      <p className="text-xs text-gray-600">Last Message</p>
+                      <p className="text-sm text-gray-900 line-clamp-2">{conv.last_message}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer */}
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setSelectedConversation(selectedConversation === conv.id ? null : conv.id)}
+                    className="w-full px-3 py-2 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-smooth font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    {selectedConversation === conv.id ? (
+                      <>
+                        <EyeOff className="w-4 h-4" />
+                        Hide
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4" />
+                        View
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

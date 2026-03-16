@@ -171,49 +171,60 @@ export default function SearchPage() {
                 <p className="text-gray-600 text-sm sm:text-base md:text-lg">No braiders found matching your criteria</p>
               </div>
             ) : (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {braiders.map((braider) => (
                   <Link
                     key={braider.id}
                     href={`/braider/${braider.user_id || braider.id}`}
-                    className="bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 sm:p-4 md:p-6 flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6"
+                    className="bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all overflow-hidden flex flex-col h-full"
                   >
-                    <div className="w-20 sm:w-24 h-20 sm:h-24 bg-gradient-to-br from-primary-200 to-accent-200 rounded-lg flex-shrink-0 flex items-center justify-center">
+                    {/* Card Header with Avatar */}
+                    <div className="relative h-32 sm:h-40 bg-gradient-to-br from-primary-200 to-accent-200 flex items-center justify-center overflow-hidden">
                       {braider.avatar_url ? (
-                        <img src={braider.avatar_url} alt={braider.full_name} className="w-full h-full object-cover rounded-lg" />
+                        <img src={braider.avatar_url} alt={braider.full_name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-2xl sm:text-3xl">💇</span>
+                        <span className="text-5xl sm:text-6xl">💇</span>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2 flex-wrap gap-2">
-                        <div>
-                          <h3 className="text-sm sm:text-base md:text-lg font-semibold">{braider.full_name}</h3>
-                          <div className="flex items-center gap-1 sm:gap-2 mt-1">
-                            <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-xs sm:text-sm font-medium">{braider.rating_avg.toFixed(1)}</span>
-                            <span className="text-xs text-gray-500">({braider.rating_count})</span>
-                          </div>
+
+                    {/* Card Content */}
+                    <div className="p-3 sm:p-4 md:p-5 flex-1 flex flex-col">
+                      <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1">{braider.full_name}</h3>
+                      
+                      {/* Rating */}
+                      <div className="flex items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
+                        <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs sm:text-sm font-medium text-gray-900">{braider.rating_avg.toFixed(1)}</span>
+                        <span className="text-xs text-gray-500">({braider.rating_count})</span>
+                      </div>
+
+                      {/* Bio */}
+                      <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2 flex-1">{braider.bio}</p>
+
+                      {/* Info */}
+                      <div className="space-y-2 mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <MapPin className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
+                          <span>{braider.travel_radius_miles} mi radius</span>
                         </div>
-                        {braider.verification_status !== 'unverified' && (
-                          <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full whitespace-nowrap">
+                        <div>
+                          From ${braider.services.length > 0 ? Math.min(...braider.services.map(s => s.price)).toFixed(2) : 'N/A'}
+                        </div>
+                      </div>
+
+                      {/* Verification Badge */}
+                      {braider.verification_status !== 'unverified' && (
+                        <div className="mb-3 sm:mb-4">
+                          <span className="inline-block px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
                             ✓ Verified
                           </span>
-                        )}
-                      </div>
-                      <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{braider.bio}</p>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 sm:w-4 h-3 sm:h-4" />
-                            <span>{braider.travel_radius_miles} mi</span>
-                          </div>
-                          <span>From ${braider.services.length > 0 ? Math.min(...braider.services.map(s => s.price)).toFixed(2) : 'N/A'}</span>
                         </div>
-                        <Link href={`/booking`} className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-xs sm:text-sm font-semibold text-center">
-                          Book Now
-                        </Link>
-                      </div>
+                      )}
+
+                      {/* Action Button */}
+                      <Link href={`/booking`} className="w-full px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-xs sm:text-sm font-semibold text-center">
+                        Book Now
+                      </Link>
                     </div>
                   </Link>
                 ))}

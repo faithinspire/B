@@ -55,7 +55,7 @@ export default function BraiderVerify() {
     loadProfile();
   }, [user]);
 
-  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: 'id' | 'selfie') => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
@@ -63,21 +63,46 @@ export default function BraiderVerify() {
       setUploading(true);
       setError('');
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', user.id);
+      if (!supabase) throw new Error('Supabase not initialized');
 
-      const response = await fetch('/api/upload/avatar', {
-        method: 'POST',
-        body: formData,
-      });
+      // Upload to Supabase storage
+      const fileName = `${user.id}/${docType}/${Date.now()}-${file.name}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('verification-documents')
+        .upload(fileName, file, { upsert: true });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+      if (uploadErr) throw uploadErr;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('verification-documents')
+        .getPublicUrl(fileName);
+
+      // Update braider profile with document URL
+      const updateData: any = {};
+      if (docType === 'id') {
+        updateData.id_document_url = publicUrl;
+      } else {
+        updateData.selfie_url = publicUrl;
       }
+      updateData.verification_status = 'pending';
 
-      setError('Document uploaded. Our team will review it shortly.');
+      const { error: updateErr } = await supabase
+        .from('braider_profiles')
+        .update(updateData)
+        .eq('user_id', user.id);
+
+      if (updateErr) throw updateErr;
+
+      // Reload profile
+      const { data: updatedProfile } = await supabase
+        .from('braider_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (updatedProfile) setProfile(updatedProfile);
+      setError(`${docType === 'id' ? 'ID' : 'Selfie'} uploaded successfully. Our team will review it shortly.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -159,13 +184,16 @@ export default function BraiderVerify() {
                 <input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={handleDocumentUpload}
+                  onChange={(e) => handleDocumentUpload(e, 'id')}
                   disabled={uploading}
                   className="hidden"
                 />
               </label>
+              {profile?.id_document_url && (
+                <p className="text-xs text-green-600 mt-2">✓ ID document uploaded</p>
+              )}
             </div>
-            {verificationStatus !== 'unverified' && (
+            {profile?.id_document_url && (
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
             )}
           </div>
@@ -175,6 +203,53 @@ export default function BraiderVerify() {
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold">
               3
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">Upload Selfie</h3>
+              <p className="text-gray-600 text-sm mt-1">Upload a clear selfie for identity verification.</p>
+              <label className="mt-3 inline-block">
+                <div className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer flex items-center gap-2 text-sm">
+                  <Upload className="w-4 h-4" />
+                  {uploading ? 'Uploading...' : 'Upload Selfie'}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleDocumentUpload(e, 'selfie')}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+              {profile?.selfie_url && (
+                <p className="text-xs text-green-600 mt-2">✓ Selfie uploaded</p>
+              )}
+            </div>
+            {profile?.selfie_url && (
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold">
+              4
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">Background Check</h3>
+              <p className="text-gray-600 text-sm mt-1">Optional: Complete a background check to increase customer trust.</p>
+              <button className="mt-3 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm font-semibold">
+                <Upload className="w-4 h-4" />
+                Request Background Check
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold">
+              5
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-gray-900">Review & Approval</h3>

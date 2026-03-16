@@ -230,44 +230,60 @@ export default function AdminPaymentsPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm md:text-base">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Booking</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">Customer</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Braider</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Amount</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden lg:table-cell">Method</th>
-                    <th className="px-3 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden lg:table-cell">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm font-mono text-gray-900">{payment.booking_id.substring(0, 8)}</td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm text-gray-900 hidden sm:table-cell">{payment.customer_name || 'Unknown'}</td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm text-gray-900 hidden md:table-cell">{payment.braider_name || 'Unknown'}</td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm font-semibold text-gray-900">${payment.amount.toFixed(2)}</td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm">
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(payment.status)}
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(payment.status)}`}>
-                            {payment.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm text-gray-600 capitalize hidden lg:table-cell">{payment.payment_method}</td>
-                      <td className="px-3 md:px-6 py-4 text-xs md:text-sm text-gray-600 hidden lg:table-cell">
-                        {new Date(payment.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {filteredPayments.map((payment) => (
+              <div
+                key={payment.id}
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 md:p-6 flex flex-col"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600 mb-1">Booking ID</p>
+                    <p className="text-sm font-mono text-gray-900">{payment.booking_id.substring(0, 12)}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {getStatusIcon(payment.status)}
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(payment.status)}`}>
+                      {payment.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Info */}
+                <div className="space-y-3 mb-4 flex-1">
+                  <div>
+                    <p className="text-xs text-gray-600">Customer</p>
+                    <p className="text-sm text-gray-900">{payment.customer_name || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Braider</p>
+                    <p className="text-sm text-gray-900">{payment.braider_name || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Amount</p>
+                    <p className="text-lg font-bold text-gray-900">${payment.amount.toFixed(2)}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-600">Method</p>
+                      <p className="text-gray-900 capitalize">{payment.payment_method}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Date</p>
+                      <p className="text-gray-900">{new Date(payment.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer */}
+                <div className="pt-4 border-t border-gray-200">
+                  <button className="w-full px-3 py-2 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-smooth font-semibold text-sm">
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
