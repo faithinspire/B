@@ -5,15 +5,16 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import Link from 'next/link';
 import {
-  BarChart3,
   Users,
   MessageSquare,
   DollarSign,
-  TrendingUp,
   AlertCircle,
   RefreshCw,
+  BarChart3,
   AlertTriangle,
+  TrendingUp,
 } from 'lucide-react';
 
 interface DashboardStats {
