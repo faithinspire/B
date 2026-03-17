@@ -43,6 +43,9 @@ export default function BraiderSignupPage() {
     id_document_url: '',
     selfie_url: '',
     background_check_consent: false,
+    next_of_kin_name: '',
+    next_of_kin_phone: '',
+    next_of_kin_relationship: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -130,6 +133,9 @@ export default function BraiderSignupPage() {
     if (stepNum === 5) {
       if (!formData.id_document_url) newErrors.id_document_url = 'ID document is required';
       if (!formData.selfie_url) newErrors.selfie_url = 'Selfie is required';
+      if (!formData.next_of_kin_name) newErrors.next_of_kin_name = 'Next of kin name is required';
+      if (!formData.next_of_kin_phone) newErrors.next_of_kin_phone = 'Next of kin phone is required';
+      if (!formData.next_of_kin_relationship) newErrors.next_of_kin_relationship = 'Relationship is required';
     }
 
     setErrors(newErrors);
@@ -488,7 +494,7 @@ export default function BraiderSignupPage() {
             {step === 5 && (
               <div className="space-y-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-blue-700 font-semibold mb-2">Verification Required</p>
+                  <p className="text-sm text-blue-700 font-semibold mb-2">Verification & Security</p>
                   <p className="text-xs text-blue-600">
                     We verify all braiders to ensure platform safety. Your documents are encrypted and secure.
                   </p>
@@ -550,6 +556,53 @@ export default function BraiderSignupPage() {
                     </label>
                   </div>
                   {errors.selfie_url && <p className="text-xs text-red-600 mt-1">{errors.selfie_url}</p>}
+                </div>
+
+                {/* Next of Kin Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Next of Kin (Emergency Contact) *</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
+                    <input
+                      type="text"
+                      value={formData.next_of_kin_name}
+                      onChange={(e) => setFormData({ ...formData, next_of_kin_name: e.target.value })}
+                      className={`input-field text-lg ${errors.next_of_kin_name ? 'border-red-500' : ''}`}
+                      placeholder="Jane Doe"
+                    />
+                    {errors.next_of_kin_name && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_name}</p>}
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
+                    <input
+                      type="tel"
+                      value={formData.next_of_kin_phone}
+                      onChange={(e) => setFormData({ ...formData, next_of_kin_phone: e.target.value })}
+                      className={`input-field text-lg ${errors.next_of_kin_phone ? 'border-red-500' : ''}`}
+                      placeholder="+1 (555) 000-0000"
+                    />
+                    {errors.next_of_kin_phone && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_phone}</p>}
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Relationship *</label>
+                    <select
+                      value={formData.next_of_kin_relationship}
+                      onChange={(e) => setFormData({ ...formData, next_of_kin_relationship: e.target.value })}
+                      className={`input-field text-lg ${errors.next_of_kin_relationship ? 'border-red-500' : ''}`}
+                    >
+                      <option value="">Select relationship</option>
+                      <option value="Parent">Parent</option>
+                      <option value="Sibling">Sibling</option>
+                      <option value="Spouse">Spouse</option>
+                      <option value="Child">Child</option>
+                      <option value="Friend">Friend</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {errors.next_of_kin_relationship && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_relationship}</p>}
+                  </div>
                 </div>
 
                 <div className="flex items-start gap-3">

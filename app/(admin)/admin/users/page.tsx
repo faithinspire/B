@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
-import { Search, Trash2, Eye, AlertCircle, Loader, Filter, X } from 'lucide-react';
+import { Search, Trash2, Eye, AlertCircle, Loader, X } from 'lucide-react';
 
 interface User {
   id: string;
@@ -75,16 +75,20 @@ export default function AdminUsersPage() {
     fetchUsers();
 
     // Real-time subscription
-    const subscription = supabase
-      .channel('admin_users')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'auth.users' },
-        () => fetchUsers()
-      )
-      .subscribe();
+    if (supabase) {
+      const subscription = supabase
+        .channel('admin_users')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'auth.users' },
+          () => fetchUsers()
+        )
+        .subscribe();
 
-    return () => subscription.unsubscribe();
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, [user, authLoading, fetchUsers]);
 
   const filteredUsers = useMemo(() => {

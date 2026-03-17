@@ -23,6 +23,9 @@ export default function CustomerSignupPage() {
     confirmPassword: '',
     default_address: '',
     preferred_contact: 'email' as 'email' | 'sms' | 'in_app',
+    next_of_kin_name: '',
+    next_of_kin_phone: '',
+    next_of_kin_relationship: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -40,6 +43,12 @@ export default function CustomerSignupPage() {
 
     if (stepNum === 2) {
       if (!formData.default_address) newErrors.default_address = 'Address is required';
+    }
+
+    if (stepNum === 3) {
+      if (!formData.next_of_kin_name) newErrors.next_of_kin_name = 'Next of kin name is required';
+      if (!formData.next_of_kin_phone) newErrors.next_of_kin_phone = 'Next of kin phone is required';
+      if (!formData.next_of_kin_relationship) newErrors.next_of_kin_relationship = 'Relationship is required';
     }
 
     setErrors(newErrors);
@@ -118,7 +127,7 @@ export default function CustomerSignupPage() {
           {/* Progress Bar */}
           <div className="px-8 pt-6">
             <div className="flex gap-2">
-              {[1, 2].map((s) => (
+              {[1, 2, 3].map((s) => (
                 <div
                   key={s}
                   className={`flex-1 h-2 rounded-full transition-all ${
@@ -139,6 +148,7 @@ export default function CustomerSignupPage() {
 
           {/* Form Content */}
           <form onSubmit={handleSubmit} className="px-8 py-8">
+            <p className="text-sm text-gray-600 mb-6">Step {step} of 3</p>
             {/* Step 1: Account Information */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
@@ -250,6 +260,59 @@ export default function CustomerSignupPage() {
               </div>
             )}
 
+            {/* Step 3: Next of Kin (Security) */}
+            {step === 3 && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-700">
+                    🔒 <strong>Security Information:</strong> We collect next of kin details for your safety and security.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Next of Kin Name *</label>
+                  <input
+                    type="text"
+                    value={formData.next_of_kin_name}
+                    onChange={(e) => setFormData({ ...formData, next_of_kin_name: e.target.value })}
+                    className={`input-field text-lg transition-smooth ${errors.next_of_kin_name ? 'border-red-500' : ''}`}
+                    placeholder="Jane Doe"
+                  />
+                  {errors.next_of_kin_name && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_name}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Next of Kin Phone *</label>
+                  <input
+                    type="tel"
+                    value={formData.next_of_kin_phone}
+                    onChange={(e) => setFormData({ ...formData, next_of_kin_phone: e.target.value })}
+                    className={`input-field text-lg transition-smooth ${errors.next_of_kin_phone ? 'border-red-500' : ''}`}
+                    placeholder="+1 (555) 000-0000"
+                  />
+                  {errors.next_of_kin_phone && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_phone}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Relationship *</label>
+                  <select
+                    value={formData.next_of_kin_relationship}
+                    onChange={(e) => setFormData({ ...formData, next_of_kin_relationship: e.target.value })}
+                    className={`input-field text-lg transition-smooth ${errors.next_of_kin_relationship ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">Select relationship</option>
+                    <option value="Parent">Parent</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Child">Child</option>
+                    <option value="Friend">Friend</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {errors.next_of_kin_relationship && <p className="text-xs text-red-600 mt-1">{errors.next_of_kin_relationship}</p>}
+                </div>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="flex gap-4 mt-8">
               {step > 1 && (
@@ -263,7 +326,7 @@ export default function CustomerSignupPage() {
                 </button>
               )}
 
-              {step < 2 ? (
+              {step < 3 ? (
                 <button
                   type="button"
                   onClick={handleNext}
