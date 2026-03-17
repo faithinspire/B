@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS user_metadata (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create notifications table (without booking_id foreign key initially)
+-- Create notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create location_tracking table (without booking_id foreign key initially)
+-- Create location_tracking table
 CREATE TABLE IF NOT EXISTS location_tracking (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID,
@@ -68,9 +68,15 @@ CREATE POLICY "Users can view their own notifications" ON notifications
 CREATE POLICY "Users can update their own notifications" ON notifications
   FOR UPDATE USING (auth.uid() = user_id);
 
+CREATE POLICY "Service role can insert notifications" ON notifications
+  FOR INSERT WITH CHECK (true);
+
 -- RLS Policies for location_tracking
 CREATE POLICY "Braiders can view their own location tracking" ON location_tracking
   FOR SELECT USING (auth.uid() = braider_id);
 
 CREATE POLICY "Braiders can insert their own location" ON location_tracking
   FOR INSERT WITH CHECK (auth.uid() = braider_id);
+
+CREATE POLICY "Service role can insert location" ON location_tracking
+  FOR INSERT WITH CHECK (true);
