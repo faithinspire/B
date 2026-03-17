@@ -133,9 +133,13 @@ export default function BraiderSignupPage() {
     if (stepNum === 5) {
       if (!formData.id_document_url) newErrors.id_document_url = 'ID document is required';
       if (!formData.selfie_url) newErrors.selfie_url = 'Selfie is required';
-      if (!formData.next_of_kin_name) newErrors.next_of_kin_name = 'Next of kin name is required';
-      if (!formData.next_of_kin_phone) newErrors.next_of_kin_phone = 'Next of kin phone is required';
-      if (!formData.next_of_kin_relationship) newErrors.next_of_kin_relationship = 'Relationship is required';
+      // Next of kin is optional - only validate if at least one field is filled
+      const hasNextOfKin = formData.next_of_kin_name || formData.next_of_kin_phone || formData.next_of_kin_relationship;
+      if (hasNextOfKin) {
+        if (!formData.next_of_kin_name) newErrors.next_of_kin_name = 'Name is required if providing next of kin';
+        if (!formData.next_of_kin_phone) newErrors.next_of_kin_phone = 'Phone is required if providing next of kin';
+        if (!formData.next_of_kin_relationship) newErrors.next_of_kin_relationship = 'Relationship is required if providing next of kin';
+      }
     }
 
     setErrors(newErrors);
@@ -560,10 +564,10 @@ export default function BraiderSignupPage() {
 
                 {/* Next of Kin Section */}
                 <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Next of Kin (Emergency Contact) *</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Next of Kin (Emergency Contact) - Optional</h3>
                   
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Name</label>
                     <input
                       type="text"
                       value={formData.next_of_kin_name}
@@ -575,7 +579,7 @@ export default function BraiderSignupPage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
                     <input
                       type="tel"
                       value={formData.next_of_kin_phone}
@@ -587,7 +591,7 @@ export default function BraiderSignupPage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Relationship *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Relationship</label>
                     <select
                       value={formData.next_of_kin_relationship}
                       onChange={(e) => setFormData({ ...formData, next_of_kin_relationship: e.target.value })}

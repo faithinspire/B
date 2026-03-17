@@ -1,18 +1,7 @@
--- COMPLETE FORCE BYPASS - DROPS ALL EXISTING POLICIES AND RECREATES CLEAN
--- This will work even if there are existing constraints or policies
+-- COMPLETE FORCE BYPASS - CREATES CLEAN TABLES WITHOUT DEPENDENCIES
+-- This bypasses all foreign key and policy errors
 
--- Step 1: Drop all existing policies (if they exist)
-DROP POLICY IF EXISTS "Users can view their own metadata" ON user_metadata;
-DROP POLICY IF EXISTS "Users can update their own metadata" ON user_metadata;
-DROP POLICY IF EXISTS "Users can insert their own metadata" ON user_metadata;
-DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
-DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
-DROP POLICY IF EXISTS "Service role can insert notifications" ON notifications;
-DROP POLICY IF EXISTS "Braiders can view their own location tracking" ON location_tracking;
-DROP POLICY IF EXISTS "Braiders can insert their own location" ON location_tracking;
-DROP POLICY IF EXISTS "Service role can insert location" ON location_tracking;
-
--- Step 2: Drop all existing tables (if they exist)
+-- Step 1: Drop all existing tables (if they exist) - CASCADE handles policies automatically
 DROP TABLE IF EXISTS location_tracking CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS user_metadata CASCADE;

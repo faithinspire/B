@@ -45,12 +45,6 @@ export default function CustomerSignupPage() {
       if (!formData.default_address) newErrors.default_address = 'Address is required';
     }
 
-    if (stepNum === 3) {
-      if (!formData.next_of_kin_name) newErrors.next_of_kin_name = 'Next of kin name is required';
-      if (!formData.next_of_kin_phone) newErrors.next_of_kin_phone = 'Next of kin phone is required';
-      if (!formData.next_of_kin_relationship) newErrors.next_of_kin_relationship = 'Relationship is required';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -127,7 +121,7 @@ export default function CustomerSignupPage() {
           {/* Progress Bar */}
           <div className="px-8 pt-6">
             <div className="flex gap-2">
-              {[1, 2, 3].map((s) => (
+              {[1, 2].map((s) => (
                 <div
                   key={s}
                   className={`flex-1 h-2 rounded-full transition-all ${
@@ -148,7 +142,7 @@ export default function CustomerSignupPage() {
 
           {/* Form Content */}
           <form onSubmit={handleSubmit} className="px-8 py-8">
-            <p className="text-sm text-gray-600 mb-6">Step {step} of 3</p>
+            <p className="text-sm text-gray-600 mb-6">Step {step} of 2</p>
             {/* Step 1: Account Information */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
@@ -326,7 +320,7 @@ export default function CustomerSignupPage() {
                 </button>
               )}
 
-              {step < 3 ? (
+              {step < 2 ? (
                 <button
                   type="button"
                   onClick={handleNext}
