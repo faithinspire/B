@@ -94,15 +94,29 @@ export async function GET(request: NextRequest) {
     const transformedUsers = (users?.users || [])
       .map((u: any) => {
         const profile = profilesMap[u.id];
+        // Try multiple sources for name
+        const full_name =
+          profile?.full_name ||
+          u.user_metadata?.full_name ||
+          u.user_metadata?.name ||
+          u.raw_user_meta_data?.full_name ||
+          u.raw_user_meta_data?.name ||
+          u.email?.split('@')[0] ||
+          'Unknown';
+        const role =
+          profile?.role ||
+          u.user_metadata?.role ||
+          u.raw_user_meta_data?.role ||
+          'customer';
         return {
           id: u.id,
-          email: u.email,
-          full_name: profile?.full_name || u.user_metadata?.full_name || 'Unknown',
-          role: profile?.role || u.user_metadata?.role || 'customer',
+          email: u.email || '',
+          full_name,
+          role,
           created_at: u.created_at,
+          phone: u.phone || u.user_metadata?.phone || '',
         };
       })
-      // Sort newest first
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return NextResponse.json(transformedUsers);

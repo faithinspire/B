@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
@@ -33,25 +33,16 @@ export function useBraiderSubscription(
   const { user } = useSupabaseAuthStore();
   const [isConnected, setIsConnected] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-
-  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const cleanup = useCallback(() => {
-    channelsRef.current.forEach((ch) => {
-      try { supabase.removeChannel(ch); } catch {}
-    });
-    channelsRef.current = [];
-  }, []);
-
   // Get conversation ID
   useEffect(() => {
-    if (!user || !booking_id) return;
+    if (!user || !booking_id || !supabase) return;
 
     const getConversationId = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase!
           .from('conversations')
           .select('id')
           .eq('booking_id', booking_id)
@@ -68,20 +59,16 @@ export function useBraiderSubscription(
     getConversationId();
   }, [user, booking_id]);
 
-  // Subscribe to messages using new Realtime API
+  // Subscribe to messages
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !supabase) return;
 
-    const channel = supabase
+    const sb = supabase!;
+    const channel = sb
       .channel(`braider-messages-${conversationId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           if (payload.new && mountedRef.current && onNewMessage) {
             onNewMessage(payload.new as Message);
@@ -94,40 +81,27 @@ export function useBraiderSubscription(
           setIsConnected(true);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           setIsConnected(false);
-          // Auto-reconnect after 3s
           reconnectTimeoutRef.current = setTimeout(() => {
-            if (mountedRef.current) {
-              supabase.removeChannel(channel);
-              channelsRef.current = channelsRef.current.filter((c) => c !== channel);
-            }
+            if (mountedRef.current) sb.removeChannel(channel);
           }, 3000);
         } else if (status === 'CLOSED') {
           setIsConnected(false);
         }
       });
 
-    channelsRef.current.push(channel);
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelsRef.current = channelsRef.current.filter((c) => c !== channel);
-    };
+    return () => { sb.removeChannel(channel); };
   }, [conversationId, onNewMessage]);
 
   // Subscribe to location updates
   useEffect(() => {
-    if (!booking_id) return;
+    if (!booking_id || !supabase) return;
 
-    const channel = supabase
+    const sb = supabase!;
+    const channel = sb
       .channel(`braider-location-sub-${booking_id}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'location_tracking',
-          filter: `booking_id=eq.${booking_id}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'location_tracking', filter: `booking_id=eq.${booking_id}` },
         (payload) => {
           if (payload.new && mountedRef.current && onLocationUpdate) {
             onLocationUpdate(payload.new as LocationUpdate);
@@ -136,12 +110,7 @@ export function useBraiderSubscription(
       )
       .subscribe();
 
-    channelsRef.current.push(channel);
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelsRef.current = channelsRef.current.filter((c) => c !== channel);
-    };
+    return () => { sb.removeChannel(channel); };
   }, [booking_id, onLocationUpdate]);
 
   useEffect(() => {
@@ -149,9 +118,8 @@ export function useBraiderSubscription(
     return () => {
       mountedRef.current = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      cleanup();
     };
-  }, [cleanup]);
+  }, []);
 
   return { isConnected };
 }

@@ -110,7 +110,7 @@ export async function GET(request: Request) {
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', conv.id)
-          .eq('read', false)
+          .eq('is_read', false)
           .neq('sender_id', userId);
 
         return {

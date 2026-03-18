@@ -86,29 +86,23 @@ export default function BraiderBookingsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700';
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'confirmed':
-        return 'bg-blue-100 text-blue-700';
-      case 'completed':
-        return 'bg-green-100 text-green-700';
-      case 'cancelled':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'accepted': return 'bg-blue-100 text-blue-700';
+      case 'escrowed': return 'bg-indigo-100 text-indigo-700';
+      case 'completed': return 'bg-green-100 text-green-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return <CheckCircle className="w-5 h-5" />;
-      case 'completed':
-        return <CheckCircle className="w-5 h-5" />;
-      case 'pending':
-        return <Clock className="w-5 h-5" />;
-      default:
-        return <AlertCircle className="w-5 h-5" />;
+      case 'accepted':
+      case 'completed': return <CheckCircle className="w-5 h-5" />;
+      case 'pending': return <Clock className="w-5 h-5" />;
+      default: return <AlertCircle className="w-5 h-5" />;
     }
   };
 
@@ -208,7 +202,7 @@ export default function BraiderBookingsPage() {
                     </div>
                   )}
 
-                  {booking.status === 'confirmed' && (
+                  {(booking.status === 'confirmed' || booking.status === 'accepted') && (
                     <div className="flex gap-2 w-full sm:w-auto">
                       <Link
                         href={`/braider/messages/${booking.id}`}

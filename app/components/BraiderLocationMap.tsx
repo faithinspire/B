@@ -59,6 +59,7 @@ export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
 
   useEffect(() => {
     const fetchLocation = async () => {
+      if (!supabase) return;
       try {
         const { data: locations, error: locErr } = await supabase
           .from('location_tracking')
@@ -146,6 +147,7 @@ export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
 
   // Subscribe to live location updates
   useEffect(() => {
+    if (!supabase) return;
     const channel = supabase
       .channel(`braider-loc-map-${booking_id}`)
       .on(
@@ -177,7 +179,7 @@ export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase?.removeChannel(channel); };
   }, [booking_id, mapsLoaded]);
 
   if (!hasApiKey) {
