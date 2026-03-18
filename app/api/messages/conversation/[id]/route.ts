@@ -12,8 +12,7 @@ interface Message {
   content: string;
   message_type: string;
   metadata: Record<string, any> | null;
-  read: boolean;
-  read_at: string | null;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -132,17 +131,14 @@ export async function GET(
 
     // Mark messages as read for current user
     const unreadMessages = (messages || []).filter(
-      (msg) => !msg.read && msg.sender_id !== userId
+      (msg) => !msg.is_read && msg.sender_id !== userId
     );
 
     if (unreadMessages.length > 0) {
       const messageIds = unreadMessages.map((msg) => msg.id);
       await serviceSupabase
         .from('messages')
-        .update({
-          read: true,
-          read_at: new Date().toISOString(),
-        })
+        .update({ is_read: true })
         .in('id', messageIds);
     }
 

@@ -19,8 +19,7 @@ interface Message {
   content: string;
   message_type: string;
   metadata: Record<string, any> | null;
-  read: boolean;
-  read_at: string | null;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -110,8 +109,7 @@ export async function POST(request: Request) {
       content: body.content,
       message_type: body.message_type,
       metadata: body.metadata || null,
-      read: false,
-      read_at: null,
+      is_read: false,
       created_at: new Date().toISOString(),
     };
 
