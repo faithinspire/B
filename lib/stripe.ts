@@ -1,27 +1,30 @@
 import Stripe from 'stripe';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+let stripeInstance: Stripe | null = null;
 
-if (!stripeSecretKey) {
-  throw new Error('STRIPE_SECRET_KEY is not configured');
+function getStripeInstance(): Stripe {
+  if (!stripeInstance) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error('STRIPE_SECRET_KEY not configured');
+    }
+    stripeInstance = new Stripe(key, {
+      apiVersion: '2023-10-16',
+    });
+  }
+  return stripeInstance;
 }
 
-export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16',
-});
-
-/**
- * Create a payment intent for a booking
- */
 export async function createPaymentIntent(
   amount: number,
   currency: string = 'usd',
   customerId?: string,
-  metadata?: Record<string, string>
+  metadata?: Record<string, any>
 ) {
   try {
+    const stripe = getStripeInstance();
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
+      amount: Math.round(amount * 100),
       currency,
       customer: customerId,
       metadata: {
@@ -41,17 +44,15 @@ export async function createPaymentIntent(
   }
 }
 
-/**
- * Confirm a payment intent
- */
 export async function confirmPaymentIntent(paymentIntentId: string) {
   try {
+    const stripe = getStripeInstance();
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     return {
       success: paymentIntent.status === 'succeeded',
       status: paymentIntent.status,
-      chargeId: paymentIntent.charges.data[0]?.id,
+      chargeId: (paymentIntent as any).charges?.data?.[0]?.id,
     };
   } catch (error) {
     console.error('Failed to confirm payment intent:', error);
@@ -59,22 +60,19 @@ export async function confirmPaymentIntent(paymentIntentId: string) {
   }
 }
 
-/**
- * Create a Stripe Connect account for a braider
- */
 export async function createConnectAccount(
   email: string,
   fullName: string,
   country: string = 'US'
 ) {
   try {
+    const stripe = getStripeInstance();
     const account = await stripe.accounts.create({
       type: 'express',
-      country,
+      country: country as any,
       email,
       business_profile: {
         name: fullName,
-        product_category: 'beauty_and_personal_care',
       },
     });
 
@@ -88,15 +86,13 @@ export async function createConnectAccount(
   }
 }
 
-/**
- * Create an account link for onboarding
- */
 export async function createAccountLink(
   accountId: string,
   refreshUrl: string,
   returnUrl: string
 ) {
   try {
+    const stripe = getStripeInstance();
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       type: 'account_onboarding',
@@ -114,9 +110,6 @@ export async function createAccountLink(
   }
 }
 
-/**
- * Create a transfer to a braider's connected account
- */
 export async function createTransfer(
   amount: number,
   destinationAccountId: string,
@@ -124,8 +117,9 @@ export async function createTransfer(
   currency: string = 'usd'
 ) {
   try {
+    const stripe = getStripeInstance();
     const transfer = await stripe.transfers.create({
-      amount: Math.round(amount * 100), // Convert to cents
+      amount: Math.round(amount * 100),
       currency,
       destination: destinationAccountId,
       metadata: {
@@ -137,7 +131,7 @@ export async function createTransfer(
     return {
       success: true,
       transferId: transfer.id,
-      status: transfer.status,
+      status: (transfer as any).status,
     };
   } catch (error) {
     console.error('Failed to create transfer:', error);
@@ -145,18 +139,16 @@ export async function createTransfer(
   }
 }
 
-/**
- * Create a payout for a braider
- */
 export async function createPayout(
   accountId: string,
   amount: number,
   currency: string = 'usd'
 ) {
   try {
+    const stripe = getStripeInstance();
     const payout = await stripe.payouts.create(
       {
-        amount: Math.round(amount * 100), // Convert to cents
+        amount: Math.round(amount * 100),
         currency,
         method: 'instant',
       },
@@ -168,24 +160,22 @@ export async function createPayout(
     return {
       success: true,
       payoutId: payout.id,
-      status: payout.status,
-      arrivalDate: payout.arrival_date,
+      status: (payout as any).status,
+      arrivalDate: (payout as any).arrival_date,
     };
   } catch (error) {
     console.error('Failed to create payout:', error);
     throw error;
-    }
+  }
 }
 
-/**
- * Refund a charge
- */
 export async function refundCharge(
   chargeId: string,
   amount?: number,
   reason?: string
 ) {
   try {
+    const stripe = getStripeInstance();
     const refund = await stripe.refunds.create({
       charge: chargeId,
       amount: amount ? Math.round(amount * 100) : undefined,
@@ -198,8 +188,8 @@ export async function refundCharge(
     return {
       success: true,
       refundId: refund.id,
-      status: refund.status,
-      amount: refund.amount / 100,
+      status: (refund as any).status,
+      amount: (refund as any).amount / 100,
     };
   } catch (error) {
     console.error('Failed to refund charge:', error);
@@ -207,19 +197,17 @@ export async function refundCharge(
   }
 }
 
-/**
- * Get account balance
- */
 export async function getAccountBalance(accountId: string) {
   try {
+    const stripe = getStripeInstance();
     const balance = await stripe.balance.retrieve({
       stripeAccount: accountId,
     });
 
     return {
       success: true,
-      available: balance.available[0]?.amount || 0,
-      pending: balance.pending[0]?.amount || 0,
+      available: (balance as any).available?.[0]?.amount || 0,
+      pending: (balance as any).pending?.[0]?.amount || 0,
     };
   } catch (error) {
     console.error('Failed to get account balance:', error);
@@ -227,15 +215,13 @@ export async function getAccountBalance(accountId: string) {
   }
 }
 
-/**
- * Verify webhook signature
- */
 export function verifyWebhookSignature(
   body: string,
   signature: string,
   secret: string
-): Stripe.Event | null {
+) {
   try {
+    const stripe = getStripeInstance();
     return stripe.webhooks.constructEvent(body, signature, secret);
   } catch (error) {
     console.error('Webhook signature verification failed:', error);
@@ -243,20 +229,17 @@ export function verifyWebhookSignature(
   }
 }
 
-/**
- * Handle payment intent succeeded event
- */
 export async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
   onSuccess: (data: {
     paymentIntentId: string;
     chargeId: string;
     amount: number;
-    metadata: Record<string, string>;
+    metadata: Record<string, any>;
   }) => Promise<void>
 ) {
   try {
-    const chargeId = paymentIntent.charges.data[0]?.id;
+    const chargeId = (paymentIntent as any).charges?.data?.[0]?.id;
     if (!chargeId) throw new Error('No charge found');
 
     await onSuccess({
@@ -271,21 +254,18 @@ export async function handlePaymentIntentSucceeded(
   }
 }
 
-/**
- * Handle payment intent failed event
- */
 export async function handlePaymentIntentFailed(
   paymentIntent: Stripe.PaymentIntent,
   onFailure: (data: {
     paymentIntentId: string;
     reason: string;
-    metadata: Record<string, string>;
+    metadata: Record<string, any>;
   }) => Promise<void>
 ) {
   try {
     await onFailure({
       paymentIntentId: paymentIntent.id,
-      reason: paymentIntent.last_payment_error?.message || 'Payment failed',
+      reason: (paymentIntent as any).last_payment_error?.message || 'Payment failed',
       metadata: paymentIntent.metadata || {},
     });
   } catch (error) {
@@ -294,23 +274,20 @@ export async function handlePaymentIntentFailed(
   }
 }
 
-/**
- * Handle charge refunded event
- */
 export async function handleChargeRefunded(
   charge: Stripe.Charge,
   onRefund: (data: {
     chargeId: string;
     refundAmount: number;
     reason: string;
-    metadata: Record<string, string>;
+    metadata: Record<string, any>;
   }) => Promise<void>
 ) {
   try {
     await onRefund({
       chargeId: charge.id,
-      refundAmount: charge.amount_refunded / 100,
-      reason: charge.refunded ? 'Full refund' : 'Partial refund',
+      refundAmount: (charge as any).amount_refunded / 100,
+      reason: (charge as any).refunded ? 'Full refund' : 'Partial refund',
       metadata: charge.metadata || {},
     });
   } catch (error) {
