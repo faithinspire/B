@@ -418,12 +418,20 @@ export default function CustomerDashboard() {
 
                   <div className="flex gap-1.5 sm:gap-2 pt-2 sm:pt-3 md:pt-4 border-t border-gray-200 flex-wrap">
                     <Link
-                      href="/braider/messages"
+                      href={`/messages/${booking.id}`}
                       className="flex-1 min-w-[120px] px-2 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-xs sm:text-sm"
                     >
                       Message Braider
                     </Link>
                     {booking.status === 'pending' && (
+                      <Link
+                        href={`/booking/${booking.id}`}
+                        className="px-2 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-smooth font-semibold text-xs sm:text-sm"
+                      >
+                        Pay Now
+                      </Link>
+                    )}
+                    {booking.status === 'confirmed' && (
                       <button
                         className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition-smooth font-semibold text-xs sm:text-sm"
                       >

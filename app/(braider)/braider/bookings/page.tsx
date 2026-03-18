@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { useSupabaseBookingStore } from '@/store/supabaseBookingStore';
-import { Calendar, MapPin, DollarSign, AlertCircle, Loader, CheckCircle, Clock } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, AlertCircle, Loader, CheckCircle, Clock, MessageCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function BraiderBookingsPage() {
   const router = useRouter();
@@ -193,12 +194,21 @@ export default function BraiderBookingsPage() {
                   )}
 
                   {booking.status === 'confirmed' && (
-                    <button
-                      onClick={() => handleStatusChange(booking.id, 'completed')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-smooth font-semibold text-sm w-full sm:w-auto"
-                    >
-                      Mark Complete
-                    </button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Link
+                        href={`/braider/messages/${booking.id}`}
+                        className="flex-1 sm:flex-none px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-sm flex items-center gap-2 justify-center"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Chat
+                      </Link>
+                      <button
+                        onClick={() => handleStatusChange(booking.id, 'completed')}
+                        className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-smooth font-semibold text-sm"
+                      >
+                        Mark Complete
+                      </button>
+                    </div>
                   )}
 
                   {booking.notes && (

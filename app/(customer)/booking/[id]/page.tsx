@@ -105,10 +105,11 @@ export default function BookingDetailPage() {
   const [paymentComplete, setPaymentComplete] = useState(false);
 
   useEffect(() => {
-    fetchBooking();
-  }, [params.id]);
+    if (params?.id) fetchBooking();
+  }, [params?.id]);
 
   const fetchBooking = async () => {
+    if (!params?.id) return;
     try {
       const response = await fetch(`/api/bookings/${params.id}`);
       
@@ -194,7 +195,15 @@ export default function BookingDetailPage() {
               {booking.status === 'confirmed' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
                   <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-blue-700">Your booking is confirmed. The braider will meet you at the scheduled time.</p>
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-700">Your booking is confirmed. The braider will meet you at the scheduled time.</p>
+                    <button
+                      onClick={() => router.push(`/messages/${booking.id}`)}
+                      className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm"
+                    >
+                      Chat with Braider
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -279,6 +288,13 @@ export default function BookingDetailPage() {
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
                 <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
                 <p className="text-green-700 font-semibold">Payment Successful!</p>
+                <p className="text-green-600 text-sm mt-1">Your booking is confirmed.</p>
+                <button
+                  onClick={() => router.push(`/messages/${booking.id}`)}
+                  className="mt-3 w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm"
+                >
+                  Chat with Braider →
+                </button>
               </div>
             )}
           </div>
