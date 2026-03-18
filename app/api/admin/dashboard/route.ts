@@ -15,20 +15,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
 
-    // Get total users
+    // Get total users from profiles table
     const { count: totalUsers } = await serviceSupabase
-      .from('users')
+      .from('profiles')
       .select('*', { count: 'exact', head: true });
 
     // Get braiders
     const { count: totalBraiders } = await serviceSupabase
-      .from('users')
+      .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('role', 'braider');
 
     // Get customers
     const { count: totalCustomers } = await serviceSupabase
-      .from('users')
+      .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('role', 'customer');
 
