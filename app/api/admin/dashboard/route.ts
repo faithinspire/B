@@ -62,6 +62,13 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 
+    // Get recent bookings (last 5)
+    const { data: recentBookings } = await serviceSupabase
+      .from('bookings')
+      .select('id, customer_name, status, appointment_date, total_amount')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
     return NextResponse.json({
       totalUsers: totalUsers || 0,
       totalBraiders: totalBraiders || 0,
@@ -71,6 +78,7 @@ export async function GET() {
       totalBookings: totalBookings || 0,
       totalRevenue: totalRevenue || 0,
       pendingPayments: pendingPayments || 0,
+      recentBookings: recentBookings || [],
     });
   } catch (error) {
     console.error('Admin dashboard error:', error);

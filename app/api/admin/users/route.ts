@@ -91,16 +91,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const transformedUsers = (users?.users || []).map((u: any) => {
-      const profile = profilesMap[u.id];
-      return {
-        id: u.id,
-        email: u.email,
-        full_name: profile?.full_name || u.user_metadata?.full_name || 'Unknown',
-        role: profile?.role || u.user_metadata?.role || 'customer',
-        created_at: u.created_at,
-      };
-    });
+    const transformedUsers = (users?.users || [])
+      .map((u: any) => {
+        const profile = profilesMap[u.id];
+        return {
+          id: u.id,
+          email: u.email,
+          full_name: profile?.full_name || u.user_metadata?.full_name || 'Unknown',
+          role: profile?.role || u.user_metadata?.role || 'customer',
+          created_at: u.created_at,
+        };
+      })
+      // Sort newest first
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return NextResponse.json(transformedUsers);
   } catch (error) {
