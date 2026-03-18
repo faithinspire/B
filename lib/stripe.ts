@@ -15,6 +15,15 @@ function getStripeInstance(): Stripe {
   return stripeInstance;
 }
 
+// Named export for direct use (e.g. webhook)
+export const stripe = {
+  webhooks: {
+    constructEvent: (body: string, signature: string, secret: string) => {
+      return getStripeInstance().webhooks.constructEvent(body, signature, secret);
+    },
+  },
+};
+
 export async function createPaymentIntent(
   amount: number,
   currency: string = 'usd',
@@ -23,12 +32,15 @@ export async function createPaymentIntent(
 ) {
   try {
     const stripe = getStripeInstance();
+    // Note: customerId here is our app user ID, NOT a Stripe customer ID
+    // We pass it only in metadata, not as the Stripe customer param
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
       currency,
-      customer: customerId,
+      automatic_payment_methods: { enabled: true },
       metadata: {
         ...metadata,
+        app_customer_id: customerId || '',
         timestamp: new Date().toISOString(),
       },
     });

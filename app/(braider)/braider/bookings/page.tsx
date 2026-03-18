@@ -44,8 +44,23 @@ export default function BraiderBookingsPage() {
 
   const handleStatusChange = async (bookingId: string, newStatus: string) => {
     try {
-      await updateBookingStatus(bookingId, newStatus as any);
-      setLocalBookings(localBookings.map(b => 
+      if (newStatus === 'confirmed') {
+        // Call accept endpoint which creates the conversation
+        const response = await fetch('/api/bookings/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingId, braiderId: user?.id }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to accept booking');
+        }
+      } else {
+        await updateBookingStatus(bookingId, newStatus as any);
+      }
+
+      setLocalBookings(localBookings.map(b =>
         b.id === bookingId ? { ...b, status: newStatus } : b
       ));
     } catch (error) {

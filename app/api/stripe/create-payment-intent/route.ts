@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create payment intent
-    const result = await createPaymentIntent(amount, 'usd', customerId, {
+    // Create payment intent - pass app IDs in metadata only, not as Stripe customer
+    const result = await createPaymentIntent(amount, 'usd', undefined, {
       bookingId,
       customerId: customerId || booking.customer_id,
       braiderId: braiderId || booking.braider_id,
