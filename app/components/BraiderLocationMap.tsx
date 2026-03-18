@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 import { supabase } from '@/lib/supabase';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, MapPin } from 'lucide-react';
 
 interface LocationData {
   id: string;
@@ -21,74 +20,119 @@ interface BraiderLocationMapProps {
   booking_id: string;
 }
 
+// Fallback map when no API key is available
+function MapFallback({ location }: { location: LocationData | null }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg p-4 gap-3">
+      <MapPin className="w-10 h-10 text-primary-600" />
+      {location ? (
+        <div className="text-center">
+          <p className="font-semibold text-gray-900 text-sm">Customer Location</p>
+          <p className="text-xs text-gray-600 mt-1">
+            {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+          </p>
+          {location.accuracy && (
+            <p className="text-xs text-gray-500">Accuracy: {location.accuracy.toFixed(0)}m</p>
+          )}
+          <p className="text-xs text-gray-400 mt-2">
+            Last updated: {new Date(location.created_at).toLocaleTimeString()}
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">No location data yet</p>
+      )}
+    </div>
+  );
+}
+
 export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
+  const mapInstance = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [latestLocation, setLatestLocation] = useState<LocationData | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const hasApiKey = !!apiKey && apiKey.length > 10;
 
   useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const { data: locations, error: locErr } = await supabase
+          .from('location_tracking')
+          .select('*')
+          .eq('booking_id', booking_id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (locErr) throw locErr;
+        setLatestLocation(locations?.[0] || null);
+      } catch (err) {
+        console.error('Error fetching location:', err);
+      }
+    };
+
+    fetchLocation();
+  }, [booking_id]);
+
+  useEffect(() => {
+    if (!hasApiKey || !mapRef.current) {
+      setLoading(false);
+      return;
+    }
+
     const initMap = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        if (!mapRef.current) return;
+        // Load Google Maps script if not already loaded
+        if (!window.google?.maps) {
+          await new Promise<void>((resolve, reject) => {
+            // Check if script already exists
+            const existing = document.querySelector(`script[src*="maps.googleapis.com"]`);
+            if (existing) {
+              existing.addEventListener('load', () => resolve());
+              return;
+            }
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load Google Maps'));
+            document.head.appendChild(script);
+          });
+        }
 
-        const loader = new Loader({
-          apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-          version: 'weekly',
-        });
+        if (!window.google?.maps || !mapRef.current) {
+          setError('Google Maps failed to load');
+          setLoading(false);
+          return;
+        }
 
-        const { Map } = await loader.importLibrary('maps');
-        const { AdvancedMarkerElement } = await loader.importLibrary('marker');
-
-        // Get latest customer location
-        const { data: locations, error: locErr } = await supabase
-          .from('location_tracking')
-          .select('*')
-          .eq('booking_id', booking_id)
-          .neq('braider_id', null)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (locErr) throw locErr;
-
-        const location = locations?.[0];
-        const center = location
-          ? { lat: location.latitude, lng: location.longitude }
+        const center = latestLocation
+          ? { lat: latestLocation.latitude, lng: latestLocation.longitude }
           : { lat: 40.7128, lng: -74.006 };
 
-        mapInstance.current = new Map(mapRef.current, {
+        mapInstance.current = new window.google.maps.Map(mapRef.current, {
           zoom: 15,
           center,
-          mapId: 'DEMO_MAP_ID',
+          mapTypeControl: false,
+          streetViewControl: false,
         });
 
-        if (location) {
-          markerRef.current = new google.maps.Marker({
+        if (latestLocation) {
+          markerRef.current = new window.google.maps.Marker({
             map: mapInstance.current,
             position: center,
             title: 'Customer Location',
           });
-
-          // Add info window
-          const infoWindow = new google.maps.InfoWindow({
-            content: `
-              <div class="p-2">
-                <p class="font-semibold">Customer Location</p>
-                <p class="text-sm text-gray-600">Accuracy: ${location.accuracy.toFixed(0)}m</p>
-                ${location.speed ? `<p class="text-sm text-gray-600">Speed: ${(location.speed * 3.6).toFixed(1)} km/h</p>` : ''}
-              </div>
-            `,
-          });
-
-          markerRef.current.addListener('click', () => {
-            infoWindow.open(mapInstance.current, markerRef.current);
-          });
         }
 
+        setMapsLoaded(true);
         setLoading(false);
       } catch (err) {
         console.error('Error initializing map:', err);
@@ -98,14 +142,12 @@ export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
     };
 
     initMap();
-  }, [booking_id]);
+  }, [hasApiKey, apiKey, latestLocation]);
 
-  // Subscribe to location updates
+  // Subscribe to live location updates
   useEffect(() => {
-    if (!mapInstance.current) return;
-
     const channel = supabase
-      .channel(`braider-location:${booking_id}`)
+      .channel(`braider-loc-map-${booking_id}`)
       .on(
         'postgres_changes',
         {
@@ -116,40 +158,39 @@ export function BraiderLocationMap({ booking_id }: BraiderLocationMapProps) {
         },
         (payload) => {
           const location = payload.new as LocationData;
+          setLatestLocation(location);
 
-          if (location.braider_id) {
-            const newPosition = {
-              lat: location.latitude,
-              lng: location.longitude,
-            };
-
+          if (mapsLoaded && mapInstance.current) {
+            const newPosition = { lat: location.latitude, lng: location.longitude };
             if (markerRef.current) {
               markerRef.current.setPosition(newPosition);
             } else {
-              markerRef.current = new google.maps.Marker({
+              markerRef.current = new window.google.maps.Marker({
                 map: mapInstance.current,
                 position: newPosition,
                 title: 'Customer Location',
               });
             }
-
-            mapInstance.current?.panTo(newPosition);
+            mapInstance.current.panTo(newPosition);
           }
         }
       )
       .subscribe();
 
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [booking_id]);
+    return () => { supabase.removeChannel(channel); };
+  }, [booking_id, mapsLoaded]);
+
+  if (!hasApiKey) {
+    return <MapFallback location={latestLocation} />;
+  }
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg p-4">
         <div className="text-center">
           <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-600 mb-2">{error}</p>
+          <MapFallback location={latestLocation} />
         </div>
       </div>
     );

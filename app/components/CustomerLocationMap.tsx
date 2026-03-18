@@ -83,25 +83,39 @@ export function CustomerLocationMap({
   useEffect(() => {
     if (!mapRef.current) return;
 
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const hasApiKey = !!apiKey && apiKey.length > 10;
+
+    if (!hasApiKey) {
+      setError('no-api-key');
+      setLoading(false);
+      return;
+    }
+
     const initMap = async () => {
       try {
         setLoading(true);
 
         // Check if Google Maps is already loaded
-        if (!window.google) {
-          const script = document.createElement('script');
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`;
-          script.async = true;
-          script.defer = true;
-
-          await new Promise((resolve, reject) => {
-            script.onload = resolve;
-            script.onerror = reject;
+        if (!window.google?.maps) {
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector(`script[src*="maps.googleapis.com"]`);
+            if (existing) {
+              if (window.google?.maps) { resolve(); return; }
+              existing.addEventListener('load', () => resolve());
+              return;
+            }
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load Google Maps'));
             document.head.appendChild(script);
           });
         }
 
-        if (!window.google || !mapRef.current) {
+        if (!window.google?.maps || !mapRef.current) {
           setError('Failed to load Google Maps');
           setLoading(false);
           return;
@@ -250,14 +264,30 @@ export function CustomerLocationMap({
           </div>
         )}
 
-        {error && (
+        {error === 'no-api-key' ? (
+          <div className="absolute inset-0 bg-gray-50 flex items-center justify-center z-10">
+            <div className="text-center p-4">
+              <MapPin className="w-10 h-10 text-primary-600 mx-auto mb-2" />
+              <p className="text-gray-700 font-semibold text-sm">Location Tracking</p>
+              {braiderLocation ? (
+                <div className="mt-2 text-xs text-gray-600">
+                  <p>{braiderName} is at:</p>
+                  <p className="font-mono mt-1">{braiderLocation.latitude.toFixed(5)}, {braiderLocation.longitude.toFixed(5)}</p>
+                  <p className="mt-1">Speed: {braiderLocation.speed?.toFixed(1) ?? 0} km/h</p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">Waiting for braider location...</p>
+              )}
+            </div>
+          </div>
+        ) : error ? (
           <div className="absolute inset-0 bg-red-50 flex items-center justify-center z-10">
             <div className="text-center">
               <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
               <p className="text-red-600 font-semibold text-sm">{error}</p>
             </div>
           </div>
-        )}
+        ) : null}
 
         <div ref={mapRef} className="w-full h-full" />
       </div>

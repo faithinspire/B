@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 interface Message {
   id: string;
@@ -56,135 +56,119 @@ export function useConversationSubscription(
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabaseRef = useRef<any>(null);
-  const subscriptionsRef = useRef<any[]>([]);
+  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
-  // Initialize Supabase client
-  const initSupabase = useCallback(() => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-    }
-    return supabaseRef.current;
+  const cleanup = useCallback(() => {
+    channelsRef.current.forEach((ch) => {
+      try { supabase.removeChannel(ch); } catch {}
+    });
+    channelsRef.current = [];
   }, []);
 
-  // Setup subscriptions
   const setupSubscriptions = useCallback(() => {
+    if (!supabase || !conversationId) {
+      setError('Supabase not configured');
+      return;
+    }
+
+    cleanup();
+
     try {
-      const supabase = initSupabase();
-
-      if (!supabase) {
-        setError('Supabase not configured');
-        return;
-      }
-
-      // Clear existing subscriptions
-      subscriptionsRef.current.forEach((sub) => {
-        if (sub && typeof sub.unsubscribe === 'function') {
-          sub.unsubscribe();
-        }
-      });
-      subscriptionsRef.current = [];
-
-      // Subscribe to messages
-      const messagesSub = supabase
-        .from(`messages:conversation_id=eq.${conversationId}`)
-        .on('INSERT', (payload: any) => {
-          if (payload.new) {
-            onNewMessage(payload.new as Message);
+      // Messages channel - new Realtime API syntax
+      const messagesChannel = supabase
+        .channel(`conv-messages-${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            if (payload.new && mountedRef.current) {
+              onNewMessage(payload.new as Message);
+            }
           }
-        })
-        .on('error', (err: any) => {
-          console.error('Messages subscription error:', err);
-          setError('Failed to subscribe to messages');
-        })
+        )
+        .subscribe((status) => {
+          if (!mountedRef.current) return;
+          if (status === 'SUBSCRIBED') {
+            setIsConnected(true);
+            setError(null);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setIsConnected(false);
+            setError('Connection lost, reconnecting...');
+            // Auto-reconnect after 3s
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) setupSubscriptions();
+            }, 3000);
+          } else if (status === 'CLOSED') {
+            setIsConnected(false);
+          }
+        });
+
+      channelsRef.current.push(messagesChannel);
+
+      // Location channel
+      const locationChannel = supabase
+        .channel(`conv-location-${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'location_tracking',
+          },
+          (payload) => {
+            if (payload.new && mountedRef.current) {
+              onLocationUpdate(payload.new as LocationTracking);
+            }
+          }
+        )
         .subscribe();
 
-      subscriptionsRef.current.push(messagesSub);
+      channelsRef.current.push(locationChannel);
 
-      // Subscribe to location updates
-      const locationSub = supabase
-        .from('location_tracking')
-        .on('INSERT', (payload: any) => {
-          if (payload.new) {
-            onLocationUpdate(payload.new as LocationTracking);
+      // Conversation updates channel
+      const conversationChannel = supabase
+        .channel(`conv-updates-${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'conversations',
+            filter: `id=eq.${conversationId}`,
+          },
+          (payload) => {
+            if (payload.new && mountedRef.current) {
+              onConversationUpdate(payload.new as Conversation);
+            }
           }
-        })
-        .on('error', (err: any) => {
-          console.error('Location subscription error:', err);
-        })
+        )
         .subscribe();
 
-      subscriptionsRef.current.push(locationSub);
-
-      // Subscribe to conversation updates
-      const conversationSub = supabase
-        .from(`conversations:id=eq.${conversationId}`)
-        .on('UPDATE', (payload: any) => {
-          if (payload.new) {
-            onConversationUpdate(payload.new as Conversation);
-          }
-        })
-        .on('error', (err: any) => {
-          console.error('Conversation subscription error:', err);
-        })
-        .subscribe();
-
-      subscriptionsRef.current.push(conversationSub);
-
-      setIsConnected(true);
-      setError(null);
+      channelsRef.current.push(conversationChannel);
     } catch (err) {
       console.error('Subscription setup error:', err);
       setError(err instanceof Error ? err.message : 'Failed to setup subscriptions');
       setIsConnected(false);
     }
-  }, [conversationId, onNewMessage, onLocationUpdate, onConversationUpdate, initSupabase]);
+  }, [conversationId, onNewMessage, onLocationUpdate, onConversationUpdate, cleanup]);
 
-  // Auto-reconnect on error (3 second delay)
   useEffect(() => {
-    if (error) {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-
-      reconnectTimeoutRef.current = setTimeout(() => {
-        console.log('Attempting to reconnect subscriptions...');
-        setupSubscriptions();
-      }, 3000);
-    }
-
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    };
-  }, [error, setupSubscriptions]);
-
-  // Setup subscriptions on mount
-  useEffect(() => {
+    mountedRef.current = true;
     setupSubscriptions();
 
     return () => {
-      // Cleanup subscriptions on unmount
-      subscriptionsRef.current.forEach((sub) => {
-        if (sub && typeof sub.unsubscribe === 'function') {
-          sub.unsubscribe();
-        }
-      });
-      subscriptionsRef.current = [];
-
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      mountedRef.current = false;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      cleanup();
     };
-  }, [setupSubscriptions]);
+  }, [setupSubscriptions, cleanup]);
 
-  return {
-    isConnected,
-    error,
-  };
+  return { isConnected, error };
 }
