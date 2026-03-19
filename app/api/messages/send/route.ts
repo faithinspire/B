@@ -34,13 +34,18 @@ export async function POST(request: Request) {
     const receiver_id = sender_role === 'customer' ? braider_id : customer_id;
 
     // Verify sender is part of conversation
-    const isPartOf =
-      sender_id === customer_id ||
-      sender_id === braider_id ||
-      sender_id === conversation.admin_id ||
-      sender_role === 'admin';
+    // Also check participant1_id/participant2_id for old schema
+    const allParticipants = [
+      customer_id, braider_id,
+      conversation.admin_id,
+      conversation.participant1_id,
+      conversation.participant2_id,
+    ].filter(Boolean);
+
+    const isPartOf = allParticipants.includes(sender_id) || sender_role === 'admin';
 
     if (!isPartOf) {
+      console.error('Sender not in conversation. sender_id:', sender_id, 'participants:', allParticipants);
       return NextResponse.json({ error: 'Sender is not part of this conversation' }, { status: 403 });
     }
 
