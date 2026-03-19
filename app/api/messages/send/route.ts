@@ -10,29 +10,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const serviceSupabase = createClient(
+    const db = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       { auth: { persistSession: false } }
     );
 
-    // Verify conversation exists
-    const { data: conversation, error: convError } = await serviceSupabase
+    // Get conversation — verify it exists
+    const { data: conversation, error: convError } = await db
       .from('conversations')
-      .select('id, customer_id, braider_id, admin_id')
+      .select('*')
       .eq('id', conversation_id)
       .single();
 
     if (convError || !conversation) {
-      console.error('Conversation lookup error:', convError);
+      console.error('Conversation lookup error:', convError?.message);
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    // Verify sender is part of conversation (admin always allowed)
+    // Determine the other participant (receiver)
+    const customer_id = conversation.customer_id || conversation.participant1_id;
+    const braider_id = conversation.braider_id || conversation.participant2_id;
+    const receiver_id = sender_role === 'customer' ? braider_id : customer_id;
+
+    // Verify sender is part of conversation
     const isPartOf =
-      sender_id === conversation.customer_id ||
-      sender_id === conversation.braider_id ||
-      (conversation.admin_id && sender_id === conversation.admin_id) ||
+      sender_id === customer_id ||
+      sender_id === braider_id ||
+      sender_id === conversation.admin_id ||
       sender_role === 'admin';
 
     if (!isPartOf) {
@@ -42,96 +47,103 @@ export async function POST(request: Request) {
     let data: any = null;
     let lastError: any = null;
 
-    // Attempt 1: full schema with all columns
-    const res1 = await serviceSupabase.from('messages').insert([{
+    // Attempt 1: full new schema
+    const r1 = await db.from('messages').insert([{
       conversation_id,
       sender_id,
       content: content.trim(),
       sender_role: sender_role || 'customer',
       message_type: message_type || 'text',
-      metadata: metadata || null,
       read: false,
+      created_at: new Date().toISOString(),
     }]).select().single();
+    if (!r1.error) { data = r1.data; }
+    else {
+      lastError = r1.error;
+      console.error('Attempt 1 failed:', r1.error.message);
 
-    if (!res1.error) {
-      data = res1.data;
-    } else {
-      lastError = res1.error;
-      console.error('Attempt 1 failed:', res1.error.message);
-
-      // Attempt 2: without optional columns, try read column
-      const res2 = await serviceSupabase.from('messages').insert([{
+      // Attempt 2: new schema without optional cols
+      const r2 = await db.from('messages').insert([{
         conversation_id,
         sender_id,
         content: content.trim(),
         read: false,
       }]).select().single();
+      if (!r2.error) { data = r2.data; lastError = null; }
+      else {
+        lastError = r2.error;
+        console.error('Attempt 2 failed:', r2.error.message);
 
-      if (!res2.error) {
-        data = res2.data;
-        lastError = null;
-      } else {
-        lastError = res2.error;
-        console.error('Attempt 2 failed:', res2.error.message);
-
-        // Attempt 3: try with is_read instead
-        const res3 = await serviceSupabase.from('messages').insert([{
-          conversation_id,
-          sender_id,
-          content: content.trim(),
-          is_read: false,
-        }]).select().single();
-
-        if (!res3.error) {
-          data = res3.data;
-          lastError = null;
-        } else {
-          lastError = res3.error;
-          console.error('Attempt 3 failed:', res3.error.message);
-
-          // Attempt 4: absolute bare minimum — just the 3 core fields
-          const res4 = await serviceSupabase.from('messages').insert([{
-            conversation_id,
+        // Attempt 3: old schema — receiver_id instead of conversation_id
+        if (receiver_id) {
+          const r3 = await db.from('messages').insert([{
             sender_id,
+            receiver_id,
             content: content.trim(),
+            read: false,
           }]).select().single();
+          if (!r3.error) { data = r3.data; lastError = null; }
+          else {
+            lastError = r3.error;
+            console.error('Attempt 3 failed:', r3.error.message);
 
-          if (!res4.error) {
-            data = res4.data;
-            lastError = null;
-          } else {
-            lastError = res4.error;
-            console.error('Attempt 4 failed:', res4.error.message);
+            // Attempt 4: old schema with is_read
+            const r4 = await db.from('messages').insert([{
+              sender_id,
+              receiver_id,
+              content: content.trim(),
+              is_read: false,
+            }]).select().single();
+            if (!r4.error) { data = r4.data; lastError = null; }
+            else {
+              lastError = r4.error;
+              console.error('Attempt 4 failed:', r4.error.message);
+
+              // Attempt 5: absolute minimum old schema
+              const r5 = await db.from('messages').insert([{
+                sender_id,
+                receiver_id,
+                content: content.trim(),
+              }]).select().single();
+              if (!r5.error) { data = r5.data; lastError = null; }
+              else {
+                lastError = r5.error;
+                console.error('Attempt 5 failed:', r5.error.message);
+              }
+            }
           }
         }
       }
     }
 
     if (lastError || !data) {
-      console.error('All message insert attempts failed. Last error:', lastError);
+      console.error('All message insert attempts failed:', lastError);
       return NextResponse.json(
-        { error: `Failed to send message: ${lastError?.message || 'Unknown error'}. Please run CRITICAL_DB_FIX_RUN_NOW.sql in Supabase.` },
+        { error: `Failed to send message: ${lastError?.message}. Run CRITICAL_DB_FIX_RUN_NOW.sql in Supabase.` },
         { status: 500 }
       );
     }
 
-    // Notify recipient (best-effort, never block the response)
+    // Ensure the returned message has conversation_id for the frontend
+    const responseData = {
+      ...data,
+      conversation_id: data.conversation_id || conversation_id,
+      created_at: data.created_at || data.timestamp || new Date().toISOString(),
+    };
+
+    // Notify recipient (best-effort)
     try {
-      const recipientId =
-        sender_role === 'customer' ? conversation.braider_id :
-        sender_role === 'braider' ? conversation.customer_id :
-        conversation.customer_id;
-      if (recipientId && recipientId !== sender_id) {
+      if (receiver_id && receiver_id !== sender_id) {
         const notifMsg = content.length > 60 ? content.slice(0, 60) + '...' : content;
-        await serviceSupabase.from('notifications').insert({
-          user_id: recipientId,
+        await db.from('notifications').insert({
+          user_id: receiver_id,
           type: 'message',
           title: 'New Message',
           message: notifMsg,
           read: false,
         }).catch(() => {
-          serviceSupabase.from('notifications').insert({
-            user_id: recipientId,
+          db.from('notifications').insert({
+            user_id: receiver_id,
             type: 'message',
             title: 'New Message',
             message: notifMsg,
@@ -141,7 +153,7 @@ export async function POST(request: Request) {
       }
     } catch {}
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(responseData, { status: 201 });
   } catch (error) {
     console.error('Message send error:', error);
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
