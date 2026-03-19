@@ -1,4 +1,9 @@
-'use client';
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
+
+const root = process.cwd();
+
+const braiderProfilePage = `'use client';
 
 export const dynamic = 'force-dynamic';
 
@@ -198,7 +203,7 @@ export default function BraiderProfilePage() {
                       {service.description && <p className="text-gray-600 text-sm mt-1">{service.description}</p>}
                     </div>
                     <div className="text-right">
-                      <p className="text-xl sm:text-2xl font-bold text-primary-600">${service.price.toFixed(2)}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-primary-600">\${service.price.toFixed(2)}</p>
                       <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-1 justify-end mt-1">
                         <Clock className="w-4 h-4" />{service.duration_minutes} min
                       </p>
@@ -225,7 +230,7 @@ export default function BraiderProfilePage() {
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex">
                       {Array(5).fill(0).map((_, i) => (
-                        <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                        <Star key={i} className={\`w-4 h-4 \${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}\`} />
                       ))}
                     </div>
                     <span className="text-xs sm:text-sm text-gray-600">Verified Customer</span>
@@ -242,3 +247,9 @@ export default function BraiderProfilePage() {
     </div>
   );
 }
+`;
+
+const filePath = resolve(root, 'app/(public)/braider/[id]/page.tsx');
+writeFileSync(filePath, braiderProfilePage, 'utf8');
+console.log('Written:', filePath);
+console.log('Done.');
