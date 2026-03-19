@@ -3,14 +3,26 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
-import { MessageCircle, Search, RefreshCw, Loader, Clock, CheckCircle } from 'lucide-react';
+import { MessageCircle, Search, RefreshCw, Loader } from 'lucide-react';
+
+interface Conv {
+  id: string;
+  booking_id?: string | null;
+  braider_id?: string | null;
+  customer_id?: string | null;
+  unread_count?: number;
+  customer_name?: string;
+  customer_avatar?: string | null;
+  last_message?: string;
+  last_message_time?: string;
+}
 
 export default function BraiderMessagesPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState<Conv[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -23,32 +35,31 @@ export default function BraiderMessagesPage() {
       setLoading(true); setError(null);
       const res = await fetch('/api/conversations?user_id=' + user.id + '&role=braider');
       if (!res.ok) throw new Error('Failed to load');
-      const convList = await res.json();
+      const convList: Conv[] = await res.json();
       if (!convList?.length) { setConversations([]); return; }
 
-      // Enrich with customer profiles + last message
-      const customerIds = [...new Set(convList.map(c => c.customer_id).filter(Boolean))];
-      let profileMap = {};
+      const customerIds = [...new Set(convList.map((c: Conv) => c.customer_id).filter(Boolean))] as string[];
+      const profileMap: Record<string, { full_name?: string; avatar_url?: string }> = {};
       if (customerIds.length && supabase) {
         const { data: profiles } = await supabase.from('profiles').select('id,full_name,avatar_url').in('id', customerIds);
-        if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
+        if (profiles) profiles.forEach((p: any) => { profileMap[p.id] = p; });
       }
-      let lastMsgMap = {};
+      const lastMsgMap: Record<string, { content?: string; created_at?: string }> = {};
       if (supabase) {
         for (const conv of convList) {
           const { data: msgs } = await supabase.from('messages').select('content,created_at').eq('conversation_id', conv.id).order('created_at', { ascending: false }).limit(1);
           if (msgs?.[0]) lastMsgMap[conv.id] = msgs[0];
         }
       }
-      const enriched = convList.map(conv => ({
+      const enriched: Conv[] = convList.map((conv: Conv) => ({
         ...conv,
-        customer_name: profileMap[conv.customer_id]?.full_name || 'Customer',
-        customer_avatar: profileMap[conv.customer_id]?.avatar_url,
+        customer_name: profileMap[conv.customer_id || '']?.full_name || 'Customer',
+        customer_avatar: profileMap[conv.customer_id || '']?.avatar_url,
         last_message: lastMsgMap[conv.id]?.content,
         last_message_time: lastMsgMap[conv.id]?.created_at,
       }));
       setConversations(enriched);
-    } catch(e) { setError(e.message); }
+    } catch(e: unknown) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setLoading(false); }
   }, [user]);
 
@@ -59,14 +70,17 @@ export default function BraiderMessagesPage() {
       const ch = supabase.channel('braider_msgs_' + user.id)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchConversations)
         .subscribe();
-      return () => supabase?.removeChannel(ch);
+      return () => { supabase?.removeChannel(ch); };
     }
   }, [user, authLoading, fetchConversations]);
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center" style={{background:'linear-gradient(135deg,#ede9f7,#dce8ff)'}}><Loader className="w-10 h-10 text-purple-600 animate-spin"/></div>;
   if (!user || user.role !== 'braider') return null;
 
-  const filtered = conversations.filter(c => (c.customer_name||'').toLowerCase().includes(search.toLowerCase()));
+  const filtered = conversations.filter((c: Conv) => (c.customer_name||'').toLowerCase().includes(search.toLowerCase()));
+
+  // Navigate using booking_id if available, otherwise fall back to conv.id
+  const navTo = (conv: Conv) => router.push('/braider/messages/' + (conv.booking_id || conv.id));
 
   return (
     <div className="min-h-screen pb-20" style={{ background: 'linear-gradient(135deg, #ede9f7 0%, #dce8ff 50%, #e8f0fe 100%)' }}>
@@ -93,10 +107,10 @@ export default function BraiderMessagesPage() {
             <p className="text-gray-600 font-semibold">No conversations yet</p>
             <p className="text-gray-400 text-sm mt-1">Accept a booking to start chatting</p>
           </div>
-        ) : filtered.map(conv => (
-          <button key={conv.id} onClick={() => router.push('/braider/messages/' + conv.booking_id)}
+        ) : filtered.map((conv: Conv) => (
+          <button key={conv.id} onClick={() => navTo(conv)}
             className="w-full bg-white/80 backdrop-blur rounded-2xl shadow-sm border border-purple-100 p-4 hover:shadow-md hover:border-purple-300 transition-all text-left flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm overflow-hidden">
               {conv.customer_avatar ? <img src={conv.customer_avatar} className="w-full h-full rounded-full object-cover" alt=""/> : (conv.customer_name||'C').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -106,7 +120,7 @@ export default function BraiderMessagesPage() {
               </div>
               <p className="text-sm text-gray-500 truncate">{conv.last_message || 'Tap to start chatting'}</p>
             </div>
-            {conv.unread_count > 0 && (
+            {(conv.unread_count || 0) > 0 && (
               <span className="w-5 h-5 bg-purple-600 text-white rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
             )}
           </button>

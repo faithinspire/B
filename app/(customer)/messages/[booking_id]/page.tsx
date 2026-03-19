@@ -19,7 +19,7 @@ interface Message {
 
 interface Conversation {
   id: string;
-  booking_id: string;
+  booking_id?: string | null;
   braider_id: string;
   customer_id: string;
   status: string;
@@ -63,13 +63,14 @@ export default function CustomerChatPage() {
       const res = await fetch('/api/conversations?user_id=' + user.id + '&role=customer');
       if (!res.ok) throw new Error('Failed to load conversations');
       const convList = await res.json();
+      // Match by booking_id OR by conv.id (fallback for old-schema convs without booking_id)
       let conv: Conversation | null = Array.isArray(convList)
-        ? convList.find((c: Conversation) => c.booking_id === booking_id) ?? null
+        ? (convList.find((c: Conversation) => c.booking_id === booking_id || c.id === booking_id) ?? null)
         : null;
       if (!conv) throw new Error('No conversation found. The braider may not have accepted yet.');
       if (conv.braider_id && supabase) {
         const { data: p } = await supabase.from('profiles').select('full_name,avatar_url').eq('id', conv.braider_id).single();
-        if (p) conv = { ...conv, braider_name: p.full_name, braider_avatar: p.avatar_url };
+        if (p) conv = { ...conv, braider_name: (p as any).full_name, braider_avatar: (p as any).avatar_url };
       }
       setConversation(conv);
       const msgRes = await fetch('/api/messages/conversation/' + conv.id + '?user_id=' + user.id + '&limit=100');
@@ -106,7 +107,7 @@ export default function CustomerChatPage() {
     return () => { supabase?.removeChannel(ch); };
   }, [conversation]);
 
-  // Real-time: braider location (replaces polling)
+  // Real-time: braider location
   useEffect(() => {
     if (!conversation?.braider_id || !supabase) return;
     const ch = supabase
@@ -144,13 +145,7 @@ export default function CustomerChatPage() {
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversation_id: conversation.id,
-          sender_id: user.id,
-          sender_role: 'customer',
-          content,
-          message_type: 'text',
-        }),
+        body: JSON.stringify({ conversation_id: conversation.id, sender_id: user.id, sender_role: 'customer', content, message_type: 'text' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send');
@@ -210,10 +205,7 @@ export default function CustomerChatPage() {
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundImage: BG, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      {/* Overlay */}
       <div className="absolute inset-0 bg-purple-900/40 backdrop-blur-[2px] pointer-events-none"/>
-
-      {/* Header */}
       <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-purple-100 px-4 py-3 flex items-center gap-3 shadow-sm">
         <button onClick={() => router.push('/messages')} className="p-2 hover:bg-purple-50 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700"/>
@@ -225,11 +217,7 @@ export default function CustomerChatPage() {
           <p className="font-semibold text-gray-900 truncate">{otherName}</p>
           <p className="text-xs text-purple-600 font-medium">Booking #{String(booking_id).slice(0, 8)}</p>
         </div>
-        <button
-          onClick={() => setShowMap(v => !v)}
-          className={`p-2 rounded-xl transition-colors ${showMap ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100 text-gray-500'}`}
-          title="Toggle Map"
-        >
+        <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-xl transition-colors ${showMap ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100 text-gray-500'}`} title="Toggle Map">
           <MapPin className="w-5 h-5"/>
         </button>
         {braiderLocation && (
@@ -240,7 +228,6 @@ export default function CustomerChatPage() {
         )}
       </div>
 
-      {/* Map Panel */}
       {showMap && (
         <div className="relative flex-shrink-0 bg-white/90 backdrop-blur border-b border-purple-100 shadow-sm" style={{ height: '260px' }}>
           <div className="h-full p-3 flex gap-3">
@@ -267,7 +254,6 @@ export default function CustomerChatPage() {
         </div>
       )}
 
-      {/* Messages */}
       <div className="relative flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -285,9 +271,9 @@ export default function CustomerChatPage() {
                 <span className="text-xs text-white font-medium bg-black/30 backdrop-blur px-3 py-1 rounded-full">{date}</span>
                 <div className="flex-1 h-px bg-white/30"/>
               </div>
-              {(msgs as Message[]).map((msg, i) => {
+              {msgs.map((msg, i) => {
                 const isOwn = msg.sender_id === user.id;
-                const showAvatar = !isOwn && (i === 0 || (msgs as Message[])[i-1]?.sender_id !== msg.sender_id);
+                const showAvatar = !isOwn && (i === 0 || msgs[i-1]?.sender_id !== msg.sender_id);
                 return (
                   <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5`}>
                     {!isOwn && (
@@ -296,19 +282,12 @@ export default function CustomerChatPage() {
                       </div>
                     )}
                     <div className={`max-w-[72%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <div className={`px-4 py-2.5 rounded-2xl shadow-md ${isOwn
-                        ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-br-sm'
-                        : 'bg-white/95 backdrop-blur text-gray-900 rounded-bl-sm border border-purple-100'
-                      } ${msg.id?.startsWith('tmp_') ? 'opacity-70' : ''}`}>
+                      <div className={`px-4 py-2.5 rounded-2xl shadow-md ${isOwn ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-br-sm' : 'bg-white/95 backdrop-blur text-gray-900 rounded-bl-sm border border-purple-100'} ${msg.id?.startsWith('tmp_') ? 'opacity-70' : ''}`}>
                         <p className="text-sm leading-relaxed">{msg.content}</p>
                       </div>
                       <div className={`flex items-center gap-1 mt-0.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
                         <span className="text-xs text-white/70">{formatTime(msg.created_at)}</span>
-                        {isOwn && (
-                          (msg.read || msg.is_read)
-                            ? <CheckCheck className="w-3.5 h-3.5 text-blue-300"/>
-                            : <Check className="w-3.5 h-3.5 text-white/50"/>
-                        )}
+                        {isOwn && ((msg.read || msg.is_read) ? <CheckCheck className="w-3.5 h-3.5 text-blue-300"/> : <Check className="w-3.5 h-3.5 text-white/50"/>)}
                       </div>
                     </div>
                   </div>
@@ -320,7 +299,6 @@ export default function CustomerChatPage() {
         <div ref={messagesEndRef}/>
       </div>
 
-      {/* Input */}
       <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-md border-t border-purple-100 px-4 py-3 shadow-lg">
         {error && <p className="text-red-500 text-xs mb-2 px-1">{error}</p>}
         <form onSubmit={handleSend} className="flex items-center gap-2">
@@ -336,11 +314,8 @@ export default function CustomerChatPage() {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e as unknown as React.FormEvent); } }}
             />
           </div>
-          <button
-            type="submit"
-            disabled={sending || !newMessage.trim()}
-            className="w-11 h-11 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex-shrink-0"
-          >
+          <button type="submit" disabled={sending || !newMessage.trim()}
+            className="w-11 h-11 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex-shrink-0">
             {sending ? <Loader className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4"/>}
           </button>
         </form>
