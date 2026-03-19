@@ -7,39 +7,19 @@ import { Send, MapPin, CheckCheck, Check, Loader, ArrowLeft } from 'lucide-react
 import { BraiderLocationMap } from '@/app/components/BraiderLocationMap';
 import { useBraiderLocationTracking } from '@/app/hooks/useBraiderLocationTracking';
 
-interface Message {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  is_read: boolean;
-}
-
-interface Conversation {
-  id: string;
-  booking_id: string;
-  customer_id: string;
-  braider_id: string;
-  status: string;
-  customer_name?: string;
-  customer_avatar?: string;
-}
-
 export default function BraiderChatPage() {
   const router = useRouter();
   const params = useParams();
-  const booking_id = params?.booking_id as string;
+  const booking_id = params?.booking_id;
   const { user, loading: authLoading } = useSupabaseAuthStore();
-
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversation, setConversation] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
   const [showMap, setShowMap] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef(null);
   const { isTracking, startTracking, stopTracking } = useBraiderLocationTracking(booking_id);
 
   useEffect(() => {
@@ -49,24 +29,23 @@ export default function BraiderChatPage() {
   const fetchData = useCallback(async () => {
     if (!user || !booking_id) return;
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       const res = await fetch('/api/conversations?user_id=' + user.id + '&role=braider');
       if (!res.ok) throw new Error('Failed to load conversations');
-      const convList: Conversation[] = await res.json();
-      const conv = convList.find((c: Conversation) => c.booking_id === booking_id);
+      const convList = await res.json();
+      let conv = Array.isArray(convList) ? convList.find(c => c.booking_id === booking_id) : null;
       if (!conv) throw new Error('No conversation found. Accept the booking first.');
       if (conv.customer_id && supabase) {
         const { data: p } = await supabase.from('profiles').select('full_name,avatar_url').eq('id', conv.customer_id).single();
-        if (p) { conv.customer_name = (p as any).full_name; conv.customer_avatar = (p as any).avatar_url; }
+        if (p) { conv = { ...conv, customer_name: p.full_name, customer_avatar: p.avatar_url }; }
       }
-      setConversation({ ...conv });
+      setConversation(conv);
       const msgRes = await fetch('/api/messages/conversation/' + conv.id + '?user_id=' + user.id + '&limit=100');
       if (msgRes.ok) {
         const d = await msgRes.json();
-        setMessages(d?.messages || d || []);
+        setMessages(d?.messages || (Array.isArray(d) ? d : []));
       }
-    } catch (err) {
+    } catch(err) {
       setError(err instanceof Error ? err.message : 'Failed to load chat');
     } finally {
       setLoading(false);
@@ -81,26 +60,27 @@ export default function BraiderChatPage() {
     if (!conversation || !supabase) return;
     const ch = supabase
       .channel('bc_' + conversation.id)
-      .on('postgres_changes' as any, {
+      .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: 'conversation_id=eq.' + conversation.id,
-      }, (payload: any) => {
-        const m = payload.new as Message;
+      }, p => {
+        const m = p.new;
         setMessages(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]);
       })
       .subscribe();
-    return () => { supabase?.removeChannel(ch); };
+    return () => supabase?.removeChannel(ch);
   }, [conversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !user || !conversation) return;
+    setSending(true);
+    setError(null);
     try {
-      setSending(true);
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,9 +92,10 @@ export default function BraiderChatPage() {
           message_type: 'text',
         }),
       });
-      if (!res.ok) throw new Error('Failed to send');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send');
       setNewMessage('');
-    } catch (err) {
+    } catch(err) {
       setError(err instanceof Error ? err.message : 'Failed to send');
     } finally {
       setSending(false);
@@ -122,7 +103,7 @@ export default function BraiderChatPage() {
   };
 
   if (authLoading || loading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader className="w-10 h-10 text-primary-600 animate-spin" /></div>;
+    return <div className="min-h-screen flex items-center justify-center"><Loader className="w-10 h-10 text-primary-600 animate-spin"/></div>;
   }
   if (!user || user.role !== 'braider') return null;
 
@@ -131,7 +112,9 @@ export default function BraiderChatPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center max-w-sm">
           <p className="text-red-600 font-semibold mb-2">{error || 'No conversation found'}</p>
-          <button onClick={() => router.push('/braider/messages')} className="px-4 py-2 bg-primary-600 text-white rounded-lg">Back</button>
+          <p className="text-gray-500 text-sm mb-4">Accept the booking first to start chatting.</p>
+          <button onClick={() => router.push('/braider/bookings')} className="px-4 py-2 bg-primary-600 text-white rounded-lg mr-2">View Bookings</button>
+          <button onClick={() => router.push('/braider/messages')} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg">Back</button>
         </div>
       </div>
     );
@@ -141,17 +124,17 @@ export default function BraiderChatPage() {
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button onClick={() => router.push('/braider/messages')} className="p-1 hover:bg-gray-100 rounded">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft className="w-5 h-5 text-gray-600"/>
         </button>
         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white font-bold">
-          {conversation.customer_name?.charAt(0)?.toUpperCase() || 'C'}
+          {(conversation.customer_name || 'C').charAt(0).toUpperCase()}
         </div>
         <div className="flex-1">
           <p className="font-semibold text-gray-900">{conversation.customer_name || 'Customer'}</p>
-          <p className="text-xs text-gray-500">Booking: {booking_id?.slice(0, 8)}...</p>
+          <p className="text-xs text-gray-500">Booking: {String(booking_id).slice(0, 8)}...</p>
         </div>
         <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-lg ${showMap ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100 text-gray-500'}`}>
-          <MapPin className="w-5 h-5" />
+          <MapPin className="w-5 h-5"/>
         </button>
       </div>
 
@@ -159,23 +142,23 @@ export default function BraiderChatPage() {
         <div className="lg:col-span-2 flex flex-col bg-white rounded-xl shadow" style={{ height: '70vh' }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0
-              ? <div className="flex items-center justify-center h-full"><p className="text-gray-400 text-sm">No messages yet</p></div>
+              ? <div className="flex items-center justify-center h-full"><p className="text-gray-400 text-sm">No messages yet. Say hello!</p></div>
               : messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.sender_id === user.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
                     <p>{msg.content}</p>
                     <div className="flex items-center gap-1 mt-1 text-xs opacity-60 justify-end">
                       <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {msg.sender_id === user.id && (msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />)}
+                      {msg.sender_id === user.id && ((msg.read || msg.is_read) ? <CheckCheck className="w-3 h-3"/> : <Check className="w-3 h-3"/>)}
                     </div>
                   </div>
                 </div>
               ))
             }
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef}/>
           </div>
           <form onSubmit={handleSend} className="p-3 border-t border-gray-100">
-            {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
+            {error && <p className="text-red-600 text-xs mb-2 px-1">{error}</p>}
             <div className="flex gap-2">
               <input
                 type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
@@ -184,7 +167,7 @@ export default function BraiderChatPage() {
                 disabled={sending}
               />
               <button type="submit" disabled={sending || !newMessage.trim()} className="p-2.5 bg-primary-600 text-white rounded-full hover:bg-primary-700 disabled:opacity-50">
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4"/>
               </button>
             </div>
           </form>
@@ -194,7 +177,7 @@ export default function BraiderChatPage() {
           {showMap && (
             <div className="bg-white rounded-xl shadow p-3" style={{ height: '280px' }}>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer Location</p>
-              <div className="h-56"><BraiderLocationMap booking_id={booking_id} /></div>
+              <div className="h-56"><BraiderLocationMap booking_id={booking_id}/></div>
             </div>
           )}
           <div className="bg-white rounded-xl shadow p-4">
@@ -203,7 +186,7 @@ export default function BraiderChatPage() {
               onClick={isTracking ? stopTracking : startTracking}
               className={`w-full px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 ${isTracking ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className="w-4 h-4"/>
               {isTracking ? 'Stop Sharing' : 'Share Location'}
             </button>
             <p className="text-xs text-gray-400 mt-2 text-center">
@@ -212,7 +195,7 @@ export default function BraiderChatPage() {
           </div>
           <div className="bg-white rounded-xl shadow p-4 text-sm">
             <h3 className="font-semibold text-gray-900 mb-1">Booking Info</h3>
-            <p className="text-gray-500 text-xs">ID: <span className="font-mono">{booking_id?.slice(0, 12)}...</span></p>
+            <p className="text-gray-500 text-xs">ID: <span className="font-mono">{String(booking_id).slice(0, 12)}...</span></p>
             <p className="text-gray-500 text-xs mt-1">Status: <span className="capitalize text-gray-700">{conversation.status}</span></p>
           </div>
         </div>
