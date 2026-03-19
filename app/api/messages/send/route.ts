@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       .single();
 
     if (convError || !conversation) {
+      console.error('Conversation lookup error:', convError);
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
@@ -38,85 +39,102 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sender is not part of this conversation' }, { status: 403 });
     }
 
-    // Try full insert first (with all columns), fall back to minimal if columns missing
     let data: any = null;
-    let insertError: any = null;
+    let lastError: any = null;
 
-    // Attempt 1: full schema
-    const fullRecord: any = {
+    // Attempt 1: full schema with all columns
+    const res1 = await serviceSupabase.from('messages').insert([{
       conversation_id,
       sender_id,
       content: content.trim(),
-    };
-    // Only add optional columns if they exist — we'll detect via error
-    fullRecord.sender_role = sender_role || 'customer';
-    fullRecord.message_type = message_type || 'text';
-    fullRecord.metadata = metadata || null;
-    fullRecord.read = false;
+      sender_role: sender_role || 'customer',
+      message_type: message_type || 'text',
+      metadata: metadata || null,
+      read: false,
+    }]).select().single();
 
-    const res1 = await serviceSupabase.from('messages').insert([fullRecord]).select().single();
     if (!res1.error) {
       data = res1.data;
     } else {
-      insertError = res1.error;
-      // Attempt 2: minimal schema (only core columns that definitely exist)
-      const minRecord: any = {
+      lastError = res1.error;
+      console.error('Attempt 1 failed:', res1.error.message);
+
+      // Attempt 2: without optional columns, try read column
+      const res2 = await serviceSupabase.from('messages').insert([{
         conversation_id,
         sender_id,
         content: content.trim(),
-      };
-      // Try adding is_read (old schema)
-      if (insertError.message?.includes('read')) {
-        minRecord.is_read = false;
-      }
-      const res2 = await serviceSupabase.from('messages').insert([minRecord]).select().single();
+        read: false,
+      }]).select().single();
+
       if (!res2.error) {
         data = res2.data;
-        insertError = null;
+        lastError = null;
       } else {
-        // Attempt 3: absolute minimum
-        const res3 = await serviceSupabase
-          .from('messages')
-          .insert([{ conversation_id, sender_id, content: content.trim() }])
-          .select()
-          .single();
+        lastError = res2.error;
+        console.error('Attempt 2 failed:', res2.error.message);
+
+        // Attempt 3: try with is_read instead
+        const res3 = await serviceSupabase.from('messages').insert([{
+          conversation_id,
+          sender_id,
+          content: content.trim(),
+          is_read: false,
+        }]).select().single();
+
         if (!res3.error) {
           data = res3.data;
-          insertError = null;
+          lastError = null;
         } else {
-          insertError = res3.error;
+          lastError = res3.error;
+          console.error('Attempt 3 failed:', res3.error.message);
+
+          // Attempt 4: absolute bare minimum — just the 3 core fields
+          const res4 = await serviceSupabase.from('messages').insert([{
+            conversation_id,
+            sender_id,
+            content: content.trim(),
+          }]).select().single();
+
+          if (!res4.error) {
+            data = res4.data;
+            lastError = null;
+          } else {
+            lastError = res4.error;
+            console.error('Attempt 4 failed:', res4.error.message);
+          }
         }
       }
     }
 
-    if (insertError || !data) {
-      console.error('Error creating message:', insertError);
+    if (lastError || !data) {
+      console.error('All message insert attempts failed. Last error:', lastError);
       return NextResponse.json(
-        { error: `Failed to create message: ${insertError?.message}` },
+        { error: `Failed to send message: ${lastError?.message || 'Unknown error'}. Please run CRITICAL_DB_FIX_RUN_NOW.sql in Supabase.` },
         { status: 500 }
       );
     }
 
-    // Notify recipient (best-effort)
+    // Notify recipient (best-effort, never block the response)
     try {
       const recipientId =
         sender_role === 'customer' ? conversation.braider_id :
         sender_role === 'braider' ? conversation.customer_id :
         conversation.customer_id;
       if (recipientId && recipientId !== sender_id) {
+        const notifMsg = content.length > 60 ? content.slice(0, 60) + '...' : content;
         await serviceSupabase.from('notifications').insert({
           user_id: recipientId,
           type: 'message',
           title: 'New Message',
-          message: content.length > 60 ? content.slice(0, 60) + '...' : content,
+          message: notifMsg,
           read: false,
         }).catch(() => {
-          // try is_read fallback
           serviceSupabase.from('notifications').insert({
             user_id: recipientId,
             type: 'message',
             title: 'New Message',
-            message: content.length > 60 ? content.slice(0, 60) + '...' : content,
+            message: notifMsg,
             is_read: false,
           }).catch(() => {});
         });

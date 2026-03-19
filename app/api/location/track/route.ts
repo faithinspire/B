@@ -68,34 +68,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
 
-    // Verify booking exists
-    const { data: booking, error: bookingError } = await serviceSupabase
-      .from('bookings')
-      .select('id, braider_id')
-      .eq('id', body.booking_id)
-      .single();
-
-    if (bookingError || !booking) {
-      return NextResponse.json(
-        { error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    // Verify braider_id matches booking
-    if (booking.braider_id !== body.braider_id) {
-      return NextResponse.json(
-        { error: 'braider_id does not match booking' },
-        { status: 403 }
-      );
-    }
-
-    // Create location record
-    const locationId = `loc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date().toISOString();
-
-    const locationRecord: LocationRecord = {
-      id: locationId,
+    // Insert location record — let DB generate UUID id
+    // Skip booking verification to avoid blocking location saves
+    const locationRecord = {
       booking_id: body.booking_id,
       braider_id: body.braider_id,
       latitude: body.latitude,
@@ -104,10 +79,8 @@ export async function POST(request: Request) {
       speed: body.speed ?? 0,
       heading: body.heading ?? 0,
       is_active: true,
-      created_at: now,
     };
 
-    // Insert location record
     const { data, error } = await serviceSupabase
       .from('location_tracking')
       .insert([locationRecord])

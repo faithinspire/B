@@ -31,48 +31,42 @@ export async function GET(
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
 
-    // Build query for latest location
-    let query = serviceSupabase
-      .from('location_tracking')
-      .select('*')
-      .eq('braider_id', braider_id)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    // Build query for latest location — try with booking_id filter first, then fallback
+    let locations: any[] | null = null;
 
-    // Filter by booking_id if provided
     if (booking_id) {
-      // Verify booking exists
-      const { data: booking, error: bookingError } = await serviceSupabase
-        .from('bookings')
-        .select('id')
-        .eq('id', booking_id)
-        .single();
+      // Try filtered by booking_id
+      const { data, error } = await serviceSupabase
+        .from('location_tracking')
+        .select('*')
+        .eq('braider_id', braider_id)
+        .eq('booking_id', booking_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (bookingError || !booking) {
-        return NextResponse.json(
-          { error: 'Booking not found' },
-          { status: 404 }
-        );
+      if (!error && data && data.length > 0) {
+        locations = data;
       }
-
-      query = query.eq('booking_id', booking_id);
     }
 
-    const { data: locations, error } = await query;
+    // Fallback: get latest location for braider regardless of booking
+    if (!locations || locations.length === 0) {
+      const { data, error } = await serviceSupabase
+        .from('location_tracking')
+        .select('*')
+        .eq('braider_id', braider_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    if (error) {
-      console.error('Error fetching braider location:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch location' },
-        { status: 500 }
-      );
+      if (error) {
+        console.error('Error fetching braider location:', error);
+        return NextResponse.json({ error: 'Failed to fetch location' }, { status: 500 });
+      }
+      locations = data;
     }
 
     if (!locations || locations.length === 0) {
-      return NextResponse.json(
-        { error: 'No location found for braider' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'No location found for braider' }, { status: 404 });
     }
 
     return NextResponse.json(locations[0]);
