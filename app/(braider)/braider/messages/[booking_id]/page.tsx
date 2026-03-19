@@ -2,12 +2,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { supabase } from '@/lib/supabase';
-import { Send, MapPin, CheckCheck, Check, Loader, ArrowLeft, Navigation, Smile } from 'lucide-react';
-import { BraiderLocationMap } from '@/app/components/BraiderLocationMap';
-import { useBraiderLocationTracking } from '@/app/hooks/useBraiderLocationTracking';
+import { createClient } from '@supabase/supabase-js';
+import { ArrowLeft, Send, Loader, MapPin, Check, CheckCheck, Phone, MoreVertical } from 'lucide-react';
 
-interface Message {
+function getDb() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+}
+
+interface Msg {
   id: string;
   conversation_id: string;
   sender_id: string;
@@ -15,258 +17,273 @@ interface Message {
   created_at: string;
   read?: boolean;
   is_read?: boolean;
-  sender_role?: string;
 }
 
-interface Conversation {
+interface ConvInfo {
   id: string;
-  booking_id?: string | null;
-  braider_id: string;
-  customer_id: string;
+  other_id: string;
+  other_name: string;
+  other_avatar: string | null;
   status: string;
-  customer_name?: string;
-  customer_avatar?: string;
 }
 
-const BG = "url('/images/braiding-styles/gemini-3-pro-image-preview-2k_b_Hero_Background_Imag.png')";
+function Avatar({ name, url, size = 10 }: { name: string; url?: string | null; size?: number }) {
+  const s = `w-${size} h-${size}`;
+  return (
+    <div className={`${s} rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0`}>
+      {url ? <img src={url} className="w-full h-full object-cover" alt={name}/> : name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
 
-export default function BraiderChatPage() {
+function formatTime(ts: string) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function formatDay(ts: string) {
+  const d = new Date(ts), t = new Date();
+  if (d.toDateString() === t.toDateString()) return 'Today';
+  const y = new Date(t); y.setDate(t.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
-  const booking_id = params?.booking_id as string;
+  const urlId = params?.booking_id as string;
   const { user, loading: authLoading } = useSupabaseAuthStore();
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [conv, setConv] = useState<ConvInfo | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [showMap, setShowMap] = useState(false);
-  const { isTracking, startTracking, stopTracking, currentPosition } = useBraiderLocationTracking(booking_id);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'braider')) router.push('/login');
   }, [user, authLoading, router]);
 
-  const fetchData = useCallback(async () => {
-    if (!user || !booking_id) return;
+  const loadConv = useCallback(async () => {
+    if (!user || !urlId) return;
+    setLoading(true); setError(null);
     try {
-      setLoading(true); setError(null);
-      const res = await fetch('/api/conversations?user_id=' + user.id + '&role=braider');
-      if (!res.ok) throw new Error('Failed to load conversations');
-      const convList = await res.json();
-      // Match by booking_id OR by conv.id (fallback for old-schema convs without booking_id)
-      let conv: Conversation | null = Array.isArray(convList)
-        ? (convList.find((c: Conversation) => c.booking_id === booking_id || c.id === booking_id) ?? null)
-        : null;
-      if (!conv) throw new Error('No conversation found. Accept the booking first.');
-      if (conv.customer_id && supabase) {
-        const { data: p } = await supabase.from('profiles').select('full_name,avatar_url').eq('id', conv.customer_id).single();
-        if (p) conv = { ...conv, customer_name: (p as any).full_name, customer_avatar: (p as any).avatar_url };
+      const db = getDb();
+      // Find conversation by booking_id OR by id
+      const { data: rows } = await db.from('conversations').select('*')
+        .or(`id.eq.${urlId},booking_id.eq.${urlId}`)
+        .limit(1);
+
+      let row = rows?.[0];
+
+      // Fallback: search by participant
+      if (!row) {
+        const { data: rows2 } = await db.from('conversations').select('*')
+          .or(`customer_id.eq.${user.id},braider_id.eq.${user.id},participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
+          .order('updated_at', { ascending: false }).limit(20);
+        row = rows2?.find((r: any) => r.booking_id === urlId || r.id === urlId);
       }
-      setConversation(conv);
-      const msgRes = await fetch('/api/messages/conversation/' + conv.id + '?user_id=' + user.id + '&limit=100');
-      if (msgRes.ok) {
-        const d = await msgRes.json();
-        setMessages(d?.messages || (Array.isArray(d) ? d : []));
+
+      if (!row) { setError('Conversation not found. The booking may not have been accepted yet.'); setLoading(false); return; }
+
+      // Determine other party
+      const otherId = row.customer_id ||
+        (row.participant1_id === user.id ? row.participant2_id : row.participant1_id);
+
+      let other_name = 'Customer', other_avatar = null;
+      if (otherId) {
+        const { data: p } = await db.from('profiles').select('full_name,avatar_url').eq('id', otherId).single();
+        if (p) { other_name = p.full_name || 'Customer'; other_avatar = p.avatar_url; }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load chat');
+
+      setConv({ id: row.id, other_id: otherId, other_name, other_avatar, status: row.status || 'active' });
+
+      // Load messages
+      const { data: msgRows } = await db.from('messages').select('*')
+        .eq('conversation_id', row.id).order('created_at', { ascending: true }).limit(200);
+      setMsgs(msgRows || []);
+
+      // Mark as read
+      if (msgRows?.length) {
+        const unread = msgRows.filter((m: Msg) => m.sender_id !== user.id && !m.read && !m.is_read);
+        if (unread.length) {
+          await db.from('messages').update({ read: true }).in('id', unread.map((m: Msg) => m.id));
+        }
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to load');
     } finally { setLoading(false); }
-  }, [user, booking_id]);
+  }, [user, urlId]);
 
   useEffect(() => {
-    if (!authLoading && user) fetchData();
-  }, [user, authLoading, fetchData]);
+    if (!authLoading && user) loadConv();
+  }, [user, authLoading, loadConv]);
 
-  // Real-time: new messages
+  // Real-time subscription
   useEffect(() => {
-    if (!conversation || !supabase) return;
-    const ch = supabase
-      .channel('chat_braider_' + conversation.id)
+    if (!conv) return;
+    const db = getDb();
+    const ch = db.channel('chat_' + conv.id)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
-        filter: 'conversation_id=eq.' + conversation.id,
+        filter: 'conversation_id=eq.' + conv.id,
       }, (p) => {
-        const m = p.new as Message;
-        setMessages(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]);
+        const m = p.new as Msg;
+        setMsgs(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]);
+        // Mark read if from other party
+        if (m.sender_id !== user?.id) {
+          db.from('messages').update({ read: true }).eq('id', m.id).then(() => {});
+        }
       })
       .subscribe();
-    return () => { supabase?.removeChannel(ch); };
-  }, [conversation]);
+    return () => { db.removeChannel(ch); };
+  }, [conv, user]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user || !conversation || sending) return;
-    const content = newMessage.trim();
-    setNewMessage('');
+  const send = async () => {
+    const content = text.trim();
+    if (!content || !conv || !user || sending) return;
+    setText('');
     setSending(true);
-    const tempMsg: Message = {
-      id: 'tmp_' + Date.now(),
-      conversation_id: conversation.id,
-      sender_id: user.id,
-      content,
-      created_at: new Date().toISOString(),
-      read: false,
-      sender_role: 'braider',
+    setError(null);
+
+    const tempId = 'tmp_' + Date.now();
+    const tempMsg: Msg = {
+      id: tempId, conversation_id: conv.id, sender_id: user.id,
+      content, created_at: new Date().toISOString(), read: false,
     };
-    setMessages(prev => [...prev, tempMsg]);
+    setMsgs(prev => [...prev, tempMsg]);
+
     try {
-      const res = await fetch('/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversation.id, sender_id: user.id, sender_role: 'braider', content, message_type: 'text' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send');
-      setMessages(prev => prev.map(m => m.id === tempMsg.id ? (data as Message) : m));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send');
-      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-      setNewMessage(content);
-    } finally { setSending(false); inputRef.current?.focus(); }
+      const db = getDb();
+      const { data, error: err } = await db.from('messages').insert({
+        conversation_id: conv.id,
+        sender_id: user.id,
+        content,
+        read: false,
+        created_at: new Date().toISOString(),
+      }).select().single();
+
+      if (err) throw new Error(err.message);
+      setMsgs(prev => prev.map(m => m.id === tempId ? data : m));
+
+      // Update conversation updated_at
+      await db.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conv.id);
+    } catch (e: any) {
+      setError('Failed to send: ' + e.message);
+      setMsgs(prev => prev.filter(m => m.id !== tempId));
+      setText(content);
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
   };
 
-  const formatTime = (ts: string) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const formatDate = (ts: string) => {
-    const d = new Date(ts); const today = new Date();
-    if (d.toDateString() === today.toDateString()) return 'Today';
-    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
-
-  const groupedMessages = messages.reduce<Record<string, Message[]>>((groups, msg) => {
-    const date = formatDate(msg.created_at);
-    if (!groups[date]) groups[date] = [];
-    groups[date].push(msg);
-    return groups;
-  }, {});
+  // Group messages by day
+  const groups: { day: string; messages: Msg[] }[] = [];
+  msgs.forEach(m => {
+    const day = formatDay(m.created_at);
+    const last = groups[groups.length - 1];
+    if (last?.day === day) last.messages.push(m);
+    else groups.push({ day, messages: [m] });
+  });
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundImage: BG, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="bg-white/80 backdrop-blur rounded-2xl p-8 text-center shadow-xl">
-          <Loader className="w-10 h-10 text-purple-600 animate-spin mx-auto mb-3"/>
-          <p className="text-gray-600 text-sm">Loading chat...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader className="w-8 h-8 text-purple-600 animate-spin"/>
       </div>
     );
   }
   if (!user || user.role !== 'braider') return null;
 
-  if (!conversation) {
+  if (!conv) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: BG, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
-          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MapPin className="w-8 h-8 text-purple-600"/>
-          </div>
-          <p className="text-red-600 font-semibold mb-2">{error || 'No conversation found'}</p>
-          <p className="text-gray-500 text-sm mb-5">Accept the booking first to start chatting.</p>
-          <button onClick={() => router.push('/braider/messages')} className="w-full py-2.5 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700">Back to Messages</button>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <MapPin className="w-8 h-8 text-red-500"/>
         </div>
+        <h2 className="text-lg font-bold text-gray-800 mb-2">Chat not available</h2>
+        <p className="text-gray-500 text-sm mb-6 max-w-xs">{error || 'Conversation not found.'}</p>
+        <button onClick={() => router.push('/braider/messages')}
+          className="px-6 py-2.5 bg-purple-600 text-white rounded-full font-semibold text-sm hover:bg-purple-700 transition-colors">
+          Back to Messages
+        </button>
       </div>
     );
   }
 
-  const otherName = conversation.customer_name || 'Customer';
-  const otherAvatar = conversation.customer_avatar;
-
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundImage: BG, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      <div className="absolute inset-0 bg-purple-900/40 backdrop-blur-[2px] pointer-events-none"/>
-      <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-purple-100 px-4 py-3 flex items-center gap-3 shadow-sm">
-        <button onClick={() => router.push('/braider/messages')} className="p-2 hover:bg-purple-50 rounded-xl transition-colors">
+    <div className="flex flex-col h-screen bg-gray-50 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+        <button onClick={() => router.push('/braider/messages')} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700"/>
         </button>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm overflow-hidden">
-          {otherAvatar ? <img src={otherAvatar} className="w-full h-full object-cover" alt={otherName}/> : otherName.charAt(0).toUpperCase()}
-        </div>
+        <Avatar name={conv.other_name} url={conv.other_avatar} size={10}/>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{otherName}</p>
-          <p className="text-xs text-purple-600 font-medium">Booking #{String(booking_id).slice(0, 8)}</p>
+          <p className="font-semibold text-gray-900 truncate leading-tight">{conv.other_name}</p>
+          <p className="text-xs text-green-500 font-medium">Active now</p>
         </div>
-        <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-xl transition-colors ${showMap ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100 text-gray-500'}`} title="Toggle Map">
-          <MapPin className="w-5 h-5"/>
+        <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+          <MoreVertical className="w-5 h-5 text-gray-500"/>
         </button>
-        {isTracking && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/>
-            <span className="text-xs text-green-700 font-medium">Sharing</span>
-          </div>
-        )}
       </div>
 
-      {showMap && (
-        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur border-b border-purple-100 shadow-sm" style={{ height: '260px' }}>
-          <div className="h-full p-3 flex gap-3">
-            <div className="flex-1 rounded-xl overflow-hidden shadow-sm">
-              <BraiderLocationMap booking_id={booking_id} braiderCurrentLocation={currentPosition}/>
-            </div>
-            <div className="w-32 flex flex-col gap-2">
-              <div className="bg-white/90 rounded-xl shadow-sm border border-purple-100 p-3">
-                <h3 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
-                  <Navigation className="w-3.5 h-3.5 text-purple-600"/> Location
-                </h3>
-                <button
-                  onClick={isTracking ? stopTracking : startTracking}
-                  className={`w-full py-2 rounded-lg font-semibold text-xs flex items-center justify-center gap-1 transition-all ${isTracking ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
-                >
-                  <MapPin className="w-3.5 h-3.5"/>
-                  {isTracking ? 'Stop' : 'Share Location'}
-                </button>
-                {isTracking && <p className="text-xs text-green-600 text-center mt-1.5 font-medium">● Live</p>}
-              </div>
-              <div className="bg-white/90 rounded-xl shadow-sm border border-purple-100 p-3 text-xs">
-                <p className="font-semibold text-gray-700 mb-1">Booking</p>
-                <p className="text-gray-500 font-mono">{String(booking_id).slice(0, 10)}...</p>
-                <p className="text-gray-500 mt-1 capitalize">{conversation.status}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="bg-white/80 backdrop-blur rounded-2xl p-6 text-center shadow-lg">
-              <Smile className="w-10 h-10 text-purple-400 mx-auto mb-2"/>
-              <p className="text-gray-700 font-medium">No messages yet</p>
-              <p className="text-gray-500 text-sm mt-1">Say hello to get started!</p>
-            </div>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {msgs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <Avatar name={conv.other_name} url={conv.other_avatar} size={16}/>
+            <p className="mt-4 font-semibold text-gray-800">{conv.other_name}</p>
+            <p className="text-sm text-gray-500 mt-1">Say hello to get started!</p>
           </div>
         ) : (
-          Object.entries(groupedMessages).map(([date, msgs]) => (
-            <div key={date}>
+          groups.map(({ day, messages }) => (
+            <div key={day}>
+              {/* Day separator */}
               <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 h-px bg-white/30"/>
-                <span className="text-xs text-white font-medium bg-black/30 backdrop-blur px-3 py-1 rounded-full">{date}</span>
-                <div className="flex-1 h-px bg-white/30"/>
+                <div className="flex-1 h-px bg-gray-200"/>
+                <span className="text-xs text-gray-400 font-medium px-2">{day}</span>
+                <div className="flex-1 h-px bg-gray-200"/>
               </div>
-              {msgs.map((msg, i) => {
-                const isOwn = msg.sender_id === user.id;
-                const showAvatar = !isOwn && (i === 0 || msgs[i-1]?.sender_id !== msg.sender_id);
+              {messages.map((m, i) => {
+                const isOwn = m.sender_id === user.id;
+                const prevSame = i > 0 && messages[i-1].sender_id === m.sender_id;
+                const nextSame = i < messages.length - 1 && messages[i+1].sender_id === m.sender_id;
+                const isTemp = m.id.startsWith('tmp_');
+
                 return (
-                  <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5`}>
+                  <div key={m.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${prevSame ? 'mt-0.5' : 'mt-3'}`}>
+                    {/* Other avatar — only show on last in group */}
                     {!isOwn && (
-                      <div className={`w-7 h-7 rounded-full flex-shrink-0 mr-2 mt-1 overflow-hidden ${showAvatar ? 'bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-xs font-bold shadow-sm' : 'opacity-0'}`}>
-                        {showAvatar && (otherAvatar ? <img src={otherAvatar} className="w-full h-full object-cover" alt=""/> : otherName.charAt(0))}
+                      <div className="w-8 flex-shrink-0 mr-2 self-end">
+                        {!nextSame && <Avatar name={conv.other_name} url={conv.other_avatar} size={8}/>}
                       </div>
                     )}
-                    <div className={`max-w-[72%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <div className={`px-4 py-2.5 rounded-2xl shadow-md ${isOwn ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-br-sm' : 'bg-white/95 backdrop-blur text-gray-900 rounded-bl-sm border border-purple-100'} ${msg.id?.startsWith('tmp_') ? 'opacity-70' : ''}`}>
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <div className="max-w-[75%] flex flex-col">
+                      <div className={`px-4 py-2.5 text-sm leading-relaxed ${
+                        isOwn
+                          ? 'bg-purple-600 text-white ' + (prevSame ? 'rounded-2xl rounded-tr-md' : nextSame ? 'rounded-2xl rounded-br-md' : 'rounded-2xl')
+                          : 'bg-white text-gray-900 shadow-sm border border-gray-100 ' + (prevSame ? 'rounded-2xl rounded-tl-md' : nextSame ? 'rounded-2xl rounded-bl-md' : 'rounded-2xl')
+                      } ${isTemp ? 'opacity-60' : ''}`}>
+                        {m.content}
                       </div>
-                      <div className={`flex items-center gap-1 mt-0.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                        <span className="text-xs text-white/70">{formatTime(msg.created_at)}</span>
-                        {isOwn && ((msg.read || msg.is_read) ? <CheckCheck className="w-3.5 h-3.5 text-blue-300"/> : <Check className="w-3.5 h-3.5 text-white/50"/>)}
-                      </div>
+                      {/* Time + read receipt — only on last in group */}
+                      {!nextSame && (
+                        <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                          <span className="text-xs text-gray-400">{formatTime(m.created_at)}</span>
+                          {isOwn && (
+                            (m.read || m.is_read)
+                              ? <CheckCheck className="w-3.5 h-3.5 text-purple-500"/>
+                              : <Check className="w-3.5 h-3.5 text-gray-400"/>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -274,29 +291,39 @@ export default function BraiderChatPage() {
             </div>
           ))
         )}
-        <div ref={messagesEndRef}/>
+        <div ref={bottomRef}/>
       </div>
 
-      <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-md border-t border-purple-100 px-4 py-3 shadow-lg">
-        {error && <p className="text-red-500 text-xs mb-2 px-1">{error}</p>}
-        <form onSubmit={handleSend} className="flex items-center gap-2">
-          <div className="flex-1 bg-white/80 border border-purple-200 rounded-2xl px-4 py-2.5 focus-within:border-purple-400 focus-within:bg-white transition-all shadow-sm">
+      {/* Error */}
+      {error && (
+        <div className="flex-shrink-0 px-4 py-2 bg-red-50 border-t border-red-100">
+          <p className="text-xs text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3 pb-safe">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 flex items-center">
             <input
               ref={inputRef}
               type="text"
-              value={newMessage}
-              onChange={e => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder="Message..."
               disabled={sending}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e as unknown as React.FormEvent); } }}
+              className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
             />
           </div>
-          <button type="submit" disabled={sending || !newMessage.trim()}
-            className="w-11 h-11 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex-shrink-0">
+          <button
+            onClick={send}
+            disabled={!text.trim() || sending}
+            className="w-10 h-10 bg-purple-600 disabled:bg-gray-300 text-white rounded-full flex items-center justify-center transition-all hover:bg-purple-700 active:scale-95 flex-shrink-0"
+          >
             {sending ? <Loader className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4"/>}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );
