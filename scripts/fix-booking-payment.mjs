@@ -1,4 +1,9 @@
-'use client';
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
+
+const root = process.cwd();
+
+const bookingPage = `'use client';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,7 +124,7 @@ function PaymentForm({ bookingId, amount, onSuccess }: { bookingId: string; amou
         disabled={!stripeReady || loading}
         className="w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-smooth font-semibold"
       >
-        {loading ? 'Processing...' : `Pay $${amount?.toFixed(2)}`}
+        {loading ? 'Processing...' : \`Pay $\${amount?.toFixed(2)}\`}
       </button>
     </form>
   );
@@ -139,7 +144,7 @@ export default function BookingDetailPage() {
   const fetchBooking = async () => {
     if (!params?.id) return;
     try {
-      const response = await fetch(`/api/bookings/${params.id}`);
+      const response = await fetch(\`/api/bookings/\${params.id}\`);
       if (!response.ok) { setLoading(false); return; }
       const data = await response.json();
       setBooking(data);
@@ -196,7 +201,7 @@ export default function BookingDetailPage() {
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">Status</h2>
-                <span className={`px-4 py-2 rounded-full font-medium ${getStatusColor(booking.status)}`}>
+                <span className={\`px-4 py-2 rounded-full font-medium \${getStatusColor(booking.status)}\`}>
                   {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
                 </span>
               </div>
@@ -211,7 +216,7 @@ export default function BookingDetailPage() {
                   <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-blue-700">Your booking is confirmed.</p>
-                    <button onClick={() => router.push(`/messages/${booking.id}`)} className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm">
+                    <button onClick={() => router.push(\`/messages/\${booking.id}\`)} className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm">
                       Chat with Braider
                     </button>
                   </div>
@@ -262,15 +267,15 @@ export default function BookingDetailPage() {
             <div className="space-y-3 mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Service</span>
-                <span className="font-medium">${(booking.service_price || 0).toFixed(2)}</span>
+                <span className="font-medium">\${(booking.service_price || 0).toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Platform Fee</span>
-                <span className="font-medium">${(booking.platform_fee || 0).toFixed(2)}</span>
+                <span className="font-medium">\${(booking.platform_fee || 0).toFixed(2)}</span>
               </div>
               <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
                 <span className="font-semibold">Total</span>
-                <span className="text-2xl font-bold text-primary-600">${(booking.total_amount || 0).toFixed(2)}</span>
+                <span className="text-2xl font-bold text-primary-600">\${(booking.total_amount || 0).toFixed(2)}</span>
               </div>
             </div>
             {isPending && !paymentComplete && (
@@ -288,7 +293,7 @@ export default function BookingDetailPage() {
                 <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
                 <p className="text-green-700 font-semibold">Payment Successful!</p>
                 <p className="text-green-600 text-sm mt-1">Your booking is confirmed.</p>
-                <button onClick={() => router.push(`/messages/${booking.id}`)} className="mt-3 w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm">
+                <button onClick={() => router.push(\`/messages/\${booking.id}\`)} className="mt-3 w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold text-sm">
                   Chat with Braider →
                 </button>
               </div>
@@ -299,3 +304,9 @@ export default function BookingDetailPage() {
     </div>
   );
 }
+`;
+
+const filePath = resolve(root, 'app/(customer)/booking/[id]/page.tsx');
+writeFileSync(filePath, bookingPage, 'utf8');
+console.log('Written:', filePath);
+console.log('Done.');

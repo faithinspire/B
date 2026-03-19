@@ -90,19 +90,19 @@ export async function POST(request: Request) {
     const isPartOfConversation =
       body.sender_id === conversation.customer_id ||
       body.sender_id === conversation.braider_id ||
-      (conversation.admin_id && body.sender_id === conversation.admin_id);
+      (conversation.admin_id && body.sender_id === conversation.admin_id) ||
+      body.sender_role === 'admin';
 
     if (!isPartOfConversation) {
+      console.error('403: sender_id', body.sender_id, 'not in conversation. customer_id:', conversation.customer_id, 'braider_id:', conversation.braider_id);
       return NextResponse.json(
         { error: 'Sender is not part of this conversation' },
         { status: 403 }
       );
     }
 
-    // Create message
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    const message: Message = {
-      id: messageId,
+    // Create message — let DB generate the ID
+    const message = {
       conversation_id: body.conversation_id,
       sender_id: body.sender_id,
       sender_role: body.sender_role,

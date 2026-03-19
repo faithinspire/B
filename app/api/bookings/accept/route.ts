@@ -82,8 +82,10 @@ export async function POST(request: NextRequest) {
         await serviceSupabase.from('messages').insert({
           conversation_id: conversationId,
           sender_id: braiderId,
+          sender_role: 'braider',
           content: `Booking accepted! Let's discuss the details.`,
           message_type: 'system',
+          is_read: false,
           created_at: new Date().toISOString(),
         });
       }
