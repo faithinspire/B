@@ -86,10 +86,21 @@ export async function POST(request: NextRequest) {
           content: `Booking accepted! Let's discuss the details.`,
           message_type: 'system',
           is_read: false,
-          created_at: new Date().toISOString(),
         });
       }
     }
+
+    // Fire notification to customer (best-effort)
+    try {
+      await serviceSupabase.from('notifications').insert({
+        user_id: booking.customer_id,
+        booking_id: bookingId,
+        type: 'booking',
+        title: 'Booking Accepted!',
+        message: 'Your braider has accepted your booking. You can now chat with them.',
+        read: false,
+      });
+    } catch {}
 
     return NextResponse.json({
       success: true,

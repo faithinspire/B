@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create message — let DB generate the ID
+    // Create message — let DB generate ID and created_at
     const message = {
       conversation_id: body.conversation_id,
       sender_id: body.sender_id,
@@ -110,7 +110,6 @@ export async function POST(request: Request) {
       message_type: body.message_type,
       metadata: body.metadata || null,
       is_read: false,
-      created_at: new Date().toISOString(),
     };
 
     const { data, error } = await serviceSupabase
@@ -127,19 +126,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // Log admin access if admin sends message
+    // Notify the other party about the new message (best-effort)
+    try {
+      const recipientId =
+        body.sender_role === 'customer' ? conversation.braider_id :
+        body.sender_role === 'braider' ? conversation.customer_id :
+        conversation.customer_id; // admin → notify customer
+      if (recipientId && recipientId !== body.sender_id) {
+        await serviceSupabase.from('notifications').insert({
+          user_id: recipientId,
+          booking_id: null,
+          type: 'message',
+          title: 'New Message',
+          message: body.content.length > 60 ? body.content.slice(0, 60) + '...' : body.content,
+          read: false,
+        });
+      }
+    } catch {}
+
+    // Log admin access if admin sends message (best-effort, don't fail on error)
     if (body.sender_role === 'admin') {
-      await serviceSupabase
-        .from('admin_access_logs')
-        .insert([
-          {
-            id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            admin_id: body.sender_id,
-            conversation_id: body.conversation_id,
-            action: 'sent_message',
-            timestamp: new Date().toISOString(),
-          },
-        ]);
+      try {
+        await serviceSupabase
+          .from('admin_access_logs')
+          .insert([
+            {
+              admin_id: body.sender_id,
+              conversation_id: body.conversation_id,
+              action: 'sent_message',
+            },
+          ]);
+      } catch (logErr) {
+        console.warn('Admin log insert failed (non-fatal):', logErr);
+      }
     }
 
     return NextResponse.json(data, { status: 201 });

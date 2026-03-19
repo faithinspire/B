@@ -17,6 +17,7 @@ export async function GET() {
         booking_id,
         customer_id,
         braider_id,
+        admin_id,
         status,
         started_at,
         ended_at,
@@ -33,14 +34,14 @@ export async function GET() {
       (conversations || []).map(async (conv) => {
         // Get customer name
         const { data: customer } = await supabase
-          .from('users')
+          .from('profiles')
           .select('full_name')
           .eq('id', conv.customer_id)
           .single();
 
         // Get braider name
         const { data: braider } = await supabase
-          .from('users')
+          .from('profiles')
           .select('full_name')
           .eq('id', conv.braider_id)
           .single();
