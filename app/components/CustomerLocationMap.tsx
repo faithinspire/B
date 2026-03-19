@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import { Loader, MapPin, Navigation, Clock, Route } from 'lucide-react';
 
 declare global {
@@ -18,12 +19,14 @@ interface CustomerLocationMapProps {
   braiderLocation?: BraiderLocation | null;
   braiderName?: string;
   bookingId?: string;
+  onBraiderLocationUpdate?: (loc: BraiderLocation) => void;
 }
 
 export function CustomerLocationMap({
-  braiderLocation,
+  braiderLocation: braiderLocationProp,
   braiderName = 'Braider',
   bookingId,
+  onBraiderLocationUpdate,
 }: CustomerLocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -32,11 +35,36 @@ export function CustomerLocationMap({
   const directionsRendererRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
   const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [braiderLocation, setBraiderLocation] = useState<BraiderLocation | null>(braiderLocationProp ?? null);
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
   const [noApiKey, setNoApiKey] = useState(false);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  // Sync prop changes
+  useEffect(() => {
+    if (braiderLocationProp) setBraiderLocation(braiderLocationProp);
+  }, [braiderLocationProp]);
+
+  // Real-time subscription for braider location updates
+  useEffect(() => {
+    if (!bookingId || !supabase) return;
+    const ch = supabase
+      .channel('clm_braider_' + bookingId)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'location_tracking',
+        filter: `booking_id=eq.${bookingId}`,
+      }, (payload) => {
+        const loc = payload.new as BraiderLocation & { booking_id: string };
+        if (loc?.latitude) {
+          setBraiderLocation(loc);
+          onBraiderLocationUpdate?.(loc);
+        }
+      })
+      .subscribe();
+    return () => { supabase?.removeChannel(ch); };
+  }, [bookingId, onBraiderLocationUpdate]);
 
   // Get customer's current location
   useEffect(() => {
