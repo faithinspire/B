@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { createClient } from '@supabase/supabase-js';
-import { ArrowLeft, Send, Loader, MapPin, Check, CheckCheck, Phone, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Send, Loader, MapPin, Check, CheckCheck, MoreVertical } from 'lucide-react';
 
 function getDb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -83,6 +83,33 @@ export default function ChatPage() {
           .or(`customer_id.eq.${user.id},braider_id.eq.${user.id},participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
           .order('updated_at', { ascending: false }).limit(20);
         row = rows2?.find((r: any) => r.booking_id === urlId || r.id === urlId);
+      }
+
+      // AUTO-CREATE: if still not found, look up the booking and create the conversation
+      if (!row) {
+        const { data: booking } = await db.from('bookings').select('*').eq('id', urlId).maybeSingle();
+        if (booking && booking.customer_id && booking.braider_id) {
+          const now = new Date().toISOString();
+          const { data: created, error: createErr } = await db.from('conversations').insert({
+            booking_id: urlId,
+            customer_id: booking.customer_id,
+            braider_id: booking.braider_id,
+            status: 'active',
+            started_at: now,
+            created_at: now,
+            updated_at: now,
+          }).select().single();
+          if (!createErr && created) {
+            row = created;
+          } else {
+            const { data: created2 } = await db.from('conversations').insert({
+              participant1_id: booking.customer_id,
+              participant2_id: booking.braider_id,
+              created_at: now,
+            }).select().single();
+            if (created2) row = created2;
+          }
+        }
       }
 
       if (!row) { setError('Conversation not found. The booking may not have been accepted yet.'); setLoading(false); return; }
