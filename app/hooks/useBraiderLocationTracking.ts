@@ -17,6 +17,7 @@ export function useBraiderLocationTracking(booking_id: string) {
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   const startTracking = useCallback(async () => {
     if (!user || !booking_id) return;
@@ -34,6 +35,8 @@ export function useBraiderLocationTracking(booking_id: string) {
         async (position) => {
           const { latitude, longitude, accuracy, speed, heading } = position.coords;
           const timestamp = position.timestamp;
+
+          setCurrentPosition({ lat: latitude, lng: longitude });
 
           try {
             // Send to server
@@ -100,6 +103,7 @@ export function useBraiderLocationTracking(booking_id: string) {
   return {
     isTracking,
     error,
+    currentPosition,
     startTracking,
     stopTracking,
   };

@@ -1,258 +1,235 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Loader, AlertCircle, MapPin } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Loader, MapPin, Navigation, Clock, Route } from 'lucide-react';
 
 declare global {
-  interface Window {
-    google: any;
-  }
+  interface Window { google: any; }
 }
 
 interface BraiderLocation {
   latitude: number;
   longitude: number;
-  accuracy: number;
-  speed: number;
-  heading: number;
-  created_at: string;
-}
-
-interface LocationHistoryPoint {
-  latitude: number;
-  longitude: number;
-  created_at: string;
+  accuracy?: number;
+  created_at?: string;
 }
 
 interface CustomerLocationMapProps {
-  braiderLocation?: BraiderLocation;
-  locationHistory?: LocationHistoryPoint[];
-  customerLocation?: {
-    latitude: number;
-    longitude: number;
-  };
+  braiderLocation?: BraiderLocation | null;
   braiderName?: string;
+  bookingId?: string;
 }
 
 export function CustomerLocationMap({
   braiderLocation,
-  locationHistory = [],
-  customerLocation,
   braiderName = 'Braider',
+  bookingId,
 }: CustomerLocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polylineRef = useRef<any>(null);
+  const braiderMarkerRef = useRef<any>(null);
+  const customerMarkerRef = useRef<any>(null);
+  const directionsRendererRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [noApiKey, setNoApiKey] = useState(false);
 
-  // Initialize map
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  // Get customer's current location
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCustomerLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {} // silent fail
+      );
+    }
+  }, []);
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    const hasApiKey = !!apiKey && apiKey.length > 10;
+  // Load Google Maps
+  useEffect(() => {
+    if (!apiKey || apiKey.length < 10) { setNoApiKey(true); setLoading(false); return; }
+    if (window.google?.maps) { setMapsReady(true); return; }
 
-    if (!hasApiKey) {
-      setError('no-api-key');
-      setLoading(false);
+    const existing = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existing) {
+      existing.addEventListener('load', () => setMapsReady(true));
       return;
     }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=directions`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setMapsReady(true);
+    script.onerror = () => { setNoApiKey(true); setLoading(false); };
+    document.head.appendChild(script);
+  }, [apiKey]);
 
-    const initMap = async () => {
-      try {
-        setLoading(true);
+  const updateRoute = useCallback(async () => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+    if (!braiderLocation || !customerLocation) return;
 
-        // Check if Google Maps is already loaded
-        if (!window.google?.maps) {
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector(`script[src*="maps.googleapis.com"]`);
-            if (existing) {
-              if (window.google?.maps) { resolve(); return; }
-              existing.addEventListener('load', () => resolve());
-              return;
-            }
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-            script.async = true;
-            script.defer = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load Google Maps'));
-            document.head.appendChild(script);
-          });
-        }
+    const braiderPos = { lat: braiderLocation.latitude, lng: braiderLocation.longitude };
+    const customerPos = customerLocation;
 
-        if (!window.google?.maps || !mapRef.current) {
-          setError('Failed to load Google Maps');
-          setLoading(false);
-          return;
-        }
+    // Update braider marker
+    if (braiderMarkerRef.current) {
+      braiderMarkerRef.current.setPosition(braiderPos);
+    } else {
+      braiderMarkerRef.current = new window.google.maps.Marker({
+        position: braiderPos,
+        map: mapInstanceRef.current,
+        title: braiderName,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#9333ea',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+        },
+        label: { text: '✂', color: '#fff', fontSize: '12px' },
+      });
+      new window.google.maps.InfoWindow({ content: `<b>${braiderName}</b><br>On the way` })
+        .open(mapInstanceRef.current, braiderMarkerRef.current);
+    }
 
-        // Determine center
-        const center = braiderLocation
-          ? { lat: braiderLocation.latitude, lng: braiderLocation.longitude }
-          : customerLocation
-            ? { lat: customerLocation.latitude, lng: customerLocation.longitude }
-            : { lat: 40.7128, lng: -74.006 }; // Default to NYC
+    // Update customer marker
+    if (customerMarkerRef.current) {
+      customerMarkerRef.current.setPosition(customerPos);
+    } else {
+      customerMarkerRef.current = new window.google.maps.Marker({
+        position: customerPos,
+        map: mapInstanceRef.current,
+        title: 'Your Location',
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+        },
+      });
+    }
 
-        // Create map
-        const mapInstance = new window.google.maps.Map(mapRef.current, {
-          zoom: 15,
-          center,
-          mapTypeControl: true,
-          fullscreenControl: true,
-          streetViewControl: false,
-          zoomControl: true,
-        });
+    // Draw directions route
+    const directionsService = new window.google.maps.DirectionsService();
+    if (!directionsRendererRef.current) {
+      directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+        suppressMarkers: true,
+        polylineOptions: { strokeColor: '#9333ea', strokeWeight: 4, strokeOpacity: 0.8 },
+      });
+      directionsRendererRef.current.setMap(mapInstanceRef.current);
+    }
 
-        mapInstanceRef.current = mapInstance;
-
-        // Clear existing markers
-        markersRef.current.forEach((marker) => marker.setMap(null));
-        markersRef.current = [];
-
-        // Add braider marker
-        if (braiderLocation) {
-          const braiderMarker = new window.google.maps.Marker({
-            position: {
-              lat: braiderLocation.latitude,
-              lng: braiderLocation.longitude,
-            },
-            map: mapInstance,
-            title: braiderName,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#9333ea',
-              fillOpacity: 1,
-              strokeColor: '#fff',
-              strokeWeight: 2,
-            },
-          });
-
-          const braiderInfo = new window.google.maps.InfoWindow({
-            content: `
-              <div class="p-2">
-                <h3 class="font-semibold text-gray-900">${braiderName}</h3>
-                <p class="text-sm text-gray-600">Accuracy: ${(braiderLocation.accuracy ?? 0).toFixed(0)}m</p>
-              </div>
-            `,
-          });
-
-          braiderMarker.addListener('click', () => {
-            braiderInfo.open(mapInstance, braiderMarker);
-          });
-
-          markersRef.current.push(braiderMarker);
-        }
-
-        // Add customer marker
-        if (customerLocation) {
-          const customerMarker = new window.google.maps.Marker({
-            position: {
-              lat: customerLocation.latitude,
-              lng: customerLocation.longitude,
-            },
-            map: mapInstance,
-            title: 'Your Location',
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#3b82f6',
-              fillOpacity: 1,
-              strokeColor: '#fff',
-              strokeWeight: 2,
-            },
-          });
-
-          const customerInfo = new window.google.maps.InfoWindow({
-            content: '<div class="p-2"><h3 class="font-semibold text-gray-900">Your Location</h3></div>',
-          });
-
-          customerMarker.addListener('click', () => {
-            customerInfo.open(mapInstance, customerMarker);
-          });
-
-          markersRef.current.push(customerMarker);
-        }
-
-        // Draw route from location history
-        if (locationHistory.length > 1) {
-          const path = locationHistory.map((loc) => ({
-            lat: loc.latitude,
-            lng: loc.longitude,
-          }));
-
-          if (polylineRef.current) {
-            polylineRef.current.setMap(null);
-          }
-
-          polylineRef.current = new window.google.maps.Polyline({
-            path,
-            geodesic: true,
-            strokeColor: '#9333ea',
-            strokeOpacity: 0.7,
-            strokeWeight: 3,
-            map: mapInstance,
-          });
-        }
-
-        // Zoom to fit all markers
-        if (markersRef.current.length > 0) {
-          const bounds = new window.google.maps.LatLngBounds();
-          markersRef.current.forEach((marker) => {
-            bounds.extend(marker.getPosition());
-          });
-          mapInstance.fitBounds(bounds);
-        }
-
-        setError(null);
-        setLoading(false);
-      } catch (err) {
-        console.error('Map initialization error:', err);
-        setError('Failed to initialize map');
-        setLoading(false);
+    try {
+      const result = await directionsService.route({
+        origin: braiderPos,
+        destination: customerPos,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      });
+      directionsRendererRef.current.setDirections(result);
+      const leg = result.routes[0]?.legs[0];
+      if (leg) {
+        setRouteInfo({ distance: leg.distance.text, duration: leg.duration.text });
       }
-    };
+    } catch {
+      // Fallback: just fit bounds
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(braiderPos);
+      bounds.extend(customerPos);
+      mapInstanceRef.current.fitBounds(bounds);
+    }
+  }, [braiderLocation, customerLocation, braiderName]);
 
-    initMap();
-  }, [braiderLocation, customerLocation, locationHistory, braiderName]);
+  // Init map once Maps is ready
+  useEffect(() => {
+    if (!mapsReady || !mapRef.current) return;
+
+    const center = braiderLocation
+      ? { lat: braiderLocation.latitude, lng: braiderLocation.longitude }
+      : customerLocation || { lat: 51.505, lng: -0.09 };
+
+    mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+      zoom: 14,
+      center,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    });
+
+    setLoading(false);
+    updateRoute();
+  }, [mapsReady]); // eslint-disable-line
+
+  // Update route when locations change
+  useEffect(() => {
+    if (mapInstanceRef.current) updateRoute();
+  }, [updateRoute]);
+
+  // Fallback UI when no API key
+  if (noApiKey) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 rounded-lg p-4 gap-2">
+        <MapPin className="w-8 h-8 text-purple-600" />
+        <p className="font-semibold text-gray-800 text-sm">{braiderName}</p>
+        {braiderLocation ? (
+          <div className="text-center">
+            <p className="text-xs text-gray-600 font-mono">
+              {braiderLocation.latitude.toFixed(5)}, {braiderLocation.longitude.toFixed(5)}
+            </p>
+            {braiderLocation.created_at && (
+              <p className="text-xs text-gray-400 mt-1">
+                Updated {new Date(braiderLocation.created_at).toLocaleTimeString()}
+              </p>
+            )}
+            <p className="text-xs text-green-600 mt-2 font-semibold">● Sharing location</p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">Waiting for braider location...</p>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full h-full relative">
-      {loading && (
-        <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-lg">
-          <Loader className="w-8 h-8 text-primary-600 animate-spin" />
+    <div className="w-full h-full flex flex-col">
+      {/* Route info bar */}
+      {routeInfo && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-purple-50 border-b border-purple-100 text-xs flex-shrink-0">
+          <div className="flex items-center gap-1 text-purple-700">
+            <Route className="w-3.5 h-3.5" />
+            <span className="font-semibold">{routeInfo.distance}</span>
+          </div>
+          <div className="flex items-center gap-1 text-purple-700">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="font-semibold">{routeInfo.duration} away</span>
+          </div>
+          <div className="flex items-center gap-1 text-green-600 ml-auto">
+            <Navigation className="w-3.5 h-3.5" />
+            <span>Live</span>
+          </div>
         </div>
       )}
-
-      {error === 'no-api-key' ? (
-        <div className="absolute inset-0 bg-gray-50 flex items-center justify-center z-10 rounded-lg">
-          <div className="text-center p-4">
-            <MapPin className="w-10 h-10 text-primary-600 mx-auto mb-2" />
-            <p className="text-gray-700 font-semibold text-sm">Braider Location</p>
-            {braiderLocation ? (
-              <div className="mt-2 text-xs text-gray-600">
-                <p>{braiderName} is at:</p>
-                <p className="font-mono mt-1">{braiderLocation.latitude.toFixed(5)}, {braiderLocation.longitude.toFixed(5)}</p>
-                <p className="mt-1 text-gray-400">Last updated: {new Date(braiderLocation.created_at).toLocaleTimeString()}</p>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 mt-1">Waiting for braider location...</p>
-            )}
+      <div className="relative flex-1">
+        {loading && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-lg">
+            <Loader className="w-7 h-7 text-purple-600 animate-spin" />
           </div>
-        </div>
-      ) : error ? (
-        <div className="absolute inset-0 bg-red-50 flex items-center justify-center z-10 rounded-lg">
-          <div className="text-center">
-            <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-            <p className="text-red-600 font-semibold text-sm">{error}</p>
+        )}
+        <div ref={mapRef} className="w-full h-full rounded-lg" />
+        {!braiderLocation && !loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 rounded-lg">
+            <div className="text-center">
+              <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">Waiting for braider to share location...</p>
+            </div>
           </div>
-        </div>
-      ) : null}
-
-      <div ref={mapRef} className="w-full h-full rounded-lg" />
+        )}
+      </div>
     </div>
   );
 }

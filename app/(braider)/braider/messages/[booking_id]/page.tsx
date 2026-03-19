@@ -20,7 +20,7 @@ export default function BraiderChatPage() {
   const [sending, setSending] = useState(false);
   const [showMap, setShowMap] = useState(true);
   const messagesEndRef = useRef(null);
-  const { isTracking, startTracking, stopTracking } = useBraiderLocationTracking(booking_id);
+  const { isTracking, startTracking, stopTracking, currentPosition } = useBraiderLocationTracking(booking_id);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'braider')) router.push('/login');
@@ -177,7 +177,7 @@ export default function BraiderChatPage() {
           {showMap && (
             <div className="bg-white rounded-xl shadow p-3" style={{ height: '280px' }}>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer Location</p>
-              <div className="h-56"><BraiderLocationMap booking_id={booking_id}/></div>
+              <div className="h-56"><BraiderLocationMap booking_id={booking_id} braiderCurrentLocation={currentPosition}/></div>
             </div>
           )}
           <div className="bg-white rounded-xl shadow p-4">
