@@ -1,18 +1,13 @@
 import Stripe from 'stripe';
 
-let stripeInstance: Stripe | null = null;
-
 function getStripeInstance(): Stripe {
-  if (!stripeInstance) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripeInstance = new Stripe(key, {
-      apiVersion: '2023-10-16',
-    });
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY not configured');
   }
-  return stripeInstance;
+  return new Stripe(key, {
+    apiVersion: '2023-10-16',
+  });
 }
 
 // Named export for direct use (e.g. webhook)
@@ -37,7 +32,7 @@ export async function createPaymentIntent(
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
       currency,
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       metadata: {
         ...metadata,
         app_customer_id: customerId || '',

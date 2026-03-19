@@ -35,24 +35,9 @@ function validateLocationData(data: TrackLocationRequest): string | null {
   if (!data.braider_id) return 'braider_id is required';
   if (data.latitude === undefined || data.latitude === null) return 'latitude is required';
   if (data.longitude === undefined || data.longitude === null) return 'longitude is required';
-  if (data.accuracy === undefined || data.accuracy === null) return 'accuracy is required';
-  if (data.speed === undefined || data.speed === null) return 'speed is required';
-  if (data.heading === undefined || data.heading === null) return 'heading is required';
 
   if (!validateCoordinates(data.latitude, data.longitude)) {
     return 'Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180';
-  }
-
-  if (typeof data.accuracy !== 'number' || data.accuracy < 0 || data.accuracy > 10000) {
-    return 'accuracy must be a number between 0 and 10000 (meters)';
-  }
-
-  if (typeof data.speed !== 'number' || data.speed < 0 || data.speed > 500) {
-    return 'speed must be a number between 0 and 500 (km/h)';
-  }
-
-  if (typeof data.heading !== 'number' || data.heading < 0 || data.heading > 360) {
-    return 'heading must be a number between 0 and 360 (degrees)';
   }
 
   return null;
@@ -115,9 +100,9 @@ export async function POST(request: Request) {
       braider_id: body.braider_id,
       latitude: body.latitude,
       longitude: body.longitude,
-      accuracy: body.accuracy,
-      speed: body.speed,
-      heading: body.heading,
+      accuracy: body.accuracy ?? 0,
+      speed: body.speed ?? 0,
+      heading: body.heading ?? 0,
       is_active: true,
       created_at: now,
     };
