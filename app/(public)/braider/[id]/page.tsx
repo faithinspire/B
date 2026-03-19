@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Star, MapPin, Clock, Shield, ChevronRight, AlertCircle } from 'lucide-react';
+import { Star, MapPin, Clock, Shield, ChevronRight, AlertCircle, Crown } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -35,6 +35,7 @@ interface BraiderProfile {
   cities: string[];
   full_name: string;
   avatar_url: string | null;
+  is_premium?: boolean;
   services: Service[];
   reviews: Review[];
 }
@@ -74,6 +75,7 @@ export default function BraiderProfilePage() {
         cities: data.cities || [],
         full_name: data.full_name || 'Braider',
         avatar_url: data.avatar_url,
+        is_premium: data.is_premium || false,
         services: data.services || [],
         reviews: data.reviews || [],
       });
@@ -158,7 +160,14 @@ export default function BraiderProfilePage() {
                     <span className="text-gray-600">({braider.rating_count} reviews)</span>
                   </div>
                 </div>
-                {getVerificationBadge(braider.verification_status)}
+                <div className="flex flex-wrap gap-2">
+                  {braider.is_premium && (
+                    <span className="flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full border border-yellow-200">
+                      <Crown className="w-3 h-3" /> Premium
+                    </span>
+                  )}
+                  {getVerificationBadge(braider.verification_status)}
+                </div>
               </div>
               <p className="text-gray-600 mb-4 text-sm sm:text-base">{braider.bio}</p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 text-sm sm:text-base text-gray-600">

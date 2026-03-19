@@ -32,6 +32,8 @@ export async function GET() {
     const { data, error } = await serviceSupabase
       .from('braider_profiles')
       .select('*')
+      .order('is_premium', { ascending: false })
+      .order('featured_order', { ascending: false })
       .order('rating_avg', { ascending: false });
 
     console.log('Braiders fetch result:', { dataCount: data?.length, error });
@@ -59,6 +61,8 @@ export async function GET() {
       specialties: b.specialties || [],
       latitude: b.latitude || null,
       longitude: b.longitude || null,
+      is_premium: b.is_premium || false,
+      featured_order: b.featured_order || 0,
       services: [],
       portfolio: [],
       total_earnings: b.total_earnings || 0,

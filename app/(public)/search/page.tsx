@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useBraiders } from '@/app/hooks/useBraiders';
-import { Star, MapPin, Filter } from 'lucide-react';
+import { Star, MapPin, Filter, Crown } from 'lucide-react';
 
 interface Braider {
   id: string;
@@ -19,6 +19,8 @@ interface Braider {
   full_name: string;
   avatar_url?: string;
   specialties?: string[];
+  is_premium?: boolean;
+  featured_order?: number;
   services: Array<{
     price: number;
   }>;
@@ -34,6 +36,7 @@ export default function SearchPage() {
     maxPrice: 500,
     minRating: 0,
     verified: false,
+    premiumOnly: false,
   });
 
   useEffect(() => {
@@ -48,6 +51,11 @@ export default function SearchPage() {
       // Filter by verified status
       if (filters.verified) {
         results = results.filter(b => b.verification_status !== 'unverified');
+      }
+
+      // Filter by premium
+      if (filters.premiumOnly) {
+        results = results.filter(b => b.is_premium);
       }
 
       // Filter by rating
@@ -76,6 +84,14 @@ export default function SearchPage() {
           b.specialties?.some((s: string) => s.toLowerCase().includes(style.toLowerCase()))
         );
       }
+
+      // Sort: premium first (by featured_order desc), then by rating
+      results.sort((a, b) => {
+        if (a.is_premium && !b.is_premium) return -1;
+        if (!a.is_premium && b.is_premium) return 1;
+        if (a.is_premium && b.is_premium) return (b.featured_order || 0) - (a.featured_order || 0);
+        return b.rating_avg - a.rating_avg;
+      });
 
       setBraiders(results);
     } catch (error) {
@@ -152,6 +168,21 @@ export default function SearchPage() {
                     <span className="text-xs sm:text-sm font-medium">Verified Only</span>
                   </label>
                 </div>
+
+                {/* Premium */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.premiumOnly}
+                      onChange={(e) => setFilters({ ...filters, premiumOnly: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-xs sm:text-sm font-medium flex items-center gap-1">
+                      <Crown className="w-3 h-3 text-yellow-500" /> Premium Only
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -185,6 +216,11 @@ export default function SearchPage() {
                       ) : (
                         <span className="text-5xl sm:text-6xl">💇</span>
                       )}
+                      {braider.is_premium && (
+                        <div className="absolute top-2 right-2 flex items-center gap-1 bg-yellow-400 text-white px-2 py-0.5 rounded-full text-xs font-bold shadow">
+                          <Crown className="w-3 h-3" /> Premium
+                        </div>
+                      )}
                     </div>
 
                     {/* Card Content */}
@@ -212,14 +248,19 @@ export default function SearchPage() {
                         </div>
                       </div>
 
-                      {/* Verification Badge */}
-                      {braider.verification_status !== 'unverified' && (
-                        <div className="mb-3 sm:mb-4">
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-2 mb-3 sm:mb-4">
+                        {braider.is_premium && (
+                          <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">
+                            <Crown className="w-3 h-3" /> Premium
+                          </span>
+                        )}
+                        {braider.verification_status !== 'unverified' && (
                           <span className="inline-block px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
                             ✓ Verified
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       {/* Action Button */}
                       <Link href={`/booking`} className="w-full px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-xs sm:text-sm font-semibold text-center">

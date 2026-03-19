@@ -97,6 +97,9 @@ export function Navigation() {
                   <Link href="/search" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
                     Browse
                   </Link>
+                  <Link href="/premium" className="px-4 py-2 text-yellow-600 hover:text-yellow-700 transition-colors font-medium flex items-center gap-1">
+                    <span>👑</span> Premium
+                  </Link>
                   <Link href="/login" className="ml-4 px-6 py-2 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 font-semibold">
                     Sign In
                   </Link>
