@@ -30,8 +30,9 @@ export default function BraiderSignupPage() {
     
     // Step 3: Service Details
     travel_radius_miles: '10',
-    is_mobile: true,
+    service_type: 'mobile' as 'mobile' | 'salon' | 'both',
     salon_address: '',
+    selected_state: '',
     cities: [] as string[],
     zip_codes: '',
     
@@ -61,28 +62,61 @@ export default function BraiderSignupPage() {
     'Hair Treatment',
   ];
 
-  const cityOptions = [
-    'New York',
-    'Los Angeles',
-    'Chicago',
-    'Houston',
-    'Phoenix',
-    'Philadelphia',
-    'San Antonio',
-    'San Diego',
-    'Dallas',
-    'San Jose',
-    'Austin',
-    'Jacksonville',
-    'Fort Worth',
-    'Columbus',
-    'Charlotte',
-    'San Francisco',
-    'Indianapolis',
-    'Seattle',
-    'Denver',
-    'Boston',
-  ];
+  const US_STATES: Record<string, string[]> = {
+    'Alabama': ['Birmingham', 'Montgomery', 'Huntsville', 'Mobile', 'Tuscaloosa', 'Hoover', 'Dothan', 'Auburn'],
+    'Alaska': ['Anchorage', 'Fairbanks', 'Juneau', 'Sitka', 'Ketchikan', 'Wasilla', 'Kenai'],
+    'Arizona': ['Phoenix', 'Tucson', 'Mesa', 'Chandler', 'Scottsdale', 'Glendale', 'Gilbert', 'Tempe', 'Peoria', 'Surprise'],
+    'Arkansas': ['Little Rock', 'Fort Smith', 'Fayetteville', 'Springdale', 'Jonesboro', 'North Little Rock', 'Conway'],
+    'California': ['Los Angeles', 'San Diego', 'San Jose', 'San Francisco', 'Fresno', 'Sacramento', 'Long Beach', 'Oakland', 'Bakersfield', 'Anaheim', 'Santa Ana', 'Riverside', 'Stockton', 'Irvine', 'Chula Vista', 'Fremont', 'San Bernardino', 'Modesto', 'Fontana', 'Moreno Valley', 'Compton', 'Inglewood', 'Pomona', 'Pasadena'],
+    'Colorado': ['Denver', 'Colorado Springs', 'Aurora', 'Fort Collins', 'Lakewood', 'Thornton', 'Arvada', 'Westminster', 'Pueblo', 'Boulder'],
+    'Connecticut': ['Bridgeport', 'New Haven', 'Hartford', 'Stamford', 'Waterbury', 'Norwalk', 'Danbury', 'New Britain'],
+    'Delaware': ['Wilmington', 'Dover', 'Newark', 'Middletown', 'Smyrna', 'Milford'],
+    'Florida': ['Jacksonville', 'Miami', 'Tampa', 'Orlando', 'St. Petersburg', 'Hialeah', 'Tallahassee', 'Fort Lauderdale', 'Port St. Lucie', 'Cape Coral', 'Pembroke Pines', 'Hollywood', 'Miramar', 'Gainesville', 'Coral Springs', 'Miami Gardens', 'Clearwater', 'Palm Bay', 'Pompano Beach', 'West Palm Beach', 'Lakeland', 'Davie', 'Miami Beach', 'Boca Raton', 'Deltona'],
+    'Georgia': ['Atlanta', 'Augusta', 'Columbus', 'Macon', 'Savannah', 'Athens', 'Sandy Springs', 'South Fulton', 'Roswell', 'Johns Creek', 'Albany', 'Warner Robins', 'Alpharetta', 'Marietta', 'Smyrna', 'Valdosta', 'Brookhaven'],
+    'Hawaii': ['Honolulu', 'Pearl City', 'Hilo', 'Kailua', 'Waipahu', 'Kaneohe', 'Mililani', 'Kahului'],
+    'Idaho': ['Boise', 'Meridian', 'Nampa', 'Idaho Falls', 'Pocatello', 'Caldwell', 'Coeur d\'Alene', 'Twin Falls'],
+    'Illinois': ['Chicago', 'Aurora', 'Joliet', 'Naperville', 'Rockford', 'Springfield', 'Elgin', 'Peoria', 'Champaign', 'Waukegan', 'Cicero', 'Bloomington', 'Arlington Heights', 'Evanston', 'Decatur'],
+    'Indiana': ['Indianapolis', 'Fort Wayne', 'Evansville', 'South Bend', 'Carmel', 'Fishers', 'Bloomington', 'Hammond', 'Gary', 'Lafayette', 'Muncie', 'Terre Haute'],
+    'Iowa': ['Des Moines', 'Cedar Rapids', 'Davenport', 'Sioux City', 'Iowa City', 'Waterloo', 'Council Bluffs', 'Ames', 'Dubuque'],
+    'Kansas': ['Wichita', 'Overland Park', 'Kansas City', 'Olathe', 'Topeka', 'Lawrence', 'Shawnee', 'Manhattan', 'Lenexa'],
+    'Kentucky': ['Louisville', 'Lexington', 'Bowling Green', 'Owensboro', 'Covington', 'Richmond', 'Georgetown', 'Florence', 'Hopkinsville'],
+    'Louisiana': ['New Orleans', 'Baton Rouge', 'Shreveport', 'Metairie', 'Lafayette', 'Lake Charles', 'Kenner', 'Bossier City', 'Monroe', 'Alexandria'],
+    'Maine': ['Portland', 'Lewiston', 'Bangor', 'South Portland', 'Auburn', 'Biddeford', 'Sanford', 'Augusta'],
+    'Maryland': ['Baltimore', 'Columbia', 'Germantown', 'Silver Spring', 'Waldorf', 'Glen Burnie', 'Ellicott City', 'Frederick', 'Dundalk', 'Rockville', 'Gaithersburg', 'Bethesda', 'Towson', 'Bowie', 'Annapolis'],
+    'Massachusetts': ['Boston', 'Worcester', 'Springfield', 'Lowell', 'Cambridge', 'New Bedford', 'Brockton', 'Quincy', 'Lynn', 'Fall River', 'Newton', 'Lawrence', 'Somerville', 'Framingham', 'Haverhill'],
+    'Michigan': ['Detroit', 'Grand Rapids', 'Warren', 'Sterling Heights', 'Ann Arbor', 'Lansing', 'Flint', 'Dearborn', 'Livonia', 'Westland', 'Troy', 'Farmington Hills', 'Kalamazoo', 'Wyoming', 'Southfield'],
+    'Minnesota': ['Minneapolis', 'Saint Paul', 'Rochester', 'Duluth', 'Bloomington', 'Brooklyn Park', 'Plymouth', 'Saint Cloud', 'Eagan', 'Woodbury', 'Maple Grove', 'Coon Rapids'],
+    'Mississippi': ['Jackson', 'Gulfport', 'Southaven', 'Hattiesburg', 'Biloxi', 'Meridian', 'Tupelo', 'Olive Branch', 'Greenville'],
+    'Missouri': ['Kansas City', 'Saint Louis', 'Springfield', 'Columbia', 'Independence', 'Lee\'s Summit', 'O\'Fallon', 'St. Joseph', 'St. Charles', 'Blue Springs', 'Joplin'],
+    'Montana': ['Billings', 'Missoula', 'Great Falls', 'Bozeman', 'Butte', 'Helena', 'Kalispell'],
+    'Nebraska': ['Omaha', 'Lincoln', 'Bellevue', 'Grand Island', 'Kearney', 'Fremont', 'Hastings', 'Norfolk'],
+    'Nevada': ['Las Vegas', 'Henderson', 'Reno', 'North Las Vegas', 'Sparks', 'Carson City', 'Fernley', 'Elko'],
+    'New Hampshire': ['Manchester', 'Nashua', 'Concord', 'Derry', 'Dover', 'Rochester', 'Salem', 'Merrimack'],
+    'New Jersey': ['Newark', 'Jersey City', 'Paterson', 'Elizabeth', 'Edison', 'Woodbridge', 'Lakewood', 'Toms River', 'Hamilton', 'Trenton', 'Clifton', 'Camden', 'Brick', 'Cherry Hill', 'Passaic', 'Middletown', 'Union City', 'Old Bridge', 'Gloucester Township', 'East Orange', 'Bayonne', 'Franklin Township', 'North Bergen', 'Vineland', 'Union Township', 'Piscataway', 'New Brunswick', 'Irvington', 'Perth Amboy', 'West New York', 'Plainfield', 'Hackensack', 'Sayreville', 'Kearny', 'Linden', 'Atlantic City', 'Hoboken', 'Montclair', 'Bloomfield', 'East Brunswick'],
+    'New Mexico': ['Albuquerque', 'Las Cruces', 'Rio Rancho', 'Santa Fe', 'Roswell', 'Farmington', 'Clovis', 'Hobbs', 'Alamogordo'],
+    'New York': ['New York City', 'Buffalo', 'Rochester', 'Yonkers', 'Syracuse', 'Albany', 'New Rochelle', 'Mount Vernon', 'Schenectady', 'Utica', 'White Plains', 'Hempstead', 'Troy', 'Niagara Falls', 'Binghamton', 'Freeport', 'Valley Stream', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Manhattan', 'Harlem', 'Jamaica', 'Flushing', 'Bronxville', 'Long Island City'],
+    'North Carolina': ['Charlotte', 'Raleigh', 'Greensboro', 'Durham', 'Winston-Salem', 'Fayetteville', 'Cary', 'Wilmington', 'High Point', 'Concord', 'Asheville', 'Gastonia', 'Jacksonville', 'Chapel Hill', 'Rocky Mount'],
+    'North Dakota': ['Fargo', 'Bismarck', 'Grand Forks', 'Minot', 'West Fargo', 'Williston', 'Dickinson'],
+    'Ohio': ['Columbus', 'Cleveland', 'Cincinnati', 'Toledo', 'Akron', 'Dayton', 'Parma', 'Canton', 'Youngstown', 'Lorain', 'Hamilton', 'Springfield', 'Kettering', 'Elyria', 'Lakewood'],
+    'Oklahoma': ['Oklahoma City', 'Tulsa', 'Norman', 'Broken Arrow', 'Lawton', 'Edmond', 'Moore', 'Midwest City', 'Enid', 'Stillwater'],
+    'Oregon': ['Portland', 'Salem', 'Eugene', 'Gresham', 'Hillsboro', 'Beaverton', 'Bend', 'Medford', 'Springfield', 'Corvallis', 'Albany'],
+    'Pennsylvania': ['Philadelphia', 'Pittsburgh', 'Allentown', 'Erie', 'Reading', 'Scranton', 'Bethlehem', 'Lancaster', 'Harrisburg', 'Altoona', 'York', 'Wilkes-Barre', 'Chester', 'Norristown'],
+    'Rhode Island': ['Providence', 'Cranston', 'Warwick', 'Pawtucket', 'East Providence', 'Woonsocket', 'Newport', 'Central Falls'],
+    'South Carolina': ['Columbia', 'Charleston', 'North Charleston', 'Mount Pleasant', 'Rock Hill', 'Greenville', 'Summerville', 'Goose Creek', 'Hilton Head Island', 'Sumter', 'Florence', 'Spartanburg'],
+    'South Dakota': ['Sioux Falls', 'Rapid City', 'Aberdeen', 'Brookings', 'Watertown', 'Mitchell', 'Yankton'],
+    'Tennessee': ['Nashville', 'Memphis', 'Knoxville', 'Chattanooga', 'Clarksville', 'Murfreesboro', 'Franklin', 'Jackson', 'Johnson City', 'Bartlett', 'Hendersonville', 'Kingsport'],
+    'Texas': ['Houston', 'San Antonio', 'Dallas', 'Austin', 'Fort Worth', 'El Paso', 'Arlington', 'Corpus Christi', 'Plano', 'Laredo', 'Lubbock', 'Garland', 'Irving', 'Amarillo', 'Grand Prairie', 'Brownsville', 'McKinney', 'Frisco', 'Pasadena', 'Killeen', 'McAllen', 'Mesquite', 'Denton', 'Carrollton', 'Midland', 'Waco', 'Abilene', 'Beaumont', 'Round Rock', 'Odessa', 'Richardson', 'Tyler', 'Pearland', 'College Station', 'League City'],
+    'Utah': ['Salt Lake City', 'West Valley City', 'Provo', 'West Jordan', 'Orem', 'Sandy', 'Ogden', 'St. George', 'Layton', 'Taylorsville', 'South Jordan', 'Lehi'],
+    'Vermont': ['Burlington', 'South Burlington', 'Rutland', 'Barre', 'Montpelier', 'Winooski', 'St. Albans'],
+    'Virginia': ['Virginia Beach', 'Norfolk', 'Chesapeake', 'Richmond', 'Newport News', 'Alexandria', 'Hampton', 'Roanoke', 'Portsmouth', 'Suffolk', 'Lynchburg', 'Harrisonburg', 'Charlottesville', 'Danville', 'Manassas'],
+    'Washington': ['Seattle', 'Spokane', 'Tacoma', 'Vancouver', 'Bellevue', 'Kent', 'Everett', 'Renton', 'Spokane Valley', 'Kirkland', 'Bellingham', 'Kennewick', 'Federal Way', 'Yakima', 'Redmond'],
+    'West Virginia': ['Charleston', 'Huntington', 'Morgantown', 'Parkersburg', 'Wheeling', 'Weirton', 'Fairmont', 'Beckley'],
+    'Wisconsin': ['Milwaukee', 'Madison', 'Green Bay', 'Kenosha', 'Racine', 'Appleton', 'Waukesha', 'Oshkosh', 'Eau Claire', 'Janesville', 'West Allis', 'La Crosse'],
+    'Wyoming': ['Cheyenne', 'Casper', 'Laramie', 'Gillette', 'Rock Springs', 'Sheridan', 'Green River'],
+    'Washington D.C.': ['Washington D.C.'],
+  };
+
+  const stateNames = Object.keys(US_STATES).sort();
 
   const toggleCity = (city: string) => {
     setFormData(prev => ({
@@ -122,8 +156,9 @@ export default function BraiderSignupPage() {
 
     if (stepNum === 3) {
       if (!formData.travel_radius_miles) newErrors.travel_radius_miles = 'Travel radius is required';
-      if (!formData.is_mobile && !formData.salon_address) newErrors.salon_address = 'Salon address is required';
-      if (formData.cities.length === 0) newErrors.cities = 'Select at least one city';
+      if ((formData.service_type === 'salon' || formData.service_type === 'both') && !formData.salon_address) newErrors.salon_address = 'Salon address is required';
+      if (!formData.selected_state) newErrors.cities = 'Select a state';
+      else if (formData.cities.length === 0) newErrors.cities = 'Select at least one city';
     }
 
     if (stepNum === 4) {
@@ -369,25 +404,36 @@ export default function BraiderSignupPage() {
                   <div className="space-y-3">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, is_mobile: true })}
+                      onClick={() => setFormData({ ...formData, service_type: 'mobile' })}
                       className={`w-full p-4 rounded-lg border-2 text-left font-medium transition-all ${
-                        formData.is_mobile
+                        formData.service_type === 'mobile'
                           ? 'border-primary-600 bg-primary-50 text-primary-600'
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}
                     >
-                      📱 Mobile - I travel to customers
+                      📱 Mobile — I travel to customers
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, is_mobile: false })}
+                      onClick={() => setFormData({ ...formData, service_type: 'salon' })}
                       className={`w-full p-4 rounded-lg border-2 text-left font-medium transition-all ${
-                        !formData.is_mobile
+                        formData.service_type === 'salon'
                           ? 'border-primary-600 bg-primary-50 text-primary-600'
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}
                     >
-                      🏪 Salon - Customers come to me
+                      🏪 Salon — Customers come to me
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, service_type: 'both' })}
+                      className={`w-full p-4 rounded-lg border-2 text-left font-medium transition-all ${
+                        formData.service_type === 'both'
+                          ? 'border-primary-600 bg-primary-50 text-primary-600'
+                          : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                    >
+                      🔄 Both — Mobile & Salon
                     </button>
                   </div>
                 </div>
@@ -404,7 +450,7 @@ export default function BraiderSignupPage() {
                   />
                 </div>
 
-                {!formData.is_mobile && (
+                {(formData.service_type === 'salon' || formData.service_type === 'both') && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Salon Address *</label>
                     <input
@@ -419,26 +465,46 @@ export default function BraiderSignupPage() {
                 )}
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Service Coverage Cities *</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                    {cityOptions.map((city) => (
-                      <button
-                        key={city}
-                        type="button"
-                        onClick={() => toggleCity(city)}
-                        className={`p-2 rounded-lg border-2 font-medium text-sm transition-all ${
-                          formData.cities.includes(city)
-                            ? 'border-primary-600 bg-primary-50 text-primary-600'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
-                        }`}
-                      >
-                        {city}
-                      </button>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">State *</label>
+                  <select
+                    value={formData.selected_state}
+                    onChange={(e) => setFormData({ ...formData, selected_state: e.target.value, cities: [] })}
+                    className="input-field text-lg"
+                  >
+                    <option value="">Select a state...</option>
+                    {stateNames.map((s) => (
+                      <option key={s} value={s}>{s}</option>
                     ))}
-                  </div>
-                  {errors.cities && <p className="text-xs text-red-600 mt-2">{errors.cities}</p>}
-                  <p className="text-xs text-gray-600 mt-2">Selected: {formData.cities.length} cities</p>
+                  </select>
                 </div>
+
+                {formData.selected_state && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Cities / Towns in {formData.selected_state} *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                      {US_STATES[formData.selected_state].map((city) => (
+                        <button
+                          key={city}
+                          type="button"
+                          onClick={() => toggleCity(city)}
+                          className={`p-2 rounded-lg border-2 font-medium text-sm transition-all text-left ${
+                            formData.cities.includes(city)
+                              ? 'border-primary-600 bg-primary-50 text-primary-600'
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                    {errors.cities && <p className="text-xs text-red-600 mt-2">{errors.cities}</p>}
+                    <p className="text-xs text-gray-500 mt-2">
+                      {formData.cities.length} selected: {formData.cities.slice(0, 3).join(', ')}{formData.cities.length > 3 ? ` +${formData.cities.length - 3} more` : ''}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Zip / Postal Codes</label>
@@ -447,7 +513,7 @@ export default function BraiderSignupPage() {
                     value={formData.zip_codes}
                     onChange={(e) => setFormData({ ...formData, zip_codes: e.target.value })}
                     className="input-field text-lg"
-                    placeholder="e.g. 10001, 10002, 90210"
+                    placeholder="e.g. 07001, 07002, 10001"
                   />
                   <p className="text-xs text-gray-500 mt-1">Separate multiple zip codes with commas</p>
                 </div>

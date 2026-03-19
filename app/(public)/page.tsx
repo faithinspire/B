@@ -152,7 +152,7 @@ export default function LandingPage(): JSX.Element {
               <p className="text-xs text-gray-400">Find verified professionals near you</p>
               <Link
                 href="/signup/braider"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-secondary-600 text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-secondary-700 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 sm:py-4 bg-secondary-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:bg-secondary-700 hover:shadow-lg transition-smooth whitespace-nowrap"
               >
                 Become a Braider
               </Link>
