@@ -8,7 +8,8 @@ import { Calendar, MapPin, AlertCircle, Loader, CheckCircle } from 'lucide-react
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 function PaymentForm({ bookingId, amount, onSuccess }: { bookingId: string; amount: number; onSuccess: () => void }) {
   const stripe = useStripe();
@@ -271,7 +272,7 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
-            {booking.status === 'pending' && !paymentComplete && (
+            {booking.status === 'pending' && !paymentComplete && stripePromise && (
               <Elements stripe={stripePromise}>
                 <PaymentForm
                   bookingId={booking.id}
@@ -282,6 +283,11 @@ export default function BookingDetailPage() {
                   }}
                 />
               </Elements>
+            )}
+            {booking.status === 'pending' && !paymentComplete && !stripePromise && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                Payment service not configured. Please contact support.
+              </div>
             )}
 
             {paymentComplete && (

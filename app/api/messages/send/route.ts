@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     }
 
     // Create message
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     const message: Message = {
       id: messageId,
       conversation_id: body.conversation_id,

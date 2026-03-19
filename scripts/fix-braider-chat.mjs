@@ -1,4 +1,7 @@
-'use client';
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
+
+const content = `'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
@@ -150,7 +153,7 @@ export default function BraiderChatPage() {
           <p className="font-semibold text-gray-900">{conversation.customer_name || 'Customer'}</p>
           <p className="text-xs text-gray-500">Booking: {booking_id?.slice(0, 8)}...</p>
         </div>
-        <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-lg ${showMap ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100 text-gray-500'}`}>
+        <button onClick={() => setShowMap(v => !v)} className={\`p-2 rounded-lg \${showMap ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100 text-gray-500'}\`}>
           <MapPin className="w-5 h-5" />
         </button>
       </div>
@@ -161,8 +164,8 @@ export default function BraiderChatPage() {
             {messages.length === 0
               ? <div className="flex items-center justify-center h-full"><p className="text-gray-400 text-sm">No messages yet</p></div>
               : messages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.sender_id === user.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                <div key={msg.id} className={\`flex \${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}\`}>
+                  <div className={\`max-w-xs px-4 py-2 rounded-2xl text-sm \${msg.sender_id === user.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-900'}\`}>
                     <p>{msg.content}</p>
                     <div className="flex items-center gap-1 mt-1 text-xs opacity-60 justify-end">
                       <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -201,7 +204,7 @@ export default function BraiderChatPage() {
             <h3 className="font-semibold text-gray-900 text-sm mb-3">Share Your Location</h3>
             <button
               onClick={isTracking ? stopTracking : startTracking}
-              className={`w-full px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 ${isTracking ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}
+              className={\`w-full px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 \${isTracking ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}\`}
             >
               <MapPin className="w-4 h-4" />
               {isTracking ? 'Stop Sharing' : 'Share Location'}
@@ -220,3 +223,7 @@ export default function BraiderChatPage() {
     </div>
   );
 }
+`;
+
+writeFileSync(resolve(process.cwd(), 'app/(braider)/braider/messages/[booking_id]/page.tsx'), content, 'utf8');
+console.log('Written braider chat page with proper TypeScript types');
