@@ -148,11 +148,10 @@ export default function LandingPage(): JSX.Element {
                 Find Braiders
               </button>
             </div>
-            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-xs text-gray-400">Find verified professionals near you</p>
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100">
               <Link
                 href="/signup/braider"
-                className="inline-flex items-center gap-2 px-6 py-3 sm:py-4 bg-secondary-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:bg-secondary-700 hover:shadow-lg transition-smooth whitespace-nowrap"
+                className="flex items-center justify-center gap-2 w-full px-6 py-3 sm:py-4 bg-secondary-600 text-white rounded-xl text-sm sm:text-base font-semibold hover:bg-secondary-700 hover:shadow-lg transition-smooth"
               >
                 Become a Braider
               </Link>
