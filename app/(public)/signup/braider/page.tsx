@@ -33,6 +33,7 @@ export default function BraiderSignupPage() {
     is_mobile: true,
     salon_address: '',
     cities: [] as string[],
+    zip_codes: '',
     
     // Step 4: Pricing
     service_name: '',
@@ -437,6 +438,18 @@ export default function BraiderSignupPage() {
                   </div>
                   {errors.cities && <p className="text-xs text-red-600 mt-2">{errors.cities}</p>}
                   <p className="text-xs text-gray-600 mt-2">Selected: {formData.cities.length} cities</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Zip / Postal Codes</label>
+                  <input
+                    type="text"
+                    value={formData.zip_codes}
+                    onChange={(e) => setFormData({ ...formData, zip_codes: e.target.value })}
+                    className="input-field text-lg"
+                    placeholder="e.g. 10001, 10002, 90210"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Separate multiple zip codes with commas</p>
                 </div>
               </div>
             )}
