@@ -1,188 +1,115 @@
 'use client';
-
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { MessageCircle, Search, AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { MessageCircle, Search, RefreshCw, Loader } from 'lucide-react';
 
-interface Conversation {
-  id: string;
-  booking_id: string;
-  customer_id: string;
-  braider_id: string;
-  admin_id: string | null;
-  status: 'active' | 'completed' | 'archived';
-  started_at: string;
-  ended_at: string | null;
-  created_at: string;
-  updated_at: string;
-  unread_count?: number;
-  braider_name?: string;
-  braider_avatar?: string;
-  last_message?: string;
-  last_message_time?: string;
-}
-
-export default function MessagesPage() {
+export default function CustomerMessagesPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== 'customer')) router.push('/login');
+  }, [user, authLoading, router]);
 
-  // Fetch conversations
   const fetchConversations = useCallback(async () => {
     if (!user) return;
-
     try {
-      setError(null);
-      const response = await fetch(
-        `/api/conversations?user_id=${user.id}&role=customer`,
-        { method: 'GET' }
-      );
+      setLoading(true); setError(null);
+      const res = await fetch('/api/conversations?user_id=' + user.id + '&role=customer');
+      if (!res.ok) throw new Error('Failed to load');
+      const convList = await res.json();
+      if (!convList?.length) { setConversations([]); return; }
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch conversations');
+      const braiderIds = [...new Set(convList.map(c => c.braider_id).filter(Boolean))];
+      let profileMap = {};
+      if (braiderIds.length && supabase) {
+        const { data: profiles } = await supabase.from('profiles').select('id,full_name,avatar_url').in('id', braiderIds);
+        if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
       }
-
-      const data = await response.json();
-      setConversations(data || []);
-    } catch (err) {
-      console.error('Error fetching conversations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load conversations');
-    }
+      let lastMsgMap = {};
+      if (supabase) {
+        for (const conv of convList) {
+          const { data: msgs } = await supabase.from('messages').select('content,created_at').eq('conversation_id', conv.id).order('created_at', { ascending: false }).limit(1);
+          if (msgs?.[0]) lastMsgMap[conv.id] = msgs[0];
+        }
+      }
+      const enriched = convList.map(conv => ({
+        ...conv,
+        braider_name: profileMap[conv.braider_id]?.full_name || 'Braider',
+        braider_avatar: profileMap[conv.braider_id]?.avatar_url,
+        last_message: lastMsgMap[conv.id]?.content,
+        last_message_time: lastMsgMap[conv.id]?.created_at,
+      }));
+      setConversations(enriched);
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
   }, [user]);
 
-  // Initialize and setup refresh interval
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!user) {
-      router.push('/login');
-      return;
+    if (!authLoading && user?.role === 'customer') {
+      fetchConversations();
+      if (!supabase) return;
+      const ch = supabase.channel('customer_msgs_' + user.id)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchConversations)
+        .subscribe();
+      return () => supabase?.removeChannel(ch);
     }
+  }, [user, authLoading, fetchConversations]);
 
-    if (user.role !== 'customer') {
-      router.push('/');
-      return;
-    }
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center" style={{background:'linear-gradient(135deg,#ede9f7,#dce8ff)'}}><Loader className="w-10 h-10 text-purple-600 animate-spin"/></div>;
+  if (!user || user.role !== 'customer') return null;
 
-    // Fetch on mount
-    fetchConversations();
-
-    // Setup refresh interval (30 seconds)
-    const interval = setInterval(fetchConversations, 30000);
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [user, authLoading, router, fetchConversations]);
-
-  // Show loading while auth is initializing
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
-        <div className="text-center">
-          <div className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
-          <p className="text-gray-600 font-semibold">Loading messages...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user || user.role !== 'customer') {
-    return null;
-  }
-
-  const filteredConversations = conversations.filter((conv) =>
-    (conv.braider_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = conversations.filter(c => (c.braider_name||'').toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-24">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2">Messages</h1>
-          <p className="text-gray-600">Chat with your braiders</p>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6 relative">
-          <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-600 transition-smooth"
-          />
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-900 font-semibold">Error</p>
-              <p className="text-red-700 text-sm">{error}</p>
-              <button
-                onClick={fetchConversations}
-                className="mt-2 text-red-600 hover:text-red-700 font-semibold text-sm"
-              >
-                Try again
-              </button>
-            </div>
+    <div className="min-h-screen pb-20" style={{ background: 'linear-gradient(135deg, #ede9f7 0%, #dce8ff 50%, #e8f0fe 100%)' }}>
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-purple-100 px-4 py-4 shadow-sm">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+            <button onClick={fetchConversations} className="p-2 hover:bg-purple-50 rounded-xl transition-colors"><RefreshCw className="w-4 h-4 text-purple-600"/></button>
           </div>
-        )}
-
-        {/* Conversations List */}
-        {filteredConversations.length === 0 ? (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+            <input type="text" placeholder="Search braiders..." value={search} onChange={e=>setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-purple-50/80 border border-purple-200 rounded-xl text-sm focus:outline-none focus:border-purple-400 focus:bg-white transition-all"/>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-2xl mx-auto px-4 py-5 space-y-3">
+        {error && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>}
+        {loading ? (
+          <div className="flex items-center justify-center py-16"><Loader className="w-8 h-8 text-purple-600 animate-spin"/></div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16">
-            <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg font-semibold">No conversations yet</p>
-            <p className="text-gray-500 mt-2">
-              {searchQuery ? 'No conversations match your search' : 'Start a booking to begin messaging'}
-            </p>
+            <div className="w-16 h-16 bg-white/60 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm"><MessageCircle className="w-8 h-8 text-purple-400"/></div>
+            <p className="text-gray-600 font-semibold">No conversations yet</p>
+            <p className="text-gray-400 text-sm mt-1">Book a braider to start chatting</p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => router.push(`/messages/${conv.booking_id}`)}
-                className="w-full p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-smooth border border-gray-200 hover:border-primary-300 text-left"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{conv.braider_name || 'Braider'}</h3>
-                    <p className="text-sm text-gray-600 line-clamp-1 mt-1">
-                      {conv.last_message || 'No messages yet'}
-                    </p>
-                  </div>
-                  {conv.unread_count && conv.unread_count > 0 && (
-                    <span className="ml-3 px-2.5 py-1 bg-primary-600 text-white text-xs font-semibold rounded-full flex-shrink-0">
-                      {conv.unread_count}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500">
-                  {conv.last_message_time
-                    ? new Date(conv.last_message_time).toLocaleDateString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'No messages'}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
+        ) : filtered.map(conv => (
+          <button key={conv.id} onClick={() => router.push('/messages/' + conv.booking_id)}
+            className="w-full bg-white/80 backdrop-blur rounded-2xl shadow-sm border border-purple-100 p-4 hover:shadow-md hover:border-purple-300 transition-all text-left flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm">
+              {conv.braider_avatar ? <img src={conv.braider_avatar} className="w-full h-full rounded-full object-cover" alt=""/> : (conv.braider_name||'B').charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-0.5">
+                <p className="font-semibold text-gray-900 truncate">{conv.braider_name}</p>
+                {conv.last_message_time && <p className="text-xs text-gray-400 flex-shrink-0 ml-2">{new Date(conv.last_message_time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</p>}
+              </div>
+              <p className="text-sm text-gray-500 truncate">{conv.last_message || 'Tap to start chatting'}</p>
+            </div>
+            {conv.unread_count > 0 && (
+              <span className="w-5 h-5 bg-purple-600 text-white rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
+            )}
+          </button>
+        ))}
       </div>
     </div>
   );

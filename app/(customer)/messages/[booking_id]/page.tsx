@@ -3,8 +3,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
-import { Send, MapPin, CheckCheck, Check, Loader, ArrowLeft } from 'lucide-react';
+import { Send, MapPin, CheckCheck, Check, Loader, ArrowLeft, Navigation, Phone, MoreVertical, Smile } from 'lucide-react';
 import { CustomerLocationMap } from '@/app/components/CustomerLocationMap';
+
 
 export default function CustomerChatPage() {
   const router = useRouter();
@@ -17,9 +18,11 @@ export default function CustomerChatPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [braiderLocation, setBraiderLocation] = useState(null);
+  
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'customer')) router.push('/login');
@@ -34,9 +37,10 @@ export default function CustomerChatPage() {
       const convList = await res.json();
       let conv = Array.isArray(convList) ? convList.find(c => c.booking_id === booking_id) : null;
       if (!conv) throw new Error('No conversation found. The braider may not have accepted yet.');
+      // Enrich with profile
       if (conv.braider_id && supabase) {
         const { data: p } = await supabase.from('profiles').select('full_name,avatar_url').eq('id', conv.braider_id).single();
-        if (p) { conv = { ...conv, braider_name: p.full_name, braider_avatar: p.avatar_url }; }
+        if (p) conv = { ...conv, braider_name: p.full_name, braider_avatar: p.avatar_url };
       }
       setConversation(conv);
       const msgRes = await fetch('/api/messages/conversation/' + conv.id + '?user_id=' + user.id + '&limit=100');
@@ -44,15 +48,14 @@ export default function CustomerChatPage() {
         const d = await msgRes.json();
         setMessages(d?.messages || (Array.isArray(d) ? d : []));
       }
+      // Fetch braider location
       if (conv.braider_id) {
         const lr = await fetch('/api/location/braider/' + conv.braider_id + '?booking_id=' + booking_id);
         if (lr.ok) { const ld = await lr.json(); if (ld?.latitude) setBraiderLocation(ld); }
       }
     } catch(err) {
       setError(err instanceof Error ? err.message : 'Failed to load chat');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [user, booking_id]);
 
   useEffect(() => {
@@ -62,143 +65,222 @@ export default function CustomerChatPage() {
   useEffect(() => {
     if (!conversation || !supabase) return;
     const ch = supabase
-      .channel('cc_' + conversation.id)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'messages',
-        filter: 'conversation_id=eq.' + conversation.id,
-      }, p => {
-        const m = p.new;
-        setMessages(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]);
-      })
+      .channel('chat_customer_' + conversation.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + conversation.id },
+        p => { const m = p.new; setMessages(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]); })
       .subscribe();
-    const li = setInterval(async () => {
-      if (!conversation?.braider_id) return;
-      try {
-        const r = await fetch('/api/location/braider/' + conversation.braider_id + '?booking_id=' + booking_id);
-        if (r.ok) { const d = await r.json(); if (d?.latitude) setBraiderLocation(d); }
-      } catch {}
-    }, 15000);
-    return () => { supabase?.removeChannel(ch); clearInterval(li); };
+    
+      // Poll braider location every 10s
+      const locInterval = setInterval(async () => {
+        if (!conv?.braider_id) return;
+        try {
+          const lr = await fetch('/api/location/braider/' + conv.braider_id + '?booking_id=' + booking_id);
+          if (lr.ok) { const ld = await lr.json(); if (ld?.latitude) setBraiderLocation(ld); }
+        } catch {}
+      }, 10000);
+      return () => { supabase?.removeChannel(ch); clearInterval(locInterval); };
   }, [conversation, booking_id]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !conversation) return;
+    if (!newMessage.trim() || !user || !conversation || sending) return;
+    const content = newMessage.trim();
+    setNewMessage('');
     setSending(true);
-    setError(null);
+    // Optimistic update
+    const tempMsg = { id: 'tmp_' + Date.now(), conversation_id: conversation.id, sender_id: user.id, content, created_at: new Date().toISOString(), read: false, sender_role: 'customer' };
+    setMessages(prev => [...prev, tempMsg]);
     try {
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversation_id: conversation.id,
-          sender_id: user.id,
-          sender_role: 'customer',
-          content: newMessage.trim(),
-          message_type: 'text',
-        }),
+        body: JSON.stringify({ conversation_id: conversation.id, sender_id: user.id, sender_role: 'customer', content, message_type: 'text' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send');
-      setNewMessage('');
+      // Replace temp with real
+      setMessages(prev => prev.map(m => m.id === tempMsg.id ? data : m));
     } catch(err) {
       setError(err instanceof Error ? err.message : 'Failed to send');
-    } finally {
-      setSending(false);
-    }
+      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+      setNewMessage(content);
+    } finally { setSending(false); inputRef.current?.focus(); }
   };
 
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (ts) => {
+    const d = new Date(ts); const today = new Date();
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  // Group messages by date
+  const groupedMessages = messages.reduce((groups, msg) => {
+    const date = formatDate(msg.created_at);
+    if (!groups[date]) groups[date] = [];
+    groups[date].push(msg);
+    return groups;
+  }, {});
+
   if (authLoading || loading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader className="w-10 h-10 text-primary-600 animate-spin"/></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #e8e0f5 0%, #dce8ff 100%)' }}>
+        <div className="text-center">
+          <Loader className="w-10 h-10 text-purple-600 animate-spin mx-auto mb-3"/>
+          <p className="text-gray-600 text-sm">Loading chat...</p>
+        </div>
+      </div>
+    );
   }
   if (!user || user.role !== 'customer') return null;
 
   if (!conversation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="text-center max-w-sm">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #e8e0f5 0%, #dce8ff 100%)' }}>
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MapPin className="w-8 h-8 text-purple-600"/>
+          </div>
           <p className="text-red-600 font-semibold mb-2">{error || 'No conversation found'}</p>
-          <p className="text-gray-500 text-sm mb-4">The braider needs to accept your booking first.</p>
-          <button onClick={() => router.push('/messages')} className="px-4 py-2 bg-primary-600 text-white rounded-lg">Back to Messages</button>
+          <p className="text-gray-500 text-sm mb-5">The braider needs to accept your booking first.</p>
+          <button onClick={() => router.push('/messages')} className="w-full py-2.5 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700">Back to Messages</button>
         </div>
       </div>
     );
   }
 
+  const otherName = conversation.braider_name || 'Braider';
+  const otherAvatar = conversation.braider_avatar;
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => router.push('/messages')} className="p-1 hover:bg-gray-100 rounded">
-          <ArrowLeft className="w-5 h-5 text-gray-600"/>
+    <div className="flex flex-col h-screen" style={{ background: 'linear-gradient(135deg, #ede9f7 0%, #dce8ff 50%, #e8f0fe 100%)' }}>
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white/90 backdrop-blur-md border-b border-purple-100 px-4 py-3 flex items-center gap-3 shadow-sm">
+        <button onClick={() => router.push('/messages')} className="p-2 hover:bg-purple-50 rounded-xl transition-colors">
+          <ArrowLeft className="w-5 h-5 text-gray-700"/>
         </button>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white font-bold">
-          {(conversation.braider_name || 'B').charAt(0).toUpperCase()}
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+          {otherAvatar ? <img src={otherAvatar} className="w-full h-full rounded-full object-cover" alt={otherName}/> : otherName.charAt(0).toUpperCase()}
         </div>
-        <div className="flex-1">
-          <p className="font-semibold text-gray-900">{conversation.braider_name || 'Braider'}</p>
-          <p className="text-xs text-gray-500">Booking: {String(booking_id).slice(0, 8)}...</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate">{otherName}</p>
+          <p className="text-xs text-purple-600 font-medium">Booking #{String(booking_id).slice(0, 8)}</p>
         </div>
-        <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-lg ${showMap ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100 text-gray-500'}`}>
+        <button onClick={() => setShowMap(v => !v)} className={`p-2 rounded-xl transition-colors ${showMap ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100 text-gray-500'}`} title="Toggle Map">
           <MapPin className="w-5 h-5"/>
         </button>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 flex flex-col bg-white rounded-xl shadow" style={{ height: '70vh' }}>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.length === 0
-              ? <div className="flex items-center justify-center h-full"><p className="text-gray-400 text-sm">No messages yet. Say hello!</p></div>
-              : messages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.sender_id === user.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
-                    <p>{msg.content}</p>
-                    <div className="flex items-center gap-1 mt-1 text-xs opacity-60 justify-end">
-                      <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {msg.sender_id === user.id && (msg.read ? <CheckCheck className="w-3 h-3"/> : <Check className="w-3 h-3"/>)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            }
-            <div ref={messagesEndRef}/>
-          </div>
-          <form onSubmit={handleSend} className="p-3 border-t border-gray-100">
-            {error && <p className="text-red-600 text-xs mb-2 px-1">{error}</p>}
-            <div className="flex gap-2">
-              <input
-                type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                disabled={sending}
-              />
-              <button type="submit" disabled={sending || !newMessage.trim()} className="p-2.5 bg-primary-600 text-white rounded-full hover:bg-primary-700 disabled:opacity-50">
-                <Send className="w-4 h-4"/>
-              </button>
+      {/* Map Panel */}
+      {showMap && (
+        <div className="flex-shrink-0 bg-white/80 backdrop-blur border-b border-purple-100 shadow-sm" style={{ height: '280px' }}>
+          <div className="h-full p-3 flex gap-3">
+            <div className="flex-1 rounded-xl overflow-hidden shadow-sm">
+              
+              <CustomerLocationMap braiderLocation={braiderLocation} braiderName={conversation?.braider_name || 'Braider'}/>
             </div>
-          </form>
-        </div>
-
-        <div className="lg:col-span-1 space-y-4">
-          {showMap && (
-            <div className="bg-white rounded-xl shadow p-3" style={{ height: '320px' }}>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Braider Location</p>
-              <div className="h-64">
-                <CustomerLocationMap braiderLocation={braiderLocation}/>
+            <div className="w-36 flex flex-col gap-2">
+              
+          <div className="bg-white/80 backdrop-blur rounded-2xl shadow-sm border border-blue-100 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <div className={`w-2 h-2 rounded-full ${braiderLocation ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}/>
+              <p className="text-xs font-semibold text-gray-700">{braiderLocation ? 'Braider is sharing location' : 'Location not shared yet'}</p>
+            </div>
+            {braiderLocation && <p className="text-xs text-gray-400">Updated {new Date(braiderLocation.created_at || Date.now()).toLocaleTimeString()}</p>}
+          </div>
+              <div className="bg-white/80 backdrop-blur rounded-2xl shadow-sm border border-purple-100 p-3 text-xs">
+                <p className="font-semibold text-gray-700 mb-1">Booking</p>
+                <p className="text-gray-500 font-mono text-xs">{String(booking_id).slice(0, 12)}...</p>
+                <p className="text-gray-500 mt-1 capitalize">{conversation.status}</p>
               </div>
             </div>
-          )}
-          <div className="bg-white rounded-xl shadow p-4 text-sm">
-            <h3 className="font-semibold text-gray-900 mb-1">Booking Info</h3>
-            <p className="text-gray-500 text-xs">Status: <span className="capitalize text-gray-700">{conversation.status}</span></p>
-            <p className={`text-xs mt-1 ${braiderLocation ? 'text-green-600' : 'text-gray-400'}`}>
-              {braiderLocation ? '● Braider is sharing location' : 'Location not available yet'}
-            </p>
           </div>
         </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-white/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <Smile className="w-8 h-8 text-purple-400"/>
+              </div>
+              <p className="text-gray-500 font-medium">No messages yet</p>
+              <p className="text-gray-400 text-sm mt-1">Say hello to get started!</p>
+            </div>
+          </div>
+        ) : (
+          Object.entries(groupedMessages).map(([date, msgs]) => (
+            <div key={date}>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-purple-200/50"/>
+                <span className="text-xs text-purple-500 font-medium bg-white/60 px-3 py-1 rounded-full shadow-sm">{date}</span>
+                <div className="flex-1 h-px bg-purple-200/50"/>
+              </div>
+              {msgs.map((msg, i) => {
+                const isOwn = msg.sender_id === user.id;
+                const showAvatar = !isOwn && (i === 0 || msgs[i-1]?.sender_id !== msg.sender_id);
+                return (
+                  <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1`}>
+                    {!isOwn && (
+                      <div className={`w-7 h-7 rounded-full flex-shrink-0 mr-2 mt-1 ${showAvatar ? 'bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-xs font-bold shadow-sm' : 'opacity-0'}`}>
+                        {showAvatar && (otherAvatar ? <img src={otherAvatar} className="w-full h-full rounded-full object-cover" alt=""/> : otherName.charAt(0))}
+                      </div>
+                    )}
+                    <div className={`max-w-[72%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div className={`px-4 py-2.5 rounded-2xl shadow-sm ${isOwn
+                        ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-br-sm'
+                        : 'bg-white/90 backdrop-blur text-gray-900 rounded-bl-sm border border-purple-100'
+                      } ${msg.id?.startsWith('tmp_') ? 'opacity-70' : ''}`}>
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                      </div>
+                      <div className={`flex items-center gap-1 mt-0.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
+                        {isOwn && (
+                          (msg.read || msg.is_read)
+                            ? <CheckCheck className="w-3.5 h-3.5 text-blue-500"/>
+                            : <Check className="w-3.5 h-3.5 text-gray-400"/>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef}/>
+      </div>
+
+      {/* Input */}
+      <div className="flex-shrink-0 bg-white/90 backdrop-blur-md border-t border-purple-100 px-4 py-3 shadow-lg">
+        {error && <p className="text-red-500 text-xs mb-2 px-1">{error}</p>}
+        <form onSubmit={handleSend} className="flex items-end gap-2">
+          <div className="flex-1 bg-purple-50/80 border border-purple-200 rounded-2xl px-4 py-2.5 focus-within:border-purple-400 focus-within:bg-white transition-all">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+              disabled={sending}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={sending || !newMessage.trim()}
+            className="w-11 h-11 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex-shrink-0"
+          >
+            {sending ? <Loader className="w-4 h-4 animate-spin"/> : <Send className="w-4 h-4"/>}
+          </button>
+        </form>
       </div>
     </div>
   );
