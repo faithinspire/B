@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 // POST /api/bookings/[id]/confirm — marks booking as confirmed (used by bypass payment)
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const bookingId = params.id;
     if (!bookingId) return NextResponse.json({ error: 'Booking ID required' }, { status: 400 });
@@ -36,7 +36,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       { user_id: booking.braider_id, type: 'booking', title: 'New Booking Confirmed', message: 'A customer has confirmed their booking with you.' },
     ];
     for (const n of notifs) {
-      await supabase.from('notifications').insert({ ...n, booking_id: bookingId, read: false }).catch(() => {});
+      try {
+        await supabase.from('notifications').insert({ ...n, booking_id: bookingId, read: false });
+      } catch {}
     }
 
     return NextResponse.json({ success: true });
