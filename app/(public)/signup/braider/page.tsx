@@ -675,13 +675,23 @@ export default function BraiderSignupPage() {
           </form>
 
           {/* Footer */}
-          <div className="px-8 py-6 bg-gray-50 border-t border-gray-200 text-center animate-slide-up">
+          <div className="px-8 py-6 bg-gray-50 border-t border-gray-200 text-center animate-slide-up space-y-3">
             <p className="text-gray-600">
               Already have an account?{' '}
               <Link href="/login" className="text-primary-600 font-semibold hover:text-primary-700 transition-smooth">
                 Sign in
               </Link>
             </p>
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-xs text-gray-500 mb-2">Want more visibility and a blog page?</p>
+              <Link
+                href="/braider/premium"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all"
+              >
+                👑 Sign up as Premium Braider
+              </Link>
+              <p className="text-xs text-gray-400 mt-1.5">From $89/mo · Appear first in search · Blog page included</p>
+            </div>
           </div>
         </div>
       </div>

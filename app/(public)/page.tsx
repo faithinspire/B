@@ -112,7 +112,7 @@ export default function LandingPage(): JSX.Element {
 
           {/* Search Bar */}
           <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-8 mb-8 sm:mb-12 animate-slide-up animate-delay-200">
-            <p className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Search for Braiders</p>
+            <p className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Find Braiders</p>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-600 w-5 h-5 pointer-events-none" />
@@ -145,16 +145,16 @@ export default function LandingPage(): JSX.Element {
                 className="bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold hover:shadow-lg transition-smooth flex items-center justify-center gap-2 px-6 py-3 sm:py-4 text-sm sm:text-base whitespace-nowrap"
               >
                 <Search className="w-4 sm:w-5 h-4 sm:h-5" />
-                Search Braiders
+                Find Braiders
               </button>
             </div>
             <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100 flex items-center justify-between">
               <p className="text-xs text-gray-400">Find verified professionals near you</p>
               <Link
                 href="/signup/braider"
-                className="text-xs sm:text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-secondary-600 text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-secondary-700 transition-colors"
               >
-                Become a Braider →
+                Become a Braider
               </Link>
             </div>
           </div>
