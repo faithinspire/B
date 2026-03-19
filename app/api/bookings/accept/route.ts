@@ -47,17 +47,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });
     }
 
-    // Check if conversation already exists
+    // Check if conversation already exists — try new schema then old
+    let existingConvId: string | null = null;
     const { data: existingConv } = await serviceSupabase
-      .from('conversations')
-      .select('id')
-      .eq('booking_id', bookingId)
-      .single();
+      .from('conversations').select('id').eq('booking_id', bookingId).maybeSingle();
+    if (existingConv?.id) {
+      existingConvId = existingConv.id;
+    } else {
+      // Try old schema
+      const { data: oldConv } = await serviceSupabase
+        .from('conversations').select('id')
+        .eq('participant1_id', booking.customer_id).eq('participant2_id', braiderId).maybeSingle();
+      if (oldConv?.id) existingConvId = oldConv.id;
+    }
 
-    let conversationId = existingConv?.id;
+    let conversationId = existingConvId;
 
-    // Create conversation if it doesn't exist
-    if (!existingConv) {
+    if (!conversationId) {
+      const now = new Date().toISOString();
+      // Try new schema insert
       const { data: newConv, error: convErr } = await serviceSupabase
         .from('conversations')
         .insert({
@@ -65,41 +73,61 @@ export async function POST(request: NextRequest) {
           customer_id: booking.customer_id,
           braider_id: braiderId,
           status: 'active',
-          started_at: new Date().toISOString(),
+          started_at: now,
+          created_at: now,
+          updated_at: now,
         })
-        .select('id')
-        .single();
+        .select('id').single();
 
-      if (convErr) {
-        console.error('Error creating conversation:', convErr);
-        return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 });
+      if (!convErr && newConv?.id) {
+        conversationId = newConv.id;
+      } else {
+        // Fallback: old schema
+        const { data: oldNew } = await serviceSupabase
+          .from('conversations')
+          .insert({ participant1_id: booking.customer_id, participant2_id: braiderId, created_at: now })
+          .select('id').single();
+        conversationId = oldNew?.id || null;
       }
 
-      conversationId = newConv?.id;
-
-      // Send system message
+      // Send system welcome message
       if (conversationId) {
-        await serviceSupabase.from('messages').insert({
-          conversation_id: conversationId,
-          sender_id: braiderId,
-          sender_role: 'braider',
-          content: `Booking accepted! Let's discuss the details.`,
-          message_type: 'system',
-          is_read: false,
-        });
+        try {
+          const { error: msgErr } = await serviceSupabase.from('messages').insert({
+            conversation_id: conversationId,
+            sender_id: braiderId,
+            content: `Booking accepted! Let's discuss the details.`,
+            read: false,
+          });
+          if (msgErr) {
+            await serviceSupabase.from('messages').insert({
+              sender_id: braiderId,
+              receiver_id: booking.customer_id,
+              content: `Booking accepted! Let's discuss the details.`,
+            });
+          }
+        } catch {}
       }
     }
 
-    // Fire notification to customer (best-effort)
+    // Notify customer (best-effort)
     try {
-      await serviceSupabase.from('notifications').insert({
+      const { error: notifErr } = await serviceSupabase.from('notifications').insert({
         user_id: booking.customer_id,
-        booking_id: bookingId,
         type: 'booking',
         title: 'Booking Accepted!',
         message: 'Your braider has accepted your booking. You can now chat with them.',
         read: false,
       });
+      if (notifErr) {
+        await serviceSupabase.from('notifications').insert({
+          user_id: booking.customer_id,
+          type: 'booking',
+          title: 'Booking Accepted!',
+          message: 'Your braider has accepted your booking. You can now chat with them.',
+          is_read: false,
+        });
+      }
     } catch {}
 
     return NextResponse.json({
