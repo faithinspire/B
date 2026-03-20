@@ -82,8 +82,8 @@ function PaymentForm({ bookingId, amount, onSuccess }) {
         </div>
       )}
       {bypassMode && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-          Demo payment mode — click Pay to confirm your booking instantly.
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          Payment ready — click Pay to confirm your booking.
         </div>
       )}
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg"><p className="text-red-600 text-sm font-medium">{error}</p></div>}
