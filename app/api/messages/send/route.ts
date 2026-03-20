@@ -31,7 +31,10 @@ export async function POST(request: Request) {
     // Determine the other participant (receiver)
     const customer_id = conversation.customer_id || conversation.participant1_id;
     const braider_id = conversation.braider_id || conversation.participant2_id;
-    const receiver_id = sender_role === 'customer' ? braider_id : customer_id;
+    // For admin messages, notify both participants
+    const receiver_id = sender_role === 'admin'
+      ? (customer_id !== sender_id ? customer_id : braider_id)
+      : sender_role === 'customer' ? braider_id : customer_id;
 
     // Verify sender is part of conversation
     // Also check participant1_id/participant2_id for old schema

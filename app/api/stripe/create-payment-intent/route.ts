@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
 
     // Try Stripe first, fall back to bypass mode if key is invalid
     const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
-    const hasValidStripeKey = stripeKey.startsWith('sk_') && stripeKey.length > 20;
+    const normalizedKey = stripeKey.toLowerCase().startsWith('sk_') && !stripeKey.startsWith('sk_')
+      ? 'sk_' + stripeKey.slice(3)
+      : stripeKey;
+    const hasValidStripeKey = normalizedKey.startsWith('sk_') && normalizedKey.length > 20;
 
     let paymentIntentId: string;
     let clientSecret: string;
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
     if (hasValidStripeKey) {
       try {
         const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
+        const stripe = new Stripe(normalizedKey, { apiVersion: '2023-10-16' });
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(amount * 100),
           currency: 'usd',
