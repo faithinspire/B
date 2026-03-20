@@ -200,30 +200,87 @@ export default function AdminConversationsPage() {
     e.preventDefault();
     if (!newMessage.trim() || !user || !selectedConv) return;
 
-    try {
-      setSending(true);
-      setChatError(null);
+    const content = newMessage.trim();
+    setNewMessage('');
+    setSending(true);
+    setChatError(null);
 
-      const response = await fetch('/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    // Optimistic update
+    const tempId = 'tmp_' + Date.now();
+    const tempMsg: Message = {
+      id: tempId,
+      conversation_id: selectedConv.id,
+      sender_id: user.id,
+      sender_role: 'admin',
+      content,
+      message_type: 'text',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+
+    try {
+      if (!supabase) throw new Error('Supabase not available');
+
+      // Try inserting directly with all fields
+      let inserted: any = null;
+      const now = new Date().toISOString();
+
+      const { data: d1, error: e1 } = await supabase.from('messages').insert({
+        conversation_id: selectedConv.id,
+        sender_id: user.id,
+        sender_role: 'admin',
+        content,
+        read: false,
+        created_at: now,
+      }).select().single();
+
+      if (!e1 && d1) {
+        inserted = d1;
+      } else {
+        // Fallback: without sender_role
+        const { data: d2, error: e2 } = await supabase.from('messages').insert({
           conversation_id: selectedConv.id,
           sender_id: user.id,
-          sender_role: 'admin',
-          content: newMessage.trim(),
-          message_type: 'text',
-        }),
-      });
+          content,
+          read: false,
+          created_at: now,
+        }).select().single();
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to send message');
+        if (!e2 && d2) {
+          inserted = d2;
+        } else {
+          // Last resort: via API with service role
+          const response = await fetch('/api/messages/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversation_id: selectedConv.id,
+              sender_id: user.id,
+              sender_role: 'admin',
+              content,
+              message_type: 'text',
+            }),
+          });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to send message');
+          }
+          inserted = await response.json();
+        }
       }
 
-      setNewMessage('');
+      // Replace temp message with real one
+      if (inserted) {
+        setMessages((prev) => prev.map((m) => m.id === tempId ? { ...inserted, sender_role: inserted.sender_role || 'admin' } : m));
+      }
+
+      // Update conversation timestamp
+      await supabase.from('conversations').update({ updated_at: now }).eq('id', selectedConv.id);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Failed to send message');
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setNewMessage(content);
     } finally {
       setSending(false);
     }
@@ -495,29 +552,23 @@ export default function AdminConversationsPage() {
 
                 {/* Input */}
                 <div className="p-4 border-t border-gray-200">
-                  {!isAdminInConversation ? (
-                    <div className="text-center py-2">
-                      <p className="text-xs text-gray-500">Join the conversation to send messages</p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSendMessage} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message as admin..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                        disabled={sending}
-                      />
-                      <button
-                        type="submit"
-                        disabled={sending || !newMessage.trim()}
-                        className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </form>
-                  )}
+                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type a message as admin..."
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      disabled={sending}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !newMessage.trim()}
+                      className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
                 </div>
               </div>
             ) : (
