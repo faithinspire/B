@@ -475,15 +475,15 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                  <button className="w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold flex items-center justify-center gap-2">
+                  <button onClick={() => router.push('/admin/users')} className="w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold flex items-center justify-center gap-2">
                     <Users className="w-5 h-5" />
                     Manage Users
                   </button>
-                  <button className="w-full px-4 py-3 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-smooth font-semibold flex items-center justify-center gap-2">
+                  <button onClick={() => router.push('/admin/disputes')} className="w-full px-4 py-3 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-smooth font-semibold flex items-center justify-center gap-2">
                     <AlertCircle className="w-5 h-5" />
                     View Disputes
                   </button>
-                  <button className="w-full px-4 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-smooth font-semibold flex items-center justify-center gap-2">
+                  <button onClick={() => router.push('/admin/financials')} className="w-full px-4 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-smooth font-semibold flex items-center justify-center gap-2">
                     <TrendingUp className="w-5 h-5" />
                     View Reports
                   </button>
