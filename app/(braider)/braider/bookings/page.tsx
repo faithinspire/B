@@ -6,8 +6,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { useSupabaseBookingStore } from '@/store/supabaseBookingStore';
-import { Calendar, MapPin, DollarSign, AlertCircle, Loader, CheckCircle, Clock, MessageCircle } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, AlertCircle, Loader, CheckCircle, Clock, MessageCircle, Navigation } from 'lucide-react';
 import Link from 'next/link';
+import dynamic_import from 'next/dynamic';
+
+const BraiderLocationMap = dynamic_import(
+  () => import('@/app/components/BraiderLocationMap').then(m => ({ default: m.BraiderLocationMap })),
+  { ssr: false, loading: () => <div className="h-48 bg-gray-100 rounded-xl flex items-center justify-center"><Loader className="w-6 h-6 text-purple-500 animate-spin" /></div> }
+);
 
 export default function BraiderBookingsPage() {
   const router = useRouter();
@@ -175,6 +181,19 @@ export default function BraiderBookingsPage() {
                   </p>
                   <p className="text-gray-900">{booking.location_address}</p>
                 </div>
+
+                {/* Live Map for confirmed/active bookings */}
+                {(booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'escrowed') && (
+                  <div className="mb-6 pb-6 border-b border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                      <Navigation className="w-4 h-4" />
+                      Live Customer Location
+                    </p>
+                    <div className="h-48 rounded-xl overflow-hidden">
+                      <BraiderLocationMap booking_id={booking.id} />
+                    </div>
+                  </div>
+                )}
 
                 {/* Status & Actions */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
