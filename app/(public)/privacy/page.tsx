@@ -6,7 +6,7 @@ export default function PrivacyPage() {
         <div className="prose prose-lg max-w-none">
           <p>Last updated: March 2024</p>
           <h2>1. Introduction</h2>
-          <p>Braidly ("we", "us", "our") operates the Braidly platform. This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our service.</p>
+          <p>BraidMe ("we", "us", "our") operates the BraidMe platform. This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our service.</p>
           
           <h2>2. Information Collection</h2>
           <p>We collect information you provide directly, including:</p>
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
           <p>We implement industry-standard security measures to protect your data, including encryption, secure authentication, and regular security audits.</p>
 
           <h2>5. Contact Us</h2>
-          <p>If you have questions about this Privacy Policy, please contact us at privacy@braidly.com</p>
+          <p>If you have questions about this Privacy Policy, please contact us at privacy@braidme.com</p>
         </div>
       </div>
     </div>

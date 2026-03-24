@@ -55,12 +55,18 @@ export async function POST(request: Request) {
     let data: any = null;
     let lastError: any = null;
 
+    // Determine sender_role from conversation if not provided
+    const resolvedRole = sender_role || (
+      conversation.customer_id === sender_id ? 'customer' :
+      conversation.braider_id === sender_id ? 'braider' : 'customer'
+    );
+
     // Attempt 1: full new schema
     const r1 = await db.from('messages').insert([{
       conversation_id,
       sender_id,
       content: content.trim(),
-      sender_role: sender_role || 'customer',
+      sender_role: resolvedRole,
       message_type: message_type || 'text',
       read: false,
       created_at: new Date().toISOString(),

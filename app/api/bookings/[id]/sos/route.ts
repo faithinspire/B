@@ -115,8 +115,8 @@ export async function POST(
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidly.com',
-          to: 'support@braidly.com',
+          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com',
+          to: 'support@braidme.com',
           subject: '🚨 URGENT: Emergency Alert - Immediate Action Required',
           html: `
             <h2>Emergency Alert</h2>

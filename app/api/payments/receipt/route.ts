@@ -281,8 +281,8 @@ function generateReceiptHTML(data: any) {
     </div>
 
     <div class="footer">
-      <p>Thank you for using Braidly!</p>
-      <p>© ${new Date().getFullYear()} Braidly. All rights reserved.</p>
+      <p>Thank you for using BraidMe!</p>
+      <p>© ${new Date().getFullYear()} BraidMe. All rights reserved.</p>
       <p>This is an automated receipt. Please keep it for your records.</p>
     </div>
   </div>

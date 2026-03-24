@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { BraidMeLogo } from './BraidMeLogo';
 import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
@@ -81,10 +82,7 @@ export function Navigation() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-sm">B</span>
-              </div>
-              <span className="font-serif font-bold text-lg hidden sm:inline text-gray-900">Braidly</span>
+              <BraidMeLogo size="sm" showText={true} />
             </Link>
 
             {/* Desktop Navigation */}

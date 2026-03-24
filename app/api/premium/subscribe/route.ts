@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       unit_amount: selectedPlan.amount,
       currency: 'usd',
       recurring: { interval: selectedPlan.interval },
-      product_data: { name: `Braidly ${selectedPlan.label}` },
+      product_data: { name: `BraidMe ${selectedPlan.label}` },
     });
 
     const session = await stripe.checkout.sessions.create({

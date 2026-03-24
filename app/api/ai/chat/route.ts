@@ -150,7 +150,7 @@ function generateAIResponse(message: string): { response: string; actions?: Arra
   // HELP & SUPPORT
   if (lowerMessage.includes('help') || lowerMessage.includes('support') || lowerMessage.includes('contact') || lowerMessage.includes('question')) {
     return {
-      response: '📞 Braidly Support:\n• Email: support@braidly.com\n• Chat: 24/7 in app\n• Phone: 1-800-BRAIDLY\n• Help Center: braidly.com/help\n\nFor emergencies during appointments, use the SOS button!',
+      response: '📞 BraidMe Support:\n• Email: support@braidme.com\n• Chat: 24/7 in app\n• Phone: 1-800-BRAIDME\n• Help Center: braidme.com/help\n\nFor emergencies during appointments, use the SOS button!',
       actions: [
         { label: '💬 Chat Support', action: 'support' },
         { label: '📧 Email Us', action: 'email' },
@@ -160,7 +160,7 @@ function generateAIResponse(message: string): { response: string; actions?: Arra
 
   // DEFAULT - MAIN MENU
   return {
-    response: 'Welcome to Braidly! 👋 I can help you with:\n• Finding & booking braiders\n• Payments & refunds\n• Safety & verification\n• Account management\n• Disputes & issues\n• Referrals & earnings\n\nWhat would you like to do?',
+    response: 'Welcome to BraidMe! 👋 I can help you with:\n• Finding & booking braiders\n• Payments & refunds\n• Safety & verification\n• Account management\n• Disputes & issues\n• Referrals & earnings\n\nWhat would you like to do?',
     actions: [
       { label: '🔍 Find Braiders', action: 'search' },
       { label: '📅 Book Now', action: 'book' },

@@ -99,7 +99,7 @@ export default function BraiderChatPage() {
     setMsgs(prev => [...prev, { id: tempId, conversation_id: conv.id, sender_id: user.id, content, created_at: new Date().toISOString(), read: false }]);
     try {
       const db = getDb();
-      const { data, error: err } = await db.from('messages').insert({ conversation_id: conv.id, sender_id: user.id, content, read: false, created_at: new Date().toISOString() }).select().single();
+      const { data, error: err } = await db.from('messages').insert({ conversation_id: conv.id, sender_id: user.id, content, sender_role: 'braider', read: false, created_at: new Date().toISOString() }).select().single();
       if (err) throw new Error(err.message);
       setMsgs(prev => prev.map(m => m.id === tempId ? data : m));
       await db.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conv.id);

@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidly.com',
-          to: 'support@braidly.com',
+          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com',
+          to: 'support@braidme.com',
           subject: `New Dispute - Booking ${booking_id}`,
           html: `
             <h2>New Dispute Report</h2>

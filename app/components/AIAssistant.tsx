@@ -21,7 +21,7 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hi! I\'m Braidly\'s AI Assistant. I can help you book braiders, answer questions, process payments, and more. What would you like to do?',
+      text: 'Hi! I\'m BraidMe\'s AI Assistant. I can help you book braiders, answer questions, process payments, and more. What would you like to do?',
       sender: 'ai',
       timestamp: new Date(),
       actions: [
@@ -178,7 +178,7 @@ export function AIAssistant() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I encountered an error. Please try again or contact support at support@braidly.com',
+        text: 'Sorry, I encountered an error. Please try again or contact support at support@braidme.com',
         sender: 'ai',
         timestamp: new Date(),
       };
@@ -206,7 +206,7 @@ export function AIAssistant() {
         <div className="fixed bottom-32 right-6 z-50 bg-white rounded-2xl shadow-2xl p-4 sm:p-6 max-w-xs animate-scale-in">
           <div className="flex items-start justify-between mb-3">
             <div>
-              <h4 className="font-semibold text-gray-900">Install Braidly</h4>
+              <h4 className="font-semibold text-gray-900">Install BraidMe</h4>
               <p className="text-sm text-gray-600 mt-1">Get quick access to book braiders</p>
             </div>
             <button
@@ -297,7 +297,7 @@ export function AIAssistant() {
                 <GripVertical className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-base sm:text-lg">Braidly AI</h3>
+                <h3 className="font-semibold text-base sm:text-lg">BraidMe AI</h3>
                 <p className="text-xs sm:text-sm opacity-90">Always here to help</p>
               </div>
             </div>

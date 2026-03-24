@@ -1,5 +1,5 @@
-// Service Worker for Braidly PWA
-const CACHE_NAME = 'braidly-v1';
+// Service Worker for BraidMe PWA
+const CACHE_NAME = 'braidme-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',

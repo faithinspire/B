@@ -14,7 +14,7 @@ export default function SignupPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-3xl font-bold text-white">B</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-serif font-bold mb-4 text-gray-900">Join Braidly</h1>
+          <h1 className="text-4xl sm:text-5xl font-serif font-bold mb-4 text-gray-900">Join BraidMe</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">Choose your role and start your journey with us</p>
         </div>
 

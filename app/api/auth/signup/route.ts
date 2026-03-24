@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: userId,
         type: 'welcome',
-        title: 'Welcome to Braidly',
+        title: 'Welcome to BraidMe',
         message: `Welcome ${full_name}! Your account has been created successfully.`,
         data: { role },
         is_read: false,

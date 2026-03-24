@@ -34,7 +34,7 @@ export default function AdminSignupPage() {
     if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     if (!formData.admin_code) newErrors.admin_code = 'Admin code is required';
-    if (formData.admin_code !== 'BRAIDLY_ADMIN_2024') newErrors.admin_code = 'Invalid admin code';
+    if (formData.admin_code !== 'BRAIDME_ADMIN_2024') newErrors.admin_code = 'Invalid admin code';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -142,7 +142,7 @@ export default function AdminSignupPage() {
                 className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-gray-800 focus:ring-2 focus:ring-gray-100 transition-smooth text-base ${
                   errors.email ? 'border-red-500' : ''
                 }`}
-                placeholder="admin@braidly.com"
+                placeholder="admin@braidme.com"
               />
               {errors.email && <p className="text-xs text-red-600 mt-2">{errors.email}</p>}
             </div>
