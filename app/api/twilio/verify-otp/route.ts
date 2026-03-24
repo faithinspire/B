@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import twilio from 'twilio';
 import { supabaseAdmin } from '@/lib/supabase';
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID!;
-const authToken = process.env.TWILIO_AUTH_TOKEN!;
-const verifySid = process.env.TWILIO_VERIFY_SERVICE_SID!;
-
-const client = twilio(accountSid, authToken);
-
 export async function POST(request: NextRequest) {
   try {
     const { phone_number, code, user_id } = await request.json();
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const verifySid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+    if (!accountSid || !authToken || !verifySid) {
+      return NextResponse.json({ error: 'Twilio not configured' }, { status: 503 });
+    }
+
+    const client = twilio(accountSid, authToken);
 
     if (!phone_number || !code || !user_id) {
       return NextResponse.json(
