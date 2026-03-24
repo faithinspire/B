@@ -37,7 +37,7 @@ export default function PremiumBraidersPage() {
       {/* Header */}
       <div className="bg-white border-b border-yellow-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-serif font-bold text-primary-600">Braidly</Link>
+          <Link href="/" className="text-2xl font-serif font-bold text-primary-600">BraidMe</Link>
           <Link href="/search" className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm">
             <ArrowLeft className="w-4 h-4" /> All Braiders
           </Link>

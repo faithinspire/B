@@ -78,7 +78,7 @@ export default function LoginPage() {
               <span className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">B</span>
             </div>
             <h1 className="text-3xl font-serif font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-primary-100">Sign in to your Braidly account</p>
+            <p className="text-primary-100">Sign in to your BraidMe account</p>
           </div>
 
           {/* Error Alert */}

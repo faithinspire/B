@@ -98,7 +98,7 @@ export default function AdminLoginPage() {
                       ? 'border-red-500 focus:border-red-600 focus:ring-red-100'
                       : 'border-gray-200 focus:border-primary-600 focus:ring-primary-100'
                   } disabled:bg-gray-50 disabled:text-gray-500`}
-                  placeholder="admin@braidly.com"
+                  placeholder="admin@braidme.com"
                   autoComplete="email"
                 />
               </div>

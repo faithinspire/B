@@ -108,7 +108,7 @@ export default function SearchPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4">
           <Link href="/" className="text-xl sm:text-2xl font-serif font-bold text-primary-600 mb-2 sm:mb-4 block">
-            Braidly
+            BraidMe
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold">Search Results</h1>
         </div>
