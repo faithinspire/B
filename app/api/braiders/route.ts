@@ -52,7 +52,7 @@ export async function GET() {
       avatar_url: b.avatar_url || null,
       bio: b.bio || '',
       experience_years: b.experience_years || 0,
-      rating_avg: b.rating_avg || 5.0,
+      rating_avg: b.rating_avg || null,
       rating_count: b.rating_count || 0,
       verification_status: b.verification_status || 'unverified',
       travel_radius_miles: b.travel_radius_miles || 10,

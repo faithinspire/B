@@ -66,7 +66,7 @@ export default function BraiderProfilePage() {
         id: data.id,
         user_id: data.user_id,
         bio: data.bio,
-        rating_avg: data.rating_avg || 5.0,
+        rating_avg: data.rating_avg || null,
         rating_count: data.rating_count || 0,
         verification_status: data.verification_status || 'unverified',
         travel_radius_miles: data.travel_radius_miles || 10,
@@ -88,16 +88,10 @@ export default function BraiderProfilePage() {
   };
 
   const getVerificationBadge = (status: string) => {
-    switch (status) {
-      case 'tier1_verified':
-        return <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">ID Verified</span>;
-      case 'tier2_verified':
-        return <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">Background Checked</span>;
-      case 'safety_badge_pro':
-        return <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Safety Pro</span>;
-      default:
-        return null;
+    if (status === 'verified') {
+      return <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">✓ Verified</span>;
     }
+    return null;
   };
 
   if (loading) {
@@ -156,8 +150,12 @@ export default function BraiderProfilePage() {
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold mb-2">{braider.full_name}</h1>
                   <div className="flex items-center gap-2 mb-3">
                     <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    <span className="text-lg font-semibold">{braider.rating_avg.toFixed(1)}</span>
-                    <span className="text-gray-600">({braider.rating_count} reviews)</span>
+                    <span className="text-lg font-semibold">
+                      {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'No ratings yet'}
+                    </span>
+                    {braider.rating_count > 0 && (
+                      <span className="text-gray-600">({braider.rating_count} review{braider.rating_count !== 1 ? 's' : ''})</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">

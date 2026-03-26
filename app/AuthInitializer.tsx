@@ -8,33 +8,26 @@ export function AuthInitializer() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Initialize auth and wait for it to complete
         const authStore = useSupabaseAuthStore.getState();
         await authStore.initializeSession();
 
-        // Get the initialized user
         const user = useSupabaseAuthStore.getState().user;
 
-        // If user is a braider, initialize braider store
         if (user?.role === 'braider') {
           const braiderStore = useSupabaseBraiderStore.getState();
           await braiderStore.initializeStore();
         }
 
-        // Track user IP
+        // Fire-and-forget IP tracking — don't block auth init
         if (user) {
-          try {
-            await fetch('/api/user/ip', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id }),
-            });
-          } catch (err) {
-            console.error('Failed to track IP:', err);
-          }
+          fetch('/api/user/ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id }),
+          }).catch(() => {});
         }
       } catch (error) {
-        console.error('Failed to initialize app:', error);
+        // silent fail — don't crash the app
       }
     };
 

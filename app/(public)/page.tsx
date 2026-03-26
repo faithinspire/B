@@ -1,15 +1,16 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, Star, Shield, Clock, Users, Zap, CheckCircle } from 'lucide-react';
 import { useBraiders } from '@/app/hooks/useBraiders';
-import { BackgroundAnimator } from '@/app/components/BackgroundAnimator';
-import { BraidingStylesGallery } from '@/app/components/BraidingStylesGallery';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
+
+// Lazy load heavy below-fold components
+const BackgroundAnimator = dynamic(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
+const BraidingStylesGallery = dynamic(() => import('@/app/components/BraidingStylesGallery').then(m => ({ default: m.BraidingStylesGallery })), { ssr: false, loading: () => null });
 
 export default function LandingPage(): JSX.Element {
   const router = useRouter();
@@ -276,12 +277,14 @@ export default function LandingPage(): JSX.Element {
                             <div className="flex items-center gap-2 mb-4 text-xs sm:text-sm">
                               <div className="flex items-center gap-1">
                                 <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
-                                <span className="font-semibold text-gray-900">{braider.rating_avg?.toFixed(1) || '5.0'}</span>
+                                <span className="font-semibold text-gray-900">
+                                  {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}
+                                </span>
                               </div>
-                              <span className="text-gray-500">({braider.rating_count || 0})</span>
+                              <span className="text-gray-500">({braider.rating_count || 0} review{braider.rating_count !== 1 ? 's' : ''})</span>
                             </div>
-                            {braider.verification_status !== 'unverified' && (
-                              <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold mb-4 w-fit">
+                            {braider.verification_status === 'verified' && (
+                              <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold mb-4 w-fit">
                                 <CheckCircle className="w-3 h-3" />
                                 Verified
                               </div>

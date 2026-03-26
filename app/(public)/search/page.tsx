@@ -48,9 +48,9 @@ export default function SearchPage() {
     try {
       let results = allBraiders as Braider[];
 
-      // Filter by verified status
+      // Filter by verified status — only show truly verified braiders
       if (filters.verified) {
-        results = results.filter(b => b.verification_status !== 'unverified');
+        results = results.filter(b => b.verification_status === 'verified');
       }
 
       // Filter by premium
@@ -58,8 +58,8 @@ export default function SearchPage() {
         results = results.filter(b => b.is_premium);
       }
 
-      // Filter by rating
-      results = results.filter(b => b.rating_avg >= filters.minRating);
+      // Filter by rating — skip unrated braiders if minRating > 0
+      results = results.filter(b => filters.minRating === 0 || (b.rating_avg != null && b.rating_avg >= filters.minRating));
 
       // Filter by price
       results = results.filter(b => {
@@ -230,8 +230,10 @@ export default function SearchPage() {
                       {/* Rating */}
                       <div className="flex items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
                         <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-xs sm:text-sm font-medium text-gray-900">{braider.rating_avg.toFixed(1)}</span>
-                        <span className="text-xs text-gray-500">({braider.rating_count})</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-900">
+                          {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}
+                        </span>
+                        <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
                       </div>
 
                       {/* Bio */}
@@ -255,7 +257,7 @@ export default function SearchPage() {
                             <Crown className="w-3 h-3" /> Premium
                           </span>
                         )}
-                        {braider.verification_status !== 'unverified' && (
+                        {braider.verification_status === 'verified' && (
                           <span className="inline-block px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
                             ✓ Verified
                           </span>

@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, DM_Sans } from 'next/font/google';
+import dynamic from 'next/dynamic';
 import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
-import { PageBackground } from './components/PageBackground';
-import { AIAssistant } from './components/AIAssistant';
 import { ServiceWorkerRegister } from './components/ServiceWorkerRegister';
 import './globals.css';
 
-// Force dynamic rendering for all routes
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Lazy load heavy components — not needed on initial paint
+const AIAssistant = dynamic(() => import('./components/AIAssistant').then(m => ({ default: m.AIAssistant })), {
+  ssr: false,
+  loading: () => null,
+});
+
+const PageBackground = dynamic(() => import('./components/PageBackground').then(m => ({ default: m.PageBackground })), {
+  ssr: false,
+  loading: () => null,
+});
 
 const playfair = Playfair_Display({
   subsets: ['latin'],

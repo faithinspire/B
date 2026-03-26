@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // avoid double renders on mobile
+  compress: true,
+  poweredByHeader: false,
   images: {
-    unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,6 +22,10 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+  },
+  experimental: {
+    optimizeCss: false,
+    optimizePackageImports: ['lucide-react', 'recharts', '@stripe/react-stripe-js'],
   },
   // Skip generating error pages during build
   generateBuildId: async () => {

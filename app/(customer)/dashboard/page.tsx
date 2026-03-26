@@ -7,14 +7,19 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { useBraiders } from '@/app/hooks/useBraiders';
-import { useBookingStore } from '@/store/bookingStore';
 import { Heart, Star, MapPin, Search, Loader, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { ReviewSubmissionModal } from '@/app/components/ReviewSubmissionModal';
+import { createClient } from '@supabase/supabase-js';
+
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function CustomerDashboard() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
   const { braiders } = useBraiders();
-  const { getBookingsByCustomer } = useBookingStore();
   
   const [favorites, setFavorites] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +30,8 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(false);
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'bookings'>('browse');
+  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Wait for auth to initialize
@@ -45,10 +52,23 @@ export default function CustomerDashboard() {
     const saved = localStorage.getItem(`favorites_${user.id}`);
     if (saved) setFavorites(JSON.parse(saved));
     
-    // Load bookings from store
-    const bookings = getBookingsByCustomer(user.id);
-    setMyBookings(bookings);
-  }, [user, authLoading, router, getBookingsByCustomer]);
+    // Load bookings from Supabase
+    sb.from('bookings')
+      .select('*')
+      .eq('customer_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setMyBookings(data);
+      });
+
+    // Load already-reviewed bookings
+    sb.from('reviews')
+      .select('booking_id')
+      .eq('reviewer_id', user.id)
+      .then(({ data }) => {
+        if (data) setReviewedBookings(new Set(data.map((r: any) => r.booking_id)));
+      });
+  }, [user, authLoading, router]);
 
   // Filter and search braiders in real-time
   const filterBraiders = useCallback(() => {
@@ -71,8 +91,8 @@ export default function CustomerDashboard() {
         results = results.filter((b) => b.specialties && b.specialties.includes(selectedSpecialty));
       }
 
-      // Rating filter
-      results = results.filter((b) => b.rating_avg >= minRating);
+      // Rating filter — skip braiders with no ratings if minRating > 0
+      results = results.filter((b) => minRating === 0 || (b.rating_avg != null && b.rating_avg >= minRating));
 
       // Price filter
       results = results.filter((b) => {
@@ -289,11 +309,13 @@ export default function CustomerDashboard() {
                           <h3 className="text-sm sm:text-base md:text-xl font-semibold text-gray-900">{braider.full_name}</h3>
                           <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
                             <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-xs sm:text-sm font-medium">{braider.rating_avg.toFixed(1)}</span>
-                            <span className="text-xs text-gray-500">({braider.rating_count})</span>
+                            <span className="text-xs sm:text-sm font-medium">
+                              {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}
+                            </span>
+                            <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
                           </div>
                         </div>
-                        {braider.verification_status !== 'unverified' && (
+                        {braider.verification_status === 'verified' && (
                           <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full whitespace-nowrap">
                             ✓ Verified
                           </span>
@@ -433,6 +455,19 @@ export default function CustomerDashboard() {
                         Pay Now
                       </Link>
                     )}
+                    {booking.status === 'completed' && !reviewedBookings.has(booking.id) && (
+                      <button
+                        onClick={() => setReviewBooking(booking)}
+                        className="flex-1 min-w-[120px] px-2 sm:px-4 py-1.5 sm:py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-smooth font-semibold text-xs sm:text-sm flex items-center justify-center gap-1"
+                      >
+                        <Star className="w-3.5 h-3.5" /> Leave Review
+                      </button>
+                    )}
+                    {booking.status === 'completed' && reviewedBookings.has(booking.id) && (
+                      <span className="flex-1 min-w-[120px] px-2 sm:px-4 py-1.5 sm:py-2 bg-gray-100 text-gray-500 rounded-lg text-center font-semibold text-xs sm:text-sm">
+                        ✓ Reviewed
+                      </span>
+                    )}
                     {(booking.status === 'pending' || booking.status === 'confirmed') && (
                       <button
                         className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition-smooth font-semibold text-xs sm:text-sm"
@@ -447,6 +482,21 @@ export default function CustomerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Review Modal */}
+      {reviewBooking && user && (
+        <ReviewSubmissionModal
+          bookingId={reviewBooking.id}
+          braiderId={reviewBooking.braider_id}
+          braiderName={reviewBooking.braider_name || 'Braider'}
+          reviewerId={user.id}
+          onClose={() => setReviewBooking(null)}
+          onSuccess={() => {
+            setReviewedBookings(prev => new Set([...prev, reviewBooking.id]));
+            setReviewBooking(null);
+          }}
+        />
+      )}
     </div>
   );
 }

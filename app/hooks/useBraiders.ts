@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export interface Braider {
@@ -30,26 +30,28 @@ export function useBraiders() {
   const [braiders, setBraiders] = useState<Braider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cacheRef = useRef<{ data: Braider[]; ts: number } | null>(null);
+  const CACHE_TTL = 60_000; // 1 minute cache
 
-  const fetchBraiders = async () => {
+  const fetchBraiders = async (force = false) => {
+    // Return cached data if fresh
+    if (!force && cacheRef.current && Date.now() - cacheRef.current.ts < CACHE_TTL) {
+      setBraiders(cacheRef.current.data);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching braiders from /api/braiders...');
-      
+
       const response = await fetch('/api/braiders');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch braiders');
-      }
-      
+      if (!response.ok) throw new Error('Failed to fetch braiders');
+
       const data = await response.json();
-      console.log('Braiders API response:', { count: Array.isArray(data) ? data.length : 0, data });
-      
-      const braidersList = Array.isArray(data) ? data : [];
-      
-      // Ensure all braiders have required fields
-      const normalizedBraiders = braidersList.map((b: any) => ({
+      const braidersList: Braider[] = Array.isArray(data) ? data : [];
+
+      const normalized = braidersList.map((b: any) => ({
         ...b,
         services: b.services || [],
         portfolio: b.portfolio || [],
@@ -57,13 +59,12 @@ export function useBraiders() {
         total_earnings: b.total_earnings || 0,
         available_balance: b.available_balance || 0,
       }));
-      
-      console.log('Normalized braiders:', { count: normalizedBraiders.length, normalizedBraiders });
-      setBraiders(normalizedBraiders);
+
+      cacheRef.current = { data: normalized, ts: Date.now() };
+      setBraiders(normalized);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
-      console.error('Error fetching braiders:', err);
       setBraiders([]);
     } finally {
       setLoading(false);
@@ -71,40 +72,24 @@ export function useBraiders() {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetchBraiders();
 
-    // Set up real-time subscription to braider_profiles table
-    if (!supabase) {
-      console.log('Supabase not configured, skipping real-time subscription');
-      return;
-    }
+    if (!supabase) return;
 
-    try {
-      const subscription = supabase
-        .channel('braider_profiles_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'braider_profiles',
-          },
-          (payload) => {
-            console.log('Real-time update received:', payload);
-            // Refetch braiders when changes occur
-            fetchBraiders();
-          }
-        )
-        .subscribe();
+    // Debounce real-time updates — don't refetch on every keystroke/change
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const subscription = supabase
+      .channel('braider_profiles_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'braider_profiles' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchBraiders(true), 2000);
+      })
+      .subscribe();
 
-      // Cleanup subscription on unmount
-      return () => {
-        subscription.unsubscribe();
-      };
-    } catch (err) {
-      console.error('Error setting up real-time subscription:', err);
-    }
+    return () => {
+      clearTimeout(debounceTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { braiders, loading, error };

@@ -80,8 +80,8 @@
   }
 }
 
-/* Smooth transitions */
-* {
+/* Smooth transitions — only on interactive elements, not everything */
+button, a, input, select, textarea {
   @apply transition-colors duration-200;
 }
 
@@ -288,9 +288,25 @@
   }
 }
 
-/* Prevent zoom on input focus (iOS) */
+/* Prevent zoom on input focus (iOS) — must be 16px+ */
 input, textarea, select {
-  font-size: 16px;
+  font-size: max(16px, 1rem);
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* GPU-accelerate common animated elements */
+.animate-fade-in,
+.animate-slide-up,
+.animate-scale-in {
+  will-change: opacity, transform;
 }
 
 

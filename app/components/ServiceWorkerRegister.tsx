@@ -5,19 +5,10 @@ import { useEffect } from 'react';
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered:', registration);
-
-          // Check for updates periodically
-          setInterval(() => {
-            registration.update();
-          }, 60000); // Check every minute
-        })
-        .catch((error) => {
-          console.log('Service Worker registration failed:', error);
-        });
+      // Defer SW registration until after page load — don't compete with critical resources
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
     }
   }, []);
 
