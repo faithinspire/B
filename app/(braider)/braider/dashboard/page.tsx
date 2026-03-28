@@ -173,7 +173,7 @@ export default function BraiderDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-xs sm:text-sm font-medium">Rating</p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-600 mt-1 sm:mt-2">{typeof profile?.rating_avg === 'number' ? profile.rating_avg.toFixed(1) : '5.0'}</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-600 mt-1 sm:mt-2">{typeof profile?.rating_avg === 'number' ? profile.rating_avg.toFixed(1) : 'No ratings yet'}</p>
               </div>
               <Star className="w-8 sm:w-10 md:w-12 h-8 sm:h-10 md:h-12 text-yellow-100" />
             </div>

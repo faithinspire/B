@@ -116,7 +116,7 @@ export default function FavoritesPage() {
                       <h3 className="text-xl font-semibold text-gray-900">{braider.full_name}</h3>
                       <div className="flex items-center gap-1 mt-1">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{braider.rating_avg?.toFixed(1) || '5.0'}</span>
+                        <span className="text-sm font-medium">{braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}</span>
                         <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
                       </div>
                     </div>
