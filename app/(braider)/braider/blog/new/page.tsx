@@ -1,6 +1,6 @@
 'use client';
 export const dynamic = 'force-dynamic';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, Save, Eye } from 'lucide-react';
@@ -10,7 +10,7 @@ function db() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 }
 
-export default function NewBlogPostPage() {
+function NewBlogPostContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams?.get('edit');
@@ -136,5 +136,13 @@ export default function NewBlogPostPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NewBlogPostPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" /></div>}>
+      <NewBlogPostContent />
+    </Suspense>
   );
 }
