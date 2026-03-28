@@ -27,8 +27,8 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
     async function initStripe() {
       try {
         const key = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
-        if (!key || !key.startsWith('pk_')) {
-          if (!cancelled) setStripeReady(true); // bypass mode
+        if (!key || !key.startsWith('pk_live_') && !key.startsWith('pk_test_')) {
+          setError('Payment system not configured. Please contact support.');
           return;
         }
 
@@ -96,6 +96,11 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
     setError('');
 
     try {
+      // Must have real Stripe loaded
+      if (!stripeRef.current || !cardRef.current) {
+        throw new Error('Payment form not ready. Please refresh and try again.');
+      }
+
       const res = await fetch('/api/stripe/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,28 +112,24 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
         throw new Error(d.error || 'Failed to create payment');
       }
 
-      const { clientSecret, bypassMode } = await res.json();
+      const { clientSecret } = await res.json();
 
-      // Bypass mode (no valid secret key) — confirm directly
-      if (bypassMode || !clientSecret || clientSecret.startsWith('bypass_')) {
-        await fetch(`/api/bookings/${bookingId}/confirm`, { method: 'POST' }).catch(() => {});
-        onSuccess();
-        return;
+      if (!clientSecret) {
+        throw new Error('No payment session received. Please try again.');
       }
 
-      // Real Stripe payment
-      if (!stripeRef.current || !cardRef.current) {
-        throw new Error('Payment form not ready. Please refresh and try again.');
-      }
-
+      // Confirm real Stripe payment — card must be valid
       const { error: stripeError, paymentIntent } = await stripeRef.current.confirmCardPayment(
         clientSecret,
         { payment_method: { card: cardRef.current } }
       );
 
       if (stripeError) {
-        setError(stripeError.message || 'Payment failed');
+        // Stripe returns the real decline reason here
+        setError(stripeError.message || 'Payment failed. Please check your card details.');
       } else if (paymentIntent?.status === 'succeeded') {
+        // Confirm booking in DB
+        await fetch(`/api/bookings/${bookingId}/confirm`, { method: 'POST' }).catch(() => {});
         onSuccess();
       } else {
         setError('Payment did not complete. Please try again.');
@@ -180,7 +181,7 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
 
       <button
         type="submit"
-        disabled={!stripeReady || loading || (hasStripe && !cardComplete)}
+        disabled={!stripeReady || loading || !cardComplete || !stripeRef.current}
         className="w-full px-4 py-3.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-base transition-colors flex items-center justify-center gap-2"
       >
         {loading ? (

@@ -13,6 +13,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
     }
 
+    const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+    if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
+      return NextResponse.json({ error: 'Payment system not configured. Please contact support.' }, { status: 503 });
+    }
+
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
@@ -34,62 +39,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // Try Stripe first, fall back to bypass mode if key is invalid
-    const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
-    // A valid Stripe secret key starts with sk_live_ or sk_test_ and is ~56+ chars
-    const hasValidStripeKey = (stripeKey.startsWith('sk_live_') || stripeKey.startsWith('sk_test_')) && stripeKey.length > 40;
+    // Create real Stripe payment intent
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
 
-    let paymentIntentId: string;
-    let clientSecret: string;
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // convert to cents
+      currency: 'usd',
+      payment_method_types: ['card'],
+      metadata: {
+        bookingId,
+        customerId: customerId || booking.customer_id || '',
+        braiderId: braiderId || booking.braider_id || '',
+      },
+    });
 
-    if (hasValidStripeKey) {
-      try {
-        const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(amount * 100),
-          currency: 'usd',
-          payment_method_types: ['card'],
-          metadata: {
-            bookingId,
-            customerId: customerId || booking.customer_id,
-            braiderId: braiderId || booking.braider_id,
-          },
-        });
-        paymentIntentId = paymentIntent.id;
-        clientSecret = paymentIntent.client_secret!;
-      } catch (stripeErr: any) {
-        console.error('Stripe error:', stripeErr?.message);
-        // Fall through to bypass mode
-        paymentIntentId = `bypass_pi_${Date.now()}`;
-        clientSecret = `bypass_secret_${bookingId}_${Date.now()}`;
-      }
-    } else {
-      // Bypass mode — no valid Stripe key
-      console.warn('No valid Stripe key — using bypass payment mode');
-      paymentIntentId = `bypass_pi_${Date.now()}`;
-      clientSecret = `bypass_secret_${bookingId}_${Date.now()}`;
-    }
-
-    // Update booking
+    // Update booking with payment intent ID
     await supabase
       .from('bookings')
       .update({
-        stripe_payment_intent_id: paymentIntentId,
+        stripe_payment_intent_id: paymentIntent.id,
         status: 'pending_payment',
       })
       .eq('id', bookingId);
 
     return NextResponse.json({
       success: true,
-      clientSecret,
-      paymentIntentId,
-      bypassMode: !hasValidStripeKey || clientSecret.startsWith('bypass_'),
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Payment intent creation error:', error);
+    // Return Stripe's actual error message to the client
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create payment intent' },
+      { error: error?.message || 'Failed to create payment intent' },
       { status: 500 }
     );
   }
