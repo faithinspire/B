@@ -26,6 +26,7 @@ const nextConfig = {
   experimental: {
     optimizeCss: false,
     optimizePackageImports: ['lucide-react', 'recharts', '@stripe/react-stripe-js'],
+    missingSuspenseWithCSRBailout: false,
   },
   // Skip generating error pages during build
   generateBuildId: async () => {
