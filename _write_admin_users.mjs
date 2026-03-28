@@ -1,4 +1,6 @@
-'use client';
+import { writeFileSync } from 'fs';
+
+const content = `'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -141,7 +143,7 @@ export default function AdminUsersPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-600">{u.email}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${roleCls(u.role)}`}>{u.role}</span>
+                            <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${roleCls(u.role)}\`}>{u.role}</span>
                           </td>
                           <td className="px-4 py-3 text-gray-500">{u.phone || '—'}</td>
                           <td className="px-4 py-3 text-gray-500 text-xs">{new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
@@ -192,7 +194,7 @@ export default function AdminUsersPage() {
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">{selected.full_name || 'Unknown'}</h2>
                   <p className="text-sm text-gray-500">{selected.email}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleCls(selected.role)}`}>{selected.role}</span>
+                  <span className={\`text-xs px-2 py-0.5 rounded-full font-medium \${roleCls(selected.role)}\`}>{selected.role}</span>
                 </div>
               </div>
               <button onClick={() => setSelected(null)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full text-lg font-bold">×</button>
@@ -220,3 +222,7 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+`;
+
+writeFileSync('app/(admin)/admin/users/page.tsx', content, 'utf8');
+console.log('Done. Size:', content.length);
