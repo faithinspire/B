@@ -1,4 +1,7 @@
-'use client';
+import { writeFileSync } from 'fs';
+
+// Force write admin users page with delete functionality
+const adminUsersPage = `'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -134,7 +137,7 @@ export default function AdminUsersPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                          <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${roleCls(u.role)}`}>{u.role}</span></td>
+                          <td className="px-4 py-3"><span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${roleCls(u.role)}\`}>{u.role}</span></td>
                           <td className="px-4 py-3 text-gray-500">{u.phone || '—'}</td>
                           <td className="px-4 py-3 text-gray-500 text-xs">{new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                           <td className="px-4 py-3">
@@ -184,7 +187,7 @@ export default function AdminUsersPage() {
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">{selected.full_name || 'Unknown'}</h2>
                   <p className="text-sm text-gray-500">{selected.email}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleCls(selected.role)}`}>{selected.role}</span>
+                  <span className={\`text-xs px-2 py-0.5 rounded-full font-medium \${roleCls(selected.role)}\`}>{selected.role}</span>
                 </div>
               </div>
               <button onClick={() => setSelected(null)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full text-lg font-bold">x</button>
@@ -212,3 +215,132 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+`;
+
+// Force write delete API route
+const deleteRoute = `import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = params.id;
+    if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Server not configured' }, { status: 500 });
+
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const token = authHeader.substring(7);
+    const { data: { user: adminUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: adminProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', adminUser.id).single();
+    if (adminProfile?.role !== 'admin') return NextResponse.json({ error: 'Only admins can delete users' }, { status: 403 });
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (deleteError) return NextResponse.json({ error: deleteError.message || 'Failed to delete user' }, { status: 500 });
+
+    await Promise.allSettled([
+      supabaseAdmin.from('profiles').delete().eq('id', userId),
+      supabaseAdmin.from('braider_profiles').delete().eq('user_id', userId),
+    ]);
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+`;
+
+// Force write review modal
+const reviewModal = `'use client';
+import { useState } from 'react';
+import { Star, X, Loader } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface ReviewSubmissionModalProps {
+  bookingId: string;
+  braiderId: string;
+  braiderName: string;
+  reviewerId: string;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export function ReviewSubmissionModal({ bookingId, braiderId, braiderName, reviewerId, onClose, onSuccess }: ReviewSubmissionModalProps) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewerId) { toast.error('You must be logged in to leave a review'); return; }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/reviews/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId, reviewer_id: reviewerId, braider_id: braiderId, rating, comment: comment || null, photos: [] }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to submit review');
+      toast.success('Review submitted!');
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit review');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 flex items-center justify-between rounded-t-3xl">
+          <h2 className="text-lg sm:text-xl font-serif font-bold">Review {braiderName}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full" aria-label="Close"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">How was your experience?</label>
+            <div className="flex gap-2 justify-center">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button key={star} type="button" onClick={() => setRating(star)} className="transition-transform hover:scale-110">
+                  <Star className={\`w-8 h-8 sm:w-10 sm:h-10 \${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}\`} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Share your feedback (optional)</label>
+            <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Tell us about your experience..."
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 text-sm" rows={4} disabled={loading} />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 font-semibold text-sm">Cancel</button>
+            <button type="submit" disabled={loading}
+              className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold text-sm flex items-center justify-center gap-2">
+              {loading && <Loader className="w-4 h-4 animate-spin" />}
+              Submit Review
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+`;
+
+writeFileSync('app/(admin)/admin/users/page.tsx', adminUsersPage, 'utf8');
+writeFileSync('app/api/admin/users/[id]/route.ts', deleteRoute, 'utf8');
+writeFileSync('app/components/ReviewSubmissionModal.tsx', reviewModal, 'utf8');
+
+console.log('All 3 files written successfully');
+console.log('admin users page:', adminUsersPage.length, 'bytes');
+console.log('delete route:', deleteRoute.length, 'bytes');
+console.log('review modal:', reviewModal.length, 'bytes');
