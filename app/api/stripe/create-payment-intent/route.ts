@@ -15,11 +15,12 @@ export async function POST(request: NextRequest) {
 
     const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
     if (!stripeKey) {
+      console.error('STRIPE_SECRET_KEY not configured');
       return NextResponse.json({ error: 'Stripe not configured. Please contact support.' }, { status: 503 });
     }
     if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
-      console.error('Invalid Stripe key format:', stripeKey.substring(0, 10));
-      return NextResponse.json({ error: 'Payment system configuration error. Please contact support.' }, { status: 503 });
+      console.error('Invalid Stripe key format. Key starts with:', stripeKey.substring(0, 15));
+      return NextResponse.json({ error: 'Invalid Stripe configuration. Please contact support.' }, { status: 503 });
     }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
