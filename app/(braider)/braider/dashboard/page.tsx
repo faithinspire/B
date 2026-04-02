@@ -218,6 +218,47 @@ export default function BraiderDashboard() {
           </div>
         </div>
 
+        {/* Service Coverage Section */}
+        <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 mb-6 sm:mb-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900">Service Coverage</h3>
+            <button
+              onClick={() => router.push('/braider/services')}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold"
+            >
+              <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+              Edit
+            </button>
+          </div>
+          <div className="space-y-3 sm:space-y-4">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600 font-semibold mb-2">Service Type</p>
+              <p className="text-sm sm:text-base text-gray-900 capitalize">{profile?.service_type === 'mobile' ? '📱 Mobile - I travel to customers' : profile?.service_type === 'salon' ? '🏪 Salon - Customers come to me' : '🔄 Both - Mobile & Salon'}</p>
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600 font-semibold mb-2">Travel Radius</p>
+              <p className="text-sm sm:text-base text-gray-900">{profile?.travel_radius_miles || 0} miles</p>
+            </div>
+            {profile?.cities && profile.cities.length > 0 && (
+              <div>
+                <p className="text-xs sm:text-sm text-gray-600 font-semibold mb-2">Cities Covered ({profile.cities.length})</p>
+                <div className="flex flex-wrap gap-2">
+                  {profile.cities.slice(0, 8).map((city: string) => (
+                    <span key={city} className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-primary-50 text-primary-700 rounded-full text-xs sm:text-sm font-medium">
+                      {city}
+                    </span>
+                  ))}
+                  {profile.cities.length > 8 && (
+                    <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm font-medium">
+                      +{profile.cities.length - 8} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Services Section */}
         <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
