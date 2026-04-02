@@ -5,11 +5,11 @@ function getStripeInstance(): Stripe {
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY not configured');
   }
-  if (!key.startsWith('sk_') && !key.toLowerCase().startsWith('sk_')) {
-    throw new Error(`Invalid STRIPE_SECRET_KEY format (got: ${key.substring(0, 7)}...)`);
+  // Accept both sk_test_ and sk_live_ prefixes
+  if (!key.startsWith('sk_test_') && !key.startsWith('sk_live_')) {
+    throw new Error(`Invalid STRIPE_SECRET_KEY format. Must start with sk_test_ or sk_live_`);
   }
-  const normalizedKey = key.startsWith('sk_') ? key : 'sk_' + key.slice(3);
-  return new Stripe(normalizedKey, {
+  return new Stripe(key, {
     apiVersion: '2023-10-16',
   });
 }

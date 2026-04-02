@@ -1,236 +1,318 @@
 'use client';
+
 export const dynamic = 'force-dynamic';
+
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { supabase } from '@/lib/supabase';
-import { Users, MessageSquare, DollarSign, AlertCircle, RefreshCw, BarChart3, AlertTriangle, TrendingUp, Calendar, CheckCircle, Clock } from 'lucide-react';
+import {
+  BarChart3,
+  Users,
+  MessageSquare,
+  DollarSign,
+  TrendingUp,
+  AlertCircle,
+  RefreshCw,
+  AlertTriangle,
+} from 'lucide-react';
+
+interface DashboardStats {
+  totalUsers: number;
+  totalBraiders: number;
+  totalCustomers: number;
+  totalConversations: number;
+  activeConversations: number;
+  totalBookings: number;
+  totalRevenue: number;
+  pendingPayments: number;
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuthStore();
-  const [stats, setStats] = useState(null);
-  const [recentUsers, setRecentUsers] = useState([]);
-  const [recentBookings, setRecentBookings] = useState([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) router.push('/login');
+    if (!authLoading && (!user || user.role !== 'admin')) {
+      router.push('/login');
+    }
   }, [user, authLoading, router]);
 
   const fetchStats = useCallback(async () => {
     try {
-      setLoading(true); setError(null);
-      const res = await fetch('/api/admin/dashboard');
-      if (!res.ok) throw new Error('Failed to fetch stats');
-      const data = await res.json();
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/admin/dashboard', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+
+      const data = await response.json();
       setStats(data);
       setLastUpdated(new Date());
-      if (data.recentBookings) setRecentBookings(data.recentBookings);
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          const ur = await fetch('/api/admin/users', { headers: { Authorization: 'Bearer ' + session.access_token } });
-          if (ur.ok) { const u = await ur.json(); setRecentUsers(u.slice(0, 6)); }
-        }
-      }
-    } catch(e) { setError(e.message); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user || user.role !== 'admin') return;
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') return;
+
     fetchStats();
-    const t = setInterval(fetchStats, 60000);
-    return () => clearInterval(t);
+    const interval = setInterval(fetchStats, 60000);
+    return () => clearInterval(interval);
   }, [user, authLoading, fetchStats]);
 
-  if (authLoading || (!user && !authLoading)) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"/></div>;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
+        <div className="text-center">
+          <div className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
+          <p className="text-gray-600 font-semibold">Loading...</p>
+        </div>
+      </div>
+    );
   }
-  if (!user || user.role !== 'admin') return null;
 
-  const navItems = [
-    { label: 'Conversations', icon: MessageSquare, path: '/admin/conversations', color: 'from-purple-600 to-purple-700' },
-    { label: 'Payments', icon: DollarSign, path: '/admin/payments', color: 'from-green-600 to-green-700' },
-    { label: 'Users', icon: Users, path: '/admin/users', color: 'from-blue-600 to-blue-700' },
-    { label: 'Disputes', icon: AlertTriangle, path: '/admin/disputes', color: 'from-red-600 to-red-700' },
-    { label: 'Verification', icon: CheckCircle, path: '/admin/verification', color: 'from-teal-600 to-teal-700' },
-    { label: 'Financials', icon: TrendingUp, path: '/admin/financials', color: 'from-orange-600 to-orange-700' },
-  ];
-
-  const statusColor = (s) => s==='completed'?'bg-green-100 text-green-700':s==='accepted'?'bg-blue-100 text-blue-700':s==='pending'?'bg-yellow-100 text-yellow-700':'bg-gray-100 text-gray-600';
-  const roleCls = (r) => r==='braider'?'bg-blue-100 text-blue-700':r==='admin'?'bg-purple-100 text-purple-700':'bg-green-100 text-green-700';
+  if (!user || user.role !== 'admin') {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-20 md:pb-8">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {lastUpdated ? 'Updated ' + lastUpdated.toLocaleTimeString() : 'Loading...'}
-            </p>
+      <div className="sticky top-0 z-40 bg-white shadow-sm">
+        <div className="w-full px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-gray-900">Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Monitor platform activity</p>
+            </div>
+            <button
+              onClick={fetchStats}
+              className="p-2 sm:p-3 bg-primary-100 hover:bg-primary-200 rounded-lg transition-smooth"
+              title="Refresh"
+            >
+              <RefreshCw className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600" />
+            </button>
           </div>
-          <button onClick={fetchStats} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-            <RefreshCw className="w-5 h-5 text-gray-600"/>
-          </button>
+          {lastUpdated && (
+            <p className="text-xs text-gray-500 mt-2">Last updated: {lastUpdated.toLocaleTimeString()}</p>
+          )}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Main Content */}
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+        {/* Error Message */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0"/>
-            <p className="text-red-700 text-sm">{error}</p>
-            <button onClick={fetchStats} className="ml-auto text-red-600 text-sm font-semibold hover:underline">Retry</button>
+          <div className="mb-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-red-900 font-semibold text-sm sm:text-base">Error</p>
+              <p className="text-red-700 text-xs sm:text-sm mt-1 break-words">{error}</p>
+              <button
+                onClick={fetchStats}
+                className="mt-2 text-red-600 hover:text-red-700 font-semibold text-xs sm:text-sm"
+              >
+                Try again
+              </button>
+            </div>
           </div>
         )}
 
+        {/* Loading */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"/>
+          <div className="text-center py-12 sm:py-16">
+            <div className="w-10 sm:w-12 h-10 sm:h-12 text-primary-600 animate-spin mx-auto mb-3 sm:mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
+            <p className="text-sm sm:text-base text-gray-600 font-semibold">Loading dashboard...</p>
           </div>
         ) : stats ? (
           <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Users</p>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-4 h-4 text-blue-600"/>
-                  </div>
+            {/* Stats Grid - Fully Responsive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+              {/* Total Users */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Total Users</h3>
+                  <Users className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalBraiders} braiders · {stats.totalCustomers} customers</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
+                <p className="text-xs text-gray-500 mt-1 sm:mt-2">
+                  {stats.totalBraiders} braiders, {stats.totalCustomers} customers
+                </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bookings</p>
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-purple-600"/>
-                  </div>
+              {/* Conversations */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Conversations</h3>
+                  <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-accent-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
-                <p className="text-xs text-gray-500 mt-1">All time</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalConversations}</p>
+                <p className="text-xs text-green-600 mt-1 sm:mt-2">{stats.activeConversations} active</p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revenue</p>
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-4 h-4 text-green-600"/>
-                  </div>
+              {/* Bookings */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Bookings</h3>
+                  <BarChart3 className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">${stats.totalRevenue?.toFixed(0) ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.pendingPayments} pending</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
+                <p className="text-xs text-gray-500 mt-1 sm:mt-2">All time</p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversations</p>
-                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4 text-orange-600"/>
-                  </div>
+              {/* Revenue */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <h3 className="text-xs sm:text-sm text-gray-600 font-semibold">Revenue</h3>
+                  <DollarSign className="w-4 sm:w-5 h-4 sm:h-5 text-green-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalConversations}</p>
-                <p className="text-xs text-green-600 mt-1">{stats.activeConversations} active</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mt-1 sm:mt-2">{stats.pendingPayments} pending</p>
               </div>
             </div>
 
-            {/* Quick Nav */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {navItems.map(item => (
-                <button key={item.path} onClick={() => router.push(item.path)}
-                  className={`bg-gradient-to-br ${item.color} rounded-xl p-4 text-white hover:opacity-90 hover:scale-105 transition-all shadow-sm flex flex-col items-center gap-2`}>
-                  <item.icon className="w-5 h-5"/>
-                  <span className="text-xs font-semibold">{item.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* User distribution bar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">User Distribution</h3>
-              <div className="space-y-3">
-                {[
-                  { label: 'Braiders', count: stats.totalBraiders, color: 'bg-blue-500' },
-                  { label: 'Customers', count: stats.totalCustomers, color: 'bg-green-500' },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-600 w-20">{item.label}</span>
-                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${item.color} rounded-full transition-all`}
-                        style={{ width: stats.totalUsers > 0 ? (item.count / stats.totalUsers * 100) + '%' : '0%' }}/>
-                    </div>
-                    <span className="text-xs font-bold text-gray-900 w-8 text-right">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent data grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Bookings */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-purple-600"/> Recent Bookings
-                  </h3>
-                  <button onClick={() => router.push('/admin/conversations')} className="text-xs text-primary-600 hover:underline">View all</button>
+            {/* Navigation Buttons - Fully Responsive */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8">
+              <button
+                onClick={() => router.push('/admin')}
+                className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold truncate">Overview</h3>
+                  <BarChart3 className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
                 </div>
-                {recentBookings.length === 0
-                  ? <p className="text-xs text-gray-400 text-center py-6">No bookings yet</p>
-                  : <div className="space-y-2">
-                      {recentBookings.map(b => (
-                        <div key={b.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{b.customer_name || 'Customer'}</p>
-                            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3 h-3"/>
-                              {b.appointment_date ? new Date(b.appointment_date).toLocaleDateString() : '—'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 ml-3">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(b.status)}`}>{b.status}</span>
-                            <span className="text-xs font-bold text-gray-900">${b.total_amount?.toFixed(0) ?? '—'}</span>
-                          </div>
+                <p className="text-xs text-white/90 hidden sm:block">Dashboard</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/conversations')}
+                className="bg-gradient-to-br from-accent-600 to-accent-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold truncate">Bookings</h3>
+                  <MessageSquare className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
+                </div>
+                <p className="text-xs text-white/90 hidden sm:block">Monitor</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/payments')}
+                className="bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold truncate">Payments</h3>
+                  <DollarSign className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
+                </div>
+                <p className="text-xs text-white/90 hidden sm:block">Revenue</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/users')}
+                className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold truncate">Users</h3>
+                  <Users className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
+                </div>
+                <p className="text-xs text-white/90 hidden sm:block">Manage</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/disputes')}
+                className="bg-gradient-to-br from-red-600 to-red-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+              >
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold truncate">Disputes</h3>
+                  <AlertTriangle className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
+                </div>
+                <p className="text-xs text-white/90 hidden sm:block">Issues</p>
+              </button>
+            </div>
+
+            {/* Activity Summary - Responsive */}
+            <div className="bg-white rounded-lg sm:rounded-xl shadow p-3 sm:p-4 md:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600" />
+                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">Activity Summary</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-600 mb-3">User Distribution</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-gray-700">Braiders</span>
+                      <div className="flex items-center gap-2 flex-1 ml-2">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden min-w-0">
+                          <div
+                            className="h-full bg-primary-600"
+                            style={{
+                              width: `${
+                                stats.totalUsers > 0
+                                  ? (stats.totalBraiders / stats.totalUsers) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
                         </div>
-                      ))}
+                        <span className="text-xs sm:text-sm font-semibold text-gray-900 flex-shrink-0">
+                          {stats.totalBraiders}
+                        </span>
+                      </div>
                     </div>
-                }
-              </div>
-
-              {/* Recent Users */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-600"/> Recent Sign-ups
-                  </h3>
-                  <button onClick={() => router.push('/admin/users')} className="text-xs text-primary-600 hover:underline">View all</button>
-                </div>
-                {recentUsers.length === 0
-                  ? <p className="text-xs text-gray-400 text-center py-6">No users yet</p>
-                  : <div className="space-y-2">
-                      {recentUsers.map(u => (
-                        <div key={u.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                            {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{u.full_name || 'Unknown'}</p>
-                            <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleCls(u.role)}`}>{u.role}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-gray-700">Customers</span>
+                      <div className="flex items-center gap-2 flex-1 ml-2">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden min-w-0">
+                          <div
+                            className="h-full bg-accent-600"
+                            style={{
+                              width: `${
+                                stats.totalUsers > 0
+                                  ? (stats.totalCustomers / stats.totalUsers) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
                         </div>
-                      ))}
+                        <span className="text-xs sm:text-sm font-semibold text-gray-900 flex-shrink-0">
+                          {stats.totalCustomers}
+                        </span>
+                      </div>
                     </div>
-                }
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-600 mb-3">Conversation Status</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-gray-700">Active</span>
+                      <span className="text-xs sm:text-sm font-semibold text-green-600">
+                        {stats.activeConversations}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-gray-700">Total</span>
+                      <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                        {stats.totalConversations}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </>

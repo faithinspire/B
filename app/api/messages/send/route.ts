@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     const isPartOf = allParticipants.includes(sender_id) || sender_role === 'admin';
 
-    if (!isPartOf) {
+    if (!isPartOf && sender_role !== 'admin') {
       console.error('Sender not in conversation. sender_id:', sender_id, 'participants:', allParticipants);
       return NextResponse.json({ error: 'Sender is not part of this conversation' }, { status: 403 });
     }

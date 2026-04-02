@@ -209,7 +209,7 @@ export default function BraiderSignupPage() {
       });
       
       // Call signup API
-      await signupUser({
+      const signupResult = await signupUser({
         email: validated.email,
         password: validated.password,
         full_name: validated.full_name,
@@ -225,6 +225,59 @@ export default function BraiderSignupPage() {
 
       // Wait for profile to be fully committed to database
       await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Get the current user ID
+      const currentUser = useSupabaseAuthStore.getState().user;
+      if (!currentUser) throw new Error('Failed to get user ID');
+
+      // Create braider profile with verification documents
+      const braiderProfileRes = await fetch('/api/braiders/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          bio: formData.bio,
+          experience_years: formData.experience_years,
+          specialties: formData.specialties,
+          service_type: formData.service_type,
+          travel_radius_miles: parseInt(formData.travel_radius_miles),
+          salon_address: formData.salon_address,
+          cities: formData.cities,
+          zip_codes: formData.zip_codes,
+          id_document_url: formData.id_document_url,
+          selfie_url: formData.selfie_url,
+          background_check_consent: formData.background_check_consent,
+          next_of_kin_name: formData.next_of_kin_name,
+          next_of_kin_phone: formData.next_of_kin_phone,
+          next_of_kin_relationship: formData.next_of_kin_relationship,
+          verification_status: 'pending',
+        }),
+      });
+
+      if (!braiderProfileRes.ok) {
+        const err = await braiderProfileRes.json();
+        throw new Error(err.error || 'Failed to create braider profile');
+      }
+
+      // Create initial service
+      if (formData.service_name && formData.service_price) {
+        const serviceRes = await fetch('/api/services/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            name: formData.service_name,
+            category: 'braids',
+            price: parseFloat(formData.service_price),
+            duration_minutes: parseInt(formData.service_duration),
+            description: `${formData.service_name} - ${formData.experience_years} years experience`,
+          }),
+        });
+
+        if (!serviceRes.ok) {
+          console.error('Failed to create service, but profile was created');
+        }
+      }
       
       // Redirect to braider dashboard
       router.push('/braider/dashboard');
