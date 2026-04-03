@@ -38,8 +38,6 @@ const nextConfig = {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
   },
-  // Exclude verification page from static generation
-  staticPageGenerationTimeout: 120,
 };
 
 module.exports = nextConfig;
