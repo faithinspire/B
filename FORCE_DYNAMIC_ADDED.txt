@@ -1,0 +1,9 @@
+Fix Applied: force-dynamic added to admin verification page
+
+This prevents Next.js from attempting to pre-render the page as static,
+which was causing the "Unsupported Server Component type" error.
+
+The verification page now uses:
+export const dynamic = 'force-dynamic';
+
+This ensures the page is always rendered dynamically on the server.
