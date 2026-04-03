@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,13 +11,6 @@ export async function POST(request: NextRequest) {
   if (!webhookSecret) {
     return NextResponse.json(
       { error: 'Webhook secret not configured' },
-      { status: 500 }
-    );
-  }
-
-  if (!supabase) {
-    return NextResponse.json(
-      { error: 'Supabase not configured' },
       { status: 500 }
     );
   }
@@ -41,6 +34,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Create service role client for database operations
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { persistSession: false } }
+  );
+
   try {
     switch (event.type) {
       case 'payment_intent.succeeded': {
@@ -60,38 +60,43 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', bookingId);
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error('Booking update error:', updateError);
+            throw updateError;
+          }
 
           // Notify customer
           if (customerId) {
-            await supabase
+            const { error: notifError } = await supabase
               .from('notifications')
               .insert({
                 user_id: customerId,
                 type: 'payment',
                 title: 'Payment Confirmed',
-                body: `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} has been confirmed.`,
+                message: `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} has been confirmed.`,
                 data: {
                   bookingId,
                   paymentIntentId: paymentIntent.id,
                 },
               });
+            if (notifError) console.error('Customer notification error:', notifError);
           }
 
           // Notify braider
           if (braiderId) {
-            await supabase
+            const { error: notifError } = await supabase
               .from('notifications')
               .insert({
                 user_id: braiderId,
                 type: 'booking',
                 title: 'Booking Payment Received',
-                body: `Payment of $${(paymentIntent.amount / 100).toFixed(2)} received for your booking.`,
+                message: `Payment of $${(paymentIntent.amount / 100).toFixed(2)} received for your booking.`,
                 data: {
                   bookingId,
                   paymentIntentId: paymentIntent.id,
                 },
               });
+            if (notifError) console.error('Braider notification error:', notifError);
           }
         }
         break;
@@ -112,22 +117,23 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', bookingId);
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error('Booking cancellation error:', updateError);
+            throw updateError;
+          }
 
           // Notify customer
           if (customerId) {
-            await supabase
+            const { error: notifError } = await supabase
               .from('notifications')
               .insert({
                 user_id: customerId,
                 type: 'payment',
                 title: 'Payment Failed',
-                body: `Your payment failed: ${failedIntent.last_payment_error?.message || 'Unknown error'}. Please try again.`,
-                data: {
-                  bookingId,
-                  error: failedIntent.last_payment_error?.message,
-                },
+                message: `Payment failed: ${failedIntent.last_payment_error?.message || 'Unknown error'}`,
+                data: { bookingId },
               });
+            if (notifError) console.error('Customer notification error:', notifError);
           }
         }
         break;
@@ -135,40 +141,45 @@ export async function POST(request: NextRequest) {
 
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
-        const bookingId = charge.metadata?.bookingId;
+        const paymentIntentId = charge.payment_intent as string;
 
-        if (bookingId) {
-          // Update booking status to refunded
-          const { error: updateError } = await supabase
+        if (paymentIntentId) {
+          // Find booking by payment intent
+          const { data: bookings, error: findError } = await supabase
             .from('bookings')
-            .update({
-              status: 'refunded',
-              escrow_released: true,
-            })
-            .eq('id', bookingId);
+            .select('id, customer_id')
+            .eq('stripe_payment_intent_id', paymentIntentId);
 
-          if (updateError) throw updateError;
+          if (!findError && bookings && bookings.length > 0) {
+            const booking = bookings[0];
 
-          // Get booking details to notify customer
-          const { data: booking } = await supabase
-            .from('bookings')
-            .select('customer_id')
-            .eq('id', bookingId)
-            .single();
+            // Update booking status
+            const { error: updateError } = await supabase
+              .from('bookings')
+              .update({
+                status: 'refunded',
+                refund_amount: charge.amount_refunded / 100,
+              })
+              .eq('id', booking.id);
 
-          if (booking) {
-            await supabase
-              .from('notifications')
-              .insert({
-                user_id: booking.customer_id,
-                type: 'payment',
-                title: 'Refund Processed',
-                body: `Your refund of $${(charge.amount_refunded / 100).toFixed(2)} has been processed.`,
-                data: {
-                  bookingId,
-                  refundAmount: charge.amount_refunded / 100,
-                },
-              });
+            if (updateError) {
+              console.error('Booking refund error:', updateError);
+              throw updateError;
+            }
+
+            // Notify customer
+            if (booking.customer_id) {
+              const { error: notifError } = await supabase
+                .from('notifications')
+                .insert({
+                  user_id: booking.customer_id,
+                  type: 'payment',
+                  title: 'Refund Processed',
+                  message: `Refund of $${(charge.amount_refunded / 100).toFixed(2)} has been processed.`,
+                  data: { bookingId: booking.id },
+                });
+              if (notifError) console.error('Customer notification error:', notifError);
+            }
           }
         }
         break;

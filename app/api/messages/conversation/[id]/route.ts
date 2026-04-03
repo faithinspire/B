@@ -52,32 +52,29 @@ export async function GET(request: Request, { params }: { params: { id: string }
       const { data: oldMsgs } = await db
         .from('messages').select('*')
         .or(`and(sender_id.eq.${customer_id},receiver_id.eq.${braider_id}),and(sender_id.eq.${braider_id},receiver_id.eq.${customer_id})`)
-        .order('timestamp', { ascending: true })
+        .order('created_at', { ascending: true })
         .limit(limit);
       if (oldMsgs) messages = oldMsgs;
     }
 
-    // Normalize messages
-    const normalized = messages.map(m => ({
-      ...m,
-      conversation_id: m.conversation_id || params.id,
-      created_at: m.created_at || m.timestamp || new Date().toISOString(),
-      read: m.read ?? m.is_read ?? false,
+    // Normalize messages to consistent format
+    const normalized = messages.map((msg: any) => ({
+      id: msg.id,
+      conversation_id: msg.conversation_id || params.id,
+      sender_id: msg.sender_id,
+      sender_role: msg.sender_role || (msg.sender_id === customer_id ? 'customer' : msg.sender_id === braider_id ? 'braider' : 'admin'),
+      content: msg.content,
+      message_type: msg.message_type || 'text',
+      read: msg.read || false,
+      created_at: msg.created_at || msg.timestamp,
     }));
 
-    // Mark unread messages as read (best-effort)
-    const unread = normalized.filter(m => !m.read && m.sender_id !== userId);
-    if (unread.length > 0) {
-      const ids = unread.map(m => m.id);
-      // Try read column
-      await db.from('messages').update({ read: true }).in('id', ids).catch(() => {
-        db.from('messages').update({ is_read: true }).in('id', ids).catch(() => {});
-      });
-    }
-
-    return NextResponse.json({ messages: normalized, total: normalized.length });
+    return NextResponse.json({ messages: normalized });
   } catch (error) {
-    console.error('Fetch messages error:', error);
-    return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+    console.error('Message retrieval error:', error);
+    return NextResponse.json(
+      { error: 'Failed to retrieve messages' },
+      { status: 500 }
+    );
   }
 }

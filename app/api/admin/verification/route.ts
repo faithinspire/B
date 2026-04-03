@@ -1,9 +1,31 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
-  return NextResponse.json([]);
-}
+export const dynamic = 'force-dynamic';
 
-export async function POST() {
-  return NextResponse.json({ success: true });
+export async function GET() {
+  try {
+    const db = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Get all pending braiders
+    const { data: braiders, error } = await db
+      .from('braider_profiles')
+      .select('*')
+      .eq('verification_status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ braiders: braiders || [] });
+  } catch (error) {
+    console.error('Verification fetch error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch pending braiders' },
+      { status: 500 }
+    );
+  }
 }

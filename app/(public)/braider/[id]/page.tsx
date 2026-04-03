@@ -35,6 +35,12 @@ interface BraiderProfile {
   cities: string[];
   full_name: string;
   avatar_url: string | null;
+  phone_number: string | null;
+  next_of_kin_name: string | null;
+  next_of_kin_phone: string | null;
+  next_of_kin_relationship: string | null;
+  id_document_url: string | null;
+  selfie_url: string | null;
   is_premium?: boolean;
   services: Service[];
   reviews: Review[];
@@ -75,6 +81,12 @@ export default function BraiderProfilePage() {
         cities: data.cities || [],
         full_name: data.full_name || 'Braider',
         avatar_url: data.avatar_url,
+        phone_number: data.phone_number,
+        next_of_kin_name: data.next_of_kin_name,
+        next_of_kin_phone: data.next_of_kin_phone,
+        next_of_kin_relationship: data.next_of_kin_relationship,
+        id_document_url: data.id_document_url,
+        selfie_url: data.selfie_url,
         is_premium: data.is_premium || false,
         services: data.services || [],
         reviews: data.reviews || [],
@@ -178,14 +190,19 @@ export default function BraiderProfilePage() {
                   <span>{braider.is_mobile ? 'Mobile Service' : 'Salon Based'}</span>
                 </div>
               </div>
-              {braider.cities && braider.cities.length > 0 && (
+              {(braider.phone_number || braider.next_of_kin_name) && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Service Coverage Cities</p>
-                  <div className="flex flex-wrap gap-2">
-                    {braider.cities.map((city) => (
-                      <span key={city} className="px-3 py-1 bg-primary-100 text-primary-700 text-xs sm:text-sm rounded-full font-medium">{city}</span>
-                    ))}
-                  </div>
+                  {braider.phone_number && (
+                    <p className="text-sm text-gray-700 mb-2"><span className="font-semibold">Phone:</span> {braider.phone_number}</p>
+                  )}
+                  {braider.next_of_kin_name && (
+                    <div className="text-sm text-gray-700">
+                      <p className="font-semibold mb-1">Next of Kin</p>
+                      <p><span className="text-gray-600">Name:</span> {braider.next_of_kin_name}</p>
+                      {braider.next_of_kin_phone && <p><span className="text-gray-600">Phone:</span> {braider.next_of_kin_phone}</p>}
+                      {braider.next_of_kin_relationship && <p><span className="text-gray-600">Relationship:</span> {braider.next_of_kin_relationship}</p>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
