@@ -91,9 +91,44 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Fetch braider profiles for braiders
+    let braiderProfilesMap: Record<string, any> = {};
+    try {
+      const { data: braiderProfiles } = await supabaseAdmin
+        .from('braider_profiles')
+        .select('*');
+
+      if (braiderProfiles) {
+        braiderProfilesMap = Object.fromEntries(
+          braiderProfiles.map(bp => [bp.user_id, bp])
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching braider profiles:', err);
+    }
+
+    // Fetch next of kin data from user_metadata table
+    let userMetadataMap: Record<string, any> = {};
+    try {
+      const { data: userMetadata } = await supabaseAdmin
+        .from('user_metadata')
+        .select('*');
+
+      if (userMetadata) {
+        userMetadataMap = Object.fromEntries(
+          userMetadata.map(um => [um.user_id, um])
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching user metadata:', err);
+    }
+
     const transformedUsers = (users?.users || [])
       .map((u: any) => {
         const profile = profilesMap[u.id];
+        const braiderProfile = braiderProfilesMap[u.id];
+        const userMetadata = userMetadataMap[u.id];
+        
         // Try multiple sources for name
         const full_name =
           profile?.full_name ||
@@ -108,13 +143,20 @@ export async function GET(request: NextRequest) {
           u.user_metadata?.role ||
           u.raw_user_meta_data?.role ||
           'customer';
+        
         return {
           id: u.id,
           email: u.email || '',
           full_name,
           role,
           created_at: u.created_at,
-          phone: u.phone || u.user_metadata?.phone || '',
+          phone: u.phone || u.user_metadata?.phone || u.raw_user_meta_data?.phone || '',
+          braiderProfile: braiderProfile || null,
+          userMetadata: userMetadata || null,
+          avatar_url: profile?.avatar_url || u.user_metadata?.avatar_url || null,
+          bio: profile?.bio || braiderProfile?.bio || '',
+          rating: braiderProfile?.rating || 0,
+          verified: braiderProfile?.verified || false,
         };
       })
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

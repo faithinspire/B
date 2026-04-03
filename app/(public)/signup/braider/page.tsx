@@ -8,7 +8,13 @@ import { useRouter } from 'next/navigation';
 import { signupSchema } from '@/lib/validations';
 import { signupUser } from '@/lib/actions/signup-user';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { createClient } from '@supabase/supabase-js';
 import { AlertCircle, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 export default function BraiderSignupPage() {
   const router = useRouter();
@@ -226,9 +232,20 @@ export default function BraiderSignupPage() {
       // Wait for profile to be fully committed to database
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Get the current user ID
-      const currentUser = useSupabaseAuthStore.getState().user;
-      if (!currentUser) throw new Error('Failed to get user ID');
+      // Get the current user ID - try multiple sources
+      let currentUser = useSupabaseAuthStore.getState().user;
+      
+      // If not in store, get from Supabase session directly
+      if (!currentUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          currentUser = { id: session.user.id, role: 'braider' } as any;
+        }
+      }
+      
+      if (!currentUser?.id) {
+        throw new Error('Failed to get user ID. Please try signing up again.');
+      }
 
       // Create braider profile with verification documents
       const braiderProfileRes = await fetch('/api/braiders/profile', {
