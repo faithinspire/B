@@ -385,9 +385,9 @@ export default function AdminConversationsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Conversations List */}
-          <div>
+          <div className="lg:col-span-1">
             {loading ? (
               <div className="text-center py-16">
                 <div className="w-12 h-12 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
@@ -451,7 +451,7 @@ export default function AdminConversationsPage() {
           </div>
 
           {/* Chat Panel */}
-          <div className="lg:sticky lg:top-4">
+          <div className="lg:col-span-2">
             {selectedConv ? (
               <div className="bg-white rounded-xl shadow-lg flex flex-col h-[600px]">
                 {/* Chat Header */}
