@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       conversation.admin_id === sender_id ? 'admin' : 'customer'
     );
 
-    // Attempt 1: full new schema with sender_role
+    // Attempt 1: full new schema with sender_role (REQUIRED)
     const r1 = await db.from('messages').insert([{
       conversation_id,
       sender_id,
@@ -77,11 +77,12 @@ export async function POST(request: Request) {
       lastError = r1.error;
       console.error('Attempt 1 failed:', r1.error.message);
 
-      // Attempt 2: new schema without optional cols
+      // Attempt 2: new schema with sender_role (MUST INCLUDE sender_role)
       const r2 = await db.from('messages').insert([{
         conversation_id,
         sender_id,
         content: content.trim(),
+        sender_role: resolvedRole || 'customer',
         read: false,
       }]).select().single();
       if (!r2.error) { data = r2.data; lastError = null; }
