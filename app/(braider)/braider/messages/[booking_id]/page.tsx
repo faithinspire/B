@@ -98,10 +98,24 @@ export default function BraiderChatPage() {
     const tempId = 'tmp_' + Date.now();
     setMsgs(prev => [...prev, { id: tempId, conversation_id: conv.id, sender_id: user.id, content, created_at: new Date().toISOString(), read: false }]);
     try {
-      const db = getDb();
-      const { data, error: err } = await db.from('messages').insert({ conversation_id: conv.id, sender_id: user.id, content, read: false, created_at: new Date().toISOString() }).select().single();
-      if (err) throw new Error(err.message);
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conv.id,
+          sender_id: user.id,
+          sender_role: 'braider',
+          content,
+          message_type: 'text',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send message');
+      }
+      const data = await res.json();
       setMsgs(prev => prev.map(m => m.id === tempId ? data : m));
+      const db = getDb();
       await db.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conv.id);
     } catch (e: any) {
       setError('Send failed: ' + e.message);

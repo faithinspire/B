@@ -47,23 +47,23 @@ export default function CustomerChatPage() {
       const { data: rows } = await db.from('conversations').select('*').or(`id.eq.${urlId},booking_id.eq.${urlId}`).limit(1);
       let row = rows?.[0];
       if (!row) {
-        const { data: rows2 } = await db.from('conversations').select('*').or(`customer_id.eq.${user.id},participant1_id.eq.${user.id},participant2_id.eq.${user.id}`).order('updated_at', { ascending: false }).limit(20);
+        const { data: rows2 } = await db.from('conversations').select('*').or(`braider_id_temp.eq.${user.id},participant1_id.eq.${user.id},participant2_id.eq.${user.id}`).order('updated_at', { ascending: false }).limit(20);
         row = rows2?.find((r: any) => r.booking_id === urlId || r.id === urlId);
       }
       if (!row) {
         const { data: booking } = await db.from('bookings').select('*').eq('id', urlId).maybeSingle();
-        if (booking?.customer_id && booking?.braider_id) {
+        if (booking?.braider_id && booking?.braider_id_temp) {
           const now = new Date().toISOString();
-          const { data: created } = await db.from('conversations').insert({ booking_id: urlId, customer_id: booking.customer_id, braider_id: booking.braider_id, status: 'active', created_at: now, updated_at: now }).select().single();
+          const { data: created } = await db.from('conversations').insert({ booking_id: urlId, braider_id: booking.braider_id, braider_id_temp: booking.braider_id_temp, status: 'active', created_at: now, updated_at: now }).select().single();
           if (created) row = created;
         }
       }
       if (!row) { setError('Conversation not found.'); setPageLoading(false); return; }
       const otherId = row.braider_id || (row.participant1_id === user.id ? row.participant2_id : row.participant1_id);
-      let other_name = 'Braider', other_avatar = null;
+      let other_name = 'Customer', other_avatar = null;
       if (otherId) {
         const { data: p } = await db.from('profiles').select('full_name,avatar_url').eq('id', otherId).single();
-        if (p) { other_name = p.full_name || 'Braider'; other_avatar = p.avatar_url; }
+        if (p) { other_name = p.full_name || 'Customer'; other_avatar = p.avatar_url; }
       }
       setConv({ id: row.id, other_id: otherId, other_name, other_avatar });
       const { data: msgRows } = await db.from('messages').select('*').eq('conversation_id', row.id).order('created_at', { ascending: true }).limit(200);
@@ -98,10 +98,24 @@ export default function CustomerChatPage() {
     const tempId = 'tmp_' + Date.now();
     setMsgs(prev => [...prev, { id: tempId, conversation_id: conv.id, sender_id: user.id, content, created_at: new Date().toISOString(), read: false }]);
     try {
-      const db = getDb();
-      const { data, error: err } = await db.from('messages').insert({ conversation_id: conv.id, sender_id: user.id, content, read: false, created_at: new Date().toISOString() }).select().single();
-      if (err) throw new Error(err.message);
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conv.id,
+          sender_id: user.id,
+          sender_role: 'customer',
+          content,
+          message_type: 'text',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send message');
+      }
+      const data = await res.json();
       setMsgs(prev => prev.map(m => m.id === tempId ? data : m));
+      const db = getDb();
       await db.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conv.id);
     } catch (e: any) {
       setError('Send failed: ' + e.message);
@@ -180,7 +194,7 @@ export default function CustomerChatPage() {
 
       {error && <div className="flex-shrink-0 px-4 py-2 bg-red-50 border-t border-red-100"><p className="text-xs text-red-600">{error}</p></div>}
 
-      {/* Input — with bottom padding for mobile nav */}
+      {/* Input — pb-24 on mobile for bottom nav, pb-3 on desktop */}
       <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3 pb-24 md:pb-3">
         <div className="flex items-center gap-2 max-w-2xl mx-auto">
           <div className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 flex items-center">
