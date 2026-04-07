@@ -8,6 +8,54 @@ interface UpdateConversationRequest {
   ended_at?: string | null;
 }
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const conversationId = params.id;
+
+    if (!conversationId) {
+      return NextResponse.json(
+        { error: 'Conversation ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const db = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Fetch conversation by ID or booking_id
+    const { data: conversation, error: convError } = await db
+      .from('conversations')
+      .select('*')
+      .or(`id.eq.${conversationId},booking_id.eq.${conversationId}`)
+      .single();
+
+    if (convError || !conversation) {
+      console.error('Conversation fetch error:', convError?.message);
+      return NextResponse.json(
+        { error: 'Conversation not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      conversation,
+    });
+  } catch (error: any) {
+    console.error('Get conversation error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to fetch conversation' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
