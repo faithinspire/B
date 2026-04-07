@@ -1,16 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 100);
+    const conversationId = params.id;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
+    if (!conversationId) {
+      return NextResponse.json(
+        { error: 'Conversation ID is required' },
+        { status: 400 }
+      );
     }
 
     const db = createClient(
@@ -19,61 +21,91 @@ export async function GET(request: Request, { params }: { params: { id: string }
       { auth: { persistSession: false } }
     );
 
-    // Get conversation
-    const { data: conversation, error: convError } = await db
-      .from('conversations').select('*').eq('id', params.id).single();
+    // Fetch all messages for this conversation
+    const { data: messages, error: messagesError } = await db
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
 
-    if (convError || !conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    if (messagesError) {
+      console.error('Messages fetch error:', messagesError.message);
+      return NextResponse.json(
+        { error: `Failed to fetch messages: ${messagesError.message}` },
+        { status: 500 }
+      );
     }
 
-    const customer_id = conversation.customer_id || conversation.participant1_id;
-    const braider_id = conversation.braider_id || conversation.participant2_id;
-
-    // Verify user is part of conversation
-    const isPartOf = userId === customer_id || userId === braider_id || userId === conversation.admin_id;
-    if (!isPartOf) {
-      return NextResponse.json({ error: 'Not part of this conversation' }, { status: 403 });
-    }
-
-    let messages: any[] = [];
-
-    // Try new schema: conversation_id column
-    const { data: newMsgs, error: newErr } = await db
-      .from('messages').select('*')
-      .eq('conversation_id', params.id)
-      .order('created_at', { ascending: true })
-      .limit(limit);
-
-    if (!newErr && newMsgs && newMsgs.length > 0) {
-      messages = newMsgs;
-    } else {
-      // Fallback: old schema — get messages between the two participants
-      const { data: oldMsgs } = await db
-        .from('messages').select('*')
-        .or(`and(sender_id.eq.${customer_id},receiver_id.eq.${braider_id}),and(sender_id.eq.${braider_id},receiver_id.eq.${customer_id})`)
-        .order('created_at', { ascending: true })
-        .limit(limit);
-      if (oldMsgs) messages = oldMsgs;
-    }
-
-    // Normalize messages to consistent format
-    const normalized = messages.map((msg: any) => ({
+    // Normalize messages to ensure consistent format
+    const normalizedMessages = (messages || []).map((msg: any) => ({
       id: msg.id,
-      conversation_id: msg.conversation_id || params.id,
+      conversation_id: msg.conversation_id,
       sender_id: msg.sender_id,
-      sender_role: msg.sender_role || (msg.sender_id === customer_id ? 'customer' : msg.sender_id === braider_id ? 'braider' : 'admin'),
+      sender_role: msg.sender_role || 'customer',
       content: msg.content,
-      message_type: msg.message_type || 'text',
-      read: msg.read || false,
+      read: msg.read || msg.is_read || false,
       created_at: msg.created_at || msg.timestamp,
+      updated_at: msg.updated_at,
     }));
 
-    return NextResponse.json({ messages: normalized });
-  } catch (error) {
-    console.error('Message retrieval error:', error);
+    return NextResponse.json({
+      success: true,
+      messages: normalizedMessages,
+      count: normalizedMessages.length,
+    });
+  } catch (error: any) {
+    console.error('Conversation messages error:', error);
     return NextResponse.json(
-      { error: 'Failed to retrieve messages' },
+      { error: error?.message || 'Failed to fetch messages' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const conversationId = params.id;
+    const body = await request.json();
+    const { message_ids } = body;
+
+    if (!conversationId || !message_ids || !Array.isArray(message_ids)) {
+      return NextResponse.json(
+        { error: 'Conversation ID and message_ids array are required' },
+        { status: 400 }
+      );
+    }
+
+    const db = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Mark messages as read
+    const { error: updateError } = await db
+      .from('messages')
+      .update({ read: true })
+      .in('id', message_ids);
+
+    if (updateError) {
+      console.error('Mark as read error:', updateError.message);
+      return NextResponse.json(
+        { error: `Failed to mark messages as read: ${updateError.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Messages marked as read',
+    });
+  } catch (error: any) {
+    console.error('Mark as read error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to mark messages as read' },
       { status: 500 }
     );
   }

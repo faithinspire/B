@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,163 +9,143 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized: No auth token provided' },
         { status: 401 }
       );
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Server not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Verify the user is admin by checking the JWT token
     const token = authHeader.replace('Bearer ', '');
+
+    // Create admin client
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Verify user is admin
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth error:', authError?.message);
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { error: 'Invalid or expired token' },
         { status: 401 }
       );
     }
 
-    // Check if user is admin - check profile.role FIRST (most reliable), then JWT metadata
+    // Check if user is admin
     let userRole = (user.user_metadata as any)?.role;
-    
-    // Try to get role from profile table for more reliable check
+
     if (!userRole || userRole !== 'admin') {
       try {
-        const { data: profile, error: profileError } = await supabaseAdmin
+        const { data: profile } = await supabaseAdmin
           .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();
 
-        if (!profileError && profile) {
+        if (profile) {
           userRole = profile.role;
         }
       } catch (err) {
-        console.error('Error fetching profile:', err);
+        console.error('Profile fetch error:', err);
       }
     }
 
     if (userRole !== 'admin') {
-      console.error('User role check failed:', { userRole, userId: user.id });
       return NextResponse.json(
         { error: 'Forbidden: Admin access required' },
         { status: 403 }
       );
     }
 
-    // Fetch all users from auth.users
+    // Fetch all users
     const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
 
     if (usersError) {
-      console.error('Error fetching users:', usersError);
+      console.error('Users fetch error:', usersError);
       return NextResponse.json(
         { error: 'Failed to fetch users' },
         { status: 500 }
       );
     }
 
-    // Transform data - get role from profiles table for accuracy
     const userIds = (users?.users || []).map((u: any) => u.id);
-    
+
+    // Fetch profiles
     let profilesMap: Record<string, any> = {};
     if (userIds.length > 0) {
       try {
-        const { data: profiles } = await supabaseAdmin
+        const { data: profiles, error: profilesError } = await supabaseAdmin
           .from('profiles')
-          .select('id, role, full_name')
+          .select('*')
           .in('id', userIds);
 
-        if (profiles) {
+        if (!profilesError && profiles) {
           profilesMap = Object.fromEntries(profiles.map(p => [p.id, p]));
         }
       } catch (err) {
-        console.error('Error fetching profiles:', err);
+        console.error('Profiles fetch error:', err);
       }
     }
 
-    // Fetch braider profiles for braiders
+    // Fetch braider profiles with document URLs
     let braiderProfilesMap: Record<string, any> = {};
     try {
-      const { data: braiderProfiles } = await supabaseAdmin
+      const { data: braiderProfiles, error: braiderError } = await supabaseAdmin
         .from('braider_profiles')
         .select('*');
 
-      if (braiderProfiles) {
+      if (!braiderError && braiderProfiles) {
         braiderProfilesMap = Object.fromEntries(
           braiderProfiles.map(bp => [bp.user_id, bp])
         );
       }
     } catch (err) {
-      console.error('Error fetching braider profiles:', err);
+      console.error('Braider profiles fetch error:', err);
     }
 
-    // Fetch next of kin data from user_metadata table
-    let userMetadataMap: Record<string, any> = {};
-    try {
-      const { data: userMetadata } = await supabaseAdmin
-        .from('user_metadata')
-        .select('*');
-
-      if (userMetadata) {
-        userMetadataMap = Object.fromEntries(
-          userMetadata.map(um => [um.user_id, um])
-        );
-      }
-    } catch (err) {
-      console.error('Error fetching user metadata:', err);
-    }
-
+    // Transform users with all details
     const transformedUsers = (users?.users || [])
       .map((u: any) => {
         const profile = profilesMap[u.id];
         const braiderProfile = braiderProfilesMap[u.id];
-        const userMetadata = userMetadataMap[u.id];
-        
-        // Try multiple sources for name
-        const full_name =
-          profile?.full_name ||
-          u.user_metadata?.full_name ||
-          u.user_metadata?.name ||
-          u.raw_user_meta_data?.full_name ||
-          u.raw_user_meta_data?.name ||
-          u.email?.split('@')[0] ||
-          'Unknown';
-        const role =
-          profile?.role ||
-          u.user_metadata?.role ||
-          u.raw_user_meta_data?.role ||
-          'customer';
-        
+
         return {
           id: u.id,
           email: u.email || '',
-          full_name,
-          role,
+          full_name: profile?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Unknown',
+          role: profile?.role || u.user_metadata?.role || 'customer',
           created_at: u.created_at,
-          phone: u.phone || u.user_metadata?.phone || u.raw_user_meta_data?.phone || '',
-          braiderProfile: braiderProfile || null,
-          userMetadata: userMetadata || null,
-          avatar_url: profile?.avatar_url || u.user_metadata?.avatar_url || null,
-          bio: profile?.bio || braiderProfile?.bio || '',
-          rating: braiderProfile?.rating || 0,
-          verified: braiderProfile?.verified || false,
+          phone: u.phone || profile?.phone || u.user_metadata?.phone || '',
+          avatar_url: profile?.avatar_url || null,
+          bio: profile?.bio || '',
+          
+          // Braider-specific fields
+          braiderProfile: braiderProfile ? {
+            user_id: braiderProfile.user_id,
+            phone_number: braiderProfile.phone_number || '',
+            next_of_kin_name: braiderProfile.next_of_kin_name || '',
+            next_of_kin_phone: braiderProfile.next_of_kin_phone || '',
+            next_of_kin_relationship: braiderProfile.next_of_kin_relationship || '',
+            id_document_url: braiderProfile.id_document_url || '',
+            selfie_url: braiderProfile.selfie_url || '',
+            bio: braiderProfile.bio || '',
+            rating: braiderProfile.rating || 0,
+            verified: braiderProfile.verified || false,
+            verification_status: braiderProfile.verification_status || 'pending',
+            created_at: braiderProfile.created_at,
+          } : null,
         };
       })
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return NextResponse.json(transformedUsers);
-  } catch (error) {
-    console.error('Error in GET /api/admin/users:', error);
+  } catch (error: any) {
+    console.error('Admin users API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }
