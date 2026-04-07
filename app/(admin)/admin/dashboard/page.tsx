@@ -14,7 +14,6 @@ import {
   AlertCircle,
   RefreshCw,
   AlertTriangle,
-  CheckCircle,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -242,17 +241,6 @@ export default function AdminDashboardPage() {
                   <AlertTriangle className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
                 </div>
                 <p className="text-xs text-white/90 hidden sm:block">Issues</p>
-              </button>
-
-              <button
-                onClick={() => router.push('/admin/verification')}
-                className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
-              >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Verify</h3>
-                  <CheckCircle className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Braiders</p>
               </button>
             </div>
 
