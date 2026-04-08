@@ -67,18 +67,52 @@ export async function POST(request: Request) {
     }
 
     // Insert message with all required fields
-    const { data: message, error: insertError } = await db
+    // Try with 'read' column first (new schema), fallback to 'is_read' (old schema)
+    let insertError: any = null;
+    let message: any = null;
+
+    const messageData = {
+      conversation_id,
+      sender_id,
+      sender_role: resolved_sender_role,
+      content: content.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    // Try new schema with 'read' column
+    const { data: newMsg, error: newErr } = await db
       .from('messages')
-      .insert({
-        conversation_id,
-        sender_id,
-        sender_role: resolved_sender_role,
-        content: content.trim(),
-        is_read: false,
-        created_at: new Date().toISOString(),
-      })
+      .insert({ ...messageData, read: false })
       .select()
       .single();
+
+    if (!newErr && newMsg) {
+      message = newMsg;
+    } else {
+      // Fallback: try old schema with 'is_read' column
+      const { data: oldMsg, error: oldErr } = await db
+        .from('messages')
+        .insert({ ...messageData, is_read: false })
+        .select()
+        .single();
+
+      if (!oldErr && oldMsg) {
+        message = oldMsg;
+      } else {
+        // Last resort: insert without read/is_read
+        const { data: bareMsg, error: bareErr } = await db
+          .from('messages')
+          .insert(messageData)
+          .select()
+          .single();
+
+        if (!bareErr && bareMsg) {
+          message = bareMsg;
+        } else {
+          insertError = bareErr || oldErr || newErr;
+        }
+      }
+    }
 
     if (insertError) {
       console.error('Message insert error:', insertError.message);

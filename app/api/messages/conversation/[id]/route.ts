@@ -84,18 +84,26 @@ export async function PATCH(
       { auth: { persistSession: false } }
     );
 
-    // Mark messages as read
+    // Mark messages as read - try 'read' column first, fallback to 'is_read'
     const { error: updateError } = await db
       .from('messages')
-      .update({ is_read: true })
+      .update({ read: true })
       .in('id', message_ids);
 
     if (updateError) {
-      console.error('Mark as read error:', updateError.message);
-      return NextResponse.json(
-        { error: `Failed to mark messages as read: ${updateError.message}` },
-        { status: 500 }
-      );
+      // Fallback: try is_read column
+      const { error: updateError2 } = await db
+        .from('messages')
+        .update({ is_read: true })
+        .in('id', message_ids);
+
+      if (updateError2) {
+        console.error('Mark as read error:', updateError2.message);
+        return NextResponse.json(
+          { error: `Failed to mark messages as read: ${updateError2.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

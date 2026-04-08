@@ -1,6 +1,38 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const booking_id = searchParams.get('id');
+
+    if (!booking_id) {
+      return NextResponse.json({ error: 'booking id is required' }, { status: 400 });
+    }
+
+    const db = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    const { data, error } = await db
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Get booking error:', error);
+    return NextResponse.json({ error: 'Failed to fetch booking' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
