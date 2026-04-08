@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         sender_id,
         sender_role: resolved_sender_role,
         content: content.trim(),
-        read: false,
+        is_read: false,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -99,8 +99,6 @@ export async function POST(request: Request) {
           message: notifContent,
           read: false,
           created_at: new Date().toISOString(),
-        }).catch(() => {
-          // Fallback if notifications table has different schema
         });
       } catch (err) {
         console.error('Notification send error:', err);

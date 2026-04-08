@@ -1,5 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2023-10-16',
+});
 
 interface MarkReadRequest {
   admin_id: string;
@@ -54,6 +59,23 @@ export async function PUT(
       );
     }
 
+    // Verify payment with Stripe if payment_intent_id exists
+    let verificationStatus = 'verified';
+    if (paymentNotification.payment_intent_id) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+          paymentNotification.payment_intent_id
+        );
+        
+        if (paymentIntent.status !== 'succeeded') {
+          verificationStatus = 'failed';
+        }
+      } catch (stripeError) {
+        console.error('Stripe verification error:', stripeError);
+        verificationStatus = 'failed';
+      }
+    }
+
     // Update payment notification
     const now = new Date().toISOString();
     const { data, error } = await serviceSupabase
@@ -61,6 +83,7 @@ export async function PUT(
       .update({
         notification_sent: true,
         sent_at: paymentNotification.sent_at || now,
+        status: verificationStatus,
         updated_at: now,
       })
       .eq('id', paymentId)
@@ -75,7 +98,7 @@ export async function PUT(
       );
     }
 
-    console.log('Payment notification marked as read:', data);
+    console.log('Payment notification verified:', data);
     return NextResponse.json(data);
   } catch (error) {
     console.error('Admin payments read API error:', error);

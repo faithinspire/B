@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -43,7 +43,7 @@ export async function GET(
       sender_id: msg.sender_id,
       sender_role: msg.sender_role || 'customer',
       content: msg.content,
-      read: msg.read || msg.is_read || false,
+      is_read: msg.is_read || msg.read || false,
       created_at: msg.created_at || msg.timestamp,
       updated_at: msg.updated_at,
     }));
@@ -87,7 +87,7 @@ export async function PATCH(
     // Mark messages as read
     const { error: updateError } = await db
       .from('messages')
-      .update({ read: true })
+      .update({ is_read: true })
       .in('id', message_ids);
 
     if (updateError) {
