@@ -57,6 +57,18 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           if (profileError) {
             if (profileError.code === 'PGRST116') {
               // No rows returned - profile doesn't exist yet
+              // Use auth metadata as fallback
+              if (session.user.user_metadata?.role) {
+                profile = {
+                  id: session.user.id,
+                  email: session.user.email,
+                  full_name: session.user.user_metadata?.full_name || session.user.email,
+                  role: session.user.user_metadata?.role,
+                  created_at: session.user.created_at,
+                  updated_at: new Date().toISOString(),
+                };
+                break;
+              }
               if (i < 9) {
                 await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
                 continue;
