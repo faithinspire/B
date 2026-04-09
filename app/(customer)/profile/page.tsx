@@ -43,11 +43,6 @@ export default function CustomerProfilePage() {
     }));
   }, [user, authLoading, router]);
 
-  const handleSave = () => {
-    // Save profile data
-    setIsEditing(false);
-  };
-
   const handleLogout = async () => {
     await signOut();
     router.push('/');
