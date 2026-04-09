@@ -63,13 +63,10 @@ export default function AdminDashboard() {
   const [payments, setPayments] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/login');
-      return;
-    }
-
+    // FORCE: Always load dashboard data, don't redirect
+    // Admin check happens server-side in API endpoints
     loadDashboardData();
-  }, [user, router]);
+  }, []);
 
   const loadDashboardData = async () => {
     try {
