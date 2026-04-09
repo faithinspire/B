@@ -102,6 +102,15 @@ export async function POST(request: NextRequest) {
 
     // 3. If braider, create braider_profiles record with specialization
     if (role === 'braider') {
+      const { 
+        state, 
+        city, 
+        address,
+        id_type,
+        id_number,
+        id_document_url,
+      } = body
+
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
         .insert({
@@ -120,10 +129,15 @@ export async function POST(request: NextRequest) {
           verification_status: 'unverified',
           travel_radius_miles: 10,
           is_mobile: true,
-          salon_address: null,
+          salon_address: address || null,
           specialties: specialization ? [specialization] : [],
           total_earnings: 0,
           available_balance: 0,
+          state: state || null,
+          city: city || null,
+          address: address || null,
+          services: services || [],
+          verified: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -131,6 +145,27 @@ export async function POST(request: NextRequest) {
       if (braiderError) {
         console.error('Braider profile error:', braiderError)
         // Continue - profile was created, just missing braider details
+      }
+
+      // 3b. Create braider verification record
+      if (id_type && id_number) {
+        const { error: verificationError } = await serviceSupabase
+          .from('braider_verifications')
+          .insert({
+            braider_id: userId,
+            id_type,
+            id_number,
+            document_url: id_document_url || null,
+            status: 'pending',
+            submitted_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+        if (verificationError) {
+          console.error('Verification record error:', verificationError)
+          // Continue - braider profile was created
+        }
       }
     }
 
