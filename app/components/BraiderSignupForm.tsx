@@ -31,6 +31,11 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   
+  // Next of Kin
+  const [nextOfKinName, setNextOfKinName] = useState('');
+  const [nextOfKinPhone, setNextOfKinPhone] = useState('');
+  const [nextOfKinRelationship, setNextOfKinRelationship] = useState('');
+  
   // Professional Info
   const [specialization, setSpecialization] = useState('');
   const [yearsExperience, setYearsExperience] = useState('');
@@ -98,6 +103,18 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
     }
     if (!address.trim()) {
       setError('Address is required');
+      return false;
+    }
+    if (!nextOfKinName.trim()) {
+      setError('Next of kin name is required');
+      return false;
+    }
+    if (!nextOfKinPhone.trim()) {
+      setError('Next of kin phone is required');
+      return false;
+    }
+    if (!nextOfKinRelationship.trim()) {
+      setError('Next of kin relationship is required');
       return false;
     }
     return true;
@@ -214,6 +231,9 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
           id_type: idType,
           id_number: idNumber,
           id_document_url: idDocumentUrl,
+          next_of_kin_name: nextOfKinName,
+          next_of_kin_phone: nextOfKinPhone,
+          next_of_kin_relationship: nextOfKinRelationship,
         }),
       });
 
@@ -367,7 +387,7 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
         {/* Location Step */}
         {currentStep === 'location' && (
           <>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Location Information</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Location & Emergency Contact</h2>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">State *</label>
@@ -408,6 +428,49 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
                 rows={3}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
               />
+            </div>
+
+            <div className="border-t-2 border-gray-200 pt-4 mt-4">
+              <h3 className="font-semibold text-gray-900 mb-4">Next of Kin (Emergency Contact)</h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                <input
+                  type="text"
+                  value={nextOfKinName}
+                  onChange={(e) => setNextOfKinName(e.target.value)}
+                  placeholder="Emergency contact name"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                <input
+                  type="tel"
+                  value={nextOfKinPhone}
+                  onChange={(e) => setNextOfKinPhone(e.target.value)}
+                  placeholder="Emergency contact phone"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Relationship *</label>
+                <select
+                  value={nextOfKinRelationship}
+                  onChange={(e) => setNextOfKinRelationship(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                >
+                  <option value="">Select relationship</option>
+                  <option value="parent">Parent</option>
+                  <option value="sibling">Sibling</option>
+                  <option value="spouse">Spouse</option>
+                  <option value="child">Child</option>
+                  <option value="friend">Friend</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
             </div>
           </>
         )}
@@ -552,6 +615,13 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
                 <p className="text-sm text-gray-700"><strong>State:</strong> {state}</p>
                 <p className="text-sm text-gray-700"><strong>City:</strong> {city}</p>
                 <p className="text-sm text-gray-700"><strong>Address:</strong> {address}</p>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-gray-900 mb-2">Next of Kin</h3>
+                <p className="text-sm text-gray-700"><strong>Name:</strong> {nextOfKinName}</p>
+                <p className="text-sm text-gray-700"><strong>Phone:</strong> {nextOfKinPhone}</p>
+                <p className="text-sm text-gray-700"><strong>Relationship:</strong> {nextOfKinRelationship}</p>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg">
