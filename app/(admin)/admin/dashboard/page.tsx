@@ -110,7 +110,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-32 md:pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 pb-40 md:pb-20">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white shadow-sm">
         <div className="w-full px-3 sm:px-4 md:px-6 py-3 sm:py-4">
