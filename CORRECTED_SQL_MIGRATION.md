@@ -1,4 +1,7 @@
-# RUN THIS SQL NOW - Copy & Paste
+# CORRECTED SQL MIGRATION - Run This Now
+
+## Error Fixed
+The previous SQL had a reference to a non-existent table. This corrected version only adds columns to existing tables.
 
 ## Where to Run
 Go to: https://app.supabase.com/project/gymgxcspjysrkluxyavd/sql/new
@@ -13,10 +16,9 @@ ALTER TABLE braider_profiles
   ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,6),
   ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,6);
 
--- Add phone and bio to profiles table
+-- Add phone column to profiles table
 ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS phone TEXT,
-  ADD COLUMN IF NOT EXISTS bio TEXT;
+  ADD COLUMN IF NOT EXISTS phone TEXT;
 
 -- Create index for fast featured braider queries
 CREATE INDEX IF NOT EXISTS idx_braider_profiles_featured 
@@ -53,7 +55,6 @@ SELECT 'Migration completed successfully!' AS status;
 
 ### Adds to `profiles` table:
 - `phone` (TEXT) - User phone number
-- `bio` (TEXT) - User bio
 
 ### Creates Index:
 - Fast queries for featured braiders sorted by premium status, featured order, and rating
@@ -72,12 +73,12 @@ SELECT 'Migration completed successfully!' AS status;
    - Should see braider cards in carousel
 
 3. **Test Admin Dashboard**
-   - Login with admin account
-   - Should see admin dashboard (not customer page)
+   - Go to http://localhost:3001/admin/dashboard
+   - Should show admin dashboard (not customer page)
 
-4. **Test Admin Users Page**
-   - Go to /admin/users
-   - Should see all users with phone numbers
+4. **Test Admin Users**
+   - Go to http://localhost:3001/admin/users
+   - Should show table with all users and phone numbers
 
 ## If You Get an Error
 
@@ -92,7 +93,7 @@ SELECT 'Migration completed successfully!' AS status;
 
 ### Other errors
 - Copy the error message
-- Check the troubleshooting guide in `COMPLETE_SYSTEM_VERIFICATION_GUIDE.md`
+- Check the troubleshooting guide
 
 ## Verification
 
@@ -103,7 +104,7 @@ After running SQL, verify columns were added:
 3. Scroll right to see all columns
 4. You should see: `is_premium`, `featured_order`, `latitude`, `longitude`
 5. Click on `profiles` table
-6. You should see: `phone`, `bio`
+6. You should see: `phone`
 
 ## Success Indicators
 
