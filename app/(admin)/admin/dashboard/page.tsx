@@ -36,9 +36,28 @@ export default function AdminDashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
-      router.push('/login');
+    console.log('=== ADMIN DASHBOARD: Checking auth ===', { user, authLoading });
+    
+    if (authLoading) {
+      console.log('=== ADMIN DASHBOARD: Still loading auth ===');
+      return;
     }
+
+    if (!user) {
+      console.warn('=== ADMIN DASHBOARD: No user, redirecting to login ===');
+      router.push('/login');
+      return;
+    }
+
+    console.log('=== ADMIN DASHBOARD: User role ===', user.role);
+
+    if (user.role !== 'admin') {
+      console.warn('=== ADMIN DASHBOARD: User is not admin, redirecting ===', { role: user.role });
+      router.push('/');
+      return;
+    }
+
+    console.log('=== ADMIN DASHBOARD: User is admin, showing dashboard ===');
   }, [user, authLoading, router]);
 
   const fetchStats = useCallback(async () => {

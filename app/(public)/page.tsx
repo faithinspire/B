@@ -23,17 +23,23 @@ export default function LandingPage(): JSX.Element {
   // Update featured braiders when braiders data loads
   useEffect(() => {
     try {
-      console.log('Braiders data received:', { count: braiders.length, braiders });
+      console.log('=== HOMEPAGE: Braiders data received ===', { count: braiders.length, braiders });
+      
+      if (!braiders || braiders.length === 0) {
+        console.warn('=== HOMEPAGE: No braiders data! ===');
+        setFeaturedBraiders([]);
+        return;
+      }
       
       const featured = braiders
         .filter((b) => b && b.full_name && b.user_id)
         .sort((a, b) => (b.rating_avg || 0) - (a.rating_avg || 0))
         .slice(0, 12);
       
-      console.log('Featured braiders after filter:', { count: featured.length, featured });
+      console.log('=== HOMEPAGE: Featured braiders after filter ===', { count: featured.length, featured });
       setFeaturedBraiders(featured);
     } catch (error) {
-      console.error('Error loading braiders:', error);
+      console.error('=== HOMEPAGE: Error loading braiders ===', error);
       setFeaturedBraiders([]);
     }
   }, [braiders]);

@@ -14,15 +14,21 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+    console.log('=== API: /api/braiders GET request ===');
+    console.log('=== API: Supabase URL configured:', !!supabaseUrl);
+    console.log('=== API: Service role key configured:', !!serviceRoleKey);
+
     // Check if Supabase is configured
     if (!supabaseUrl || !serviceRoleKey || !isValidUrl(supabaseUrl)) {
-      console.warn('Supabase not properly configured, returning empty braiders list');
-      return NextResponse.json([]);
+      console.error('=== API: Supabase not properly configured ===');
+      console.error('=== API: URL valid:', isValidUrl(supabaseUrl));
+      console.error('=== API: URL:', supabaseUrl);
+      return NextResponse.json([], { status: 200 });
     }
 
     // Use service role client to bypass RLS
@@ -30,7 +36,7 @@ export async function GET() {
       auth: { persistSession: false },
     });
 
-    console.log('Fetching braiders from braider_profiles table...');
+    console.log('=== API: Fetching braiders from braider_profiles table ===');
 
     // Fetch all braiders from braider_profiles table
     const { data, error } = await serviceSupabase
@@ -40,11 +46,16 @@ export async function GET() {
       .order('featured_order', { ascending: false })
       .order('rating_avg', { ascending: false });
 
-    console.log('Braiders fetch result:', { dataCount: data?.length, error });
+    console.log('=== API: Braiders fetch result ===', { dataCount: data?.length, hasError: !!error });
 
     if (error) {
-      console.error('Error fetching braiders:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('=== API: Error fetching braiders ===', error);
+      return NextResponse.json([], { status: 200 });
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('=== API: WARNING - No braiders found in database ===');
+      return NextResponse.json([], { status: 200 });
     }
 
     // Map data to include all fields
@@ -75,10 +86,17 @@ export async function GET() {
       updated_at: b.updated_at,
     }));
 
-    console.log(`Returning ${braiders.length} braiders`);
-    return NextResponse.json(braiders);
+    console.log(`=== API: Returning ${braiders.length} braiders ===`);
+    return NextResponse.json(braiders, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
-    console.error('Braiders API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch braiders' }, { status: 500 });
+    console.error('=== API: Braiders API error ===', error);
+    return NextResponse.json([], { status: 200 });
   }
 }

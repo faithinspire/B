@@ -37,7 +37,10 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
+      console.log('=== AUTH STORE: Session check ===', { hasSession: !!session, userId: session?.user?.id });
+
       if (!session?.user) {
+        console.log('=== AUTH STORE: No session, setting user to null ===');
         set({ user: null });
         return;
       }
@@ -57,7 +60,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           if (profileError) {
             if (profileError.code === 'PGRST116') {
               // No rows returned - profile doesn't exist yet
-              // Use auth metadata as fallback
+              console.warn('=== AUTH STORE: Profile not found, using auth metadata ===');
               if (session.user.user_metadata?.role) {
                 profile = {
                   id: session.user.id,
@@ -77,6 +80,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
               throw profileError;
             }
           } else {
+            console.log('=== AUTH STORE: Profile found ===', { role: profileData?.role });
             profile = profileData;
             break;
           }
@@ -88,8 +92,9 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       }
 
       // CRITICAL: Get role from profile.role FIRST, then auth metadata
-      // NEVER default to customer if role should be braider/admin
       const role = profile?.role || session.user.user_metadata?.role || 'customer';
+      
+      console.log('=== AUTH STORE: Setting user with role ===', { role, email: session.user.email });
 
       set({
         user: {
@@ -101,7 +106,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         },
       });
     } catch (error) {
-      console.error('Failed to initialize session:', error);
+      console.error('=== AUTH STORE: Failed to initialize session ===', error);
       set({ error: error instanceof Error ? error.message : 'Failed to initialize session' });
     } finally {
       set({ loading: false });

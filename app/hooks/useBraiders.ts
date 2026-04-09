@@ -30,35 +30,50 @@ export function useBraiders() {
   const [braiders, setBraiders] = useState<Braider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const cacheRef = useRef<{ data: Braider[]; ts: number } | null>(null);
-  const CACHE_TTL = 60_000; // 1 minute cache
+  const fetchAttemptRef = useRef(0);
 
   const fetchBraiders = async (force = false) => {
-    // Return cached data if fresh (unless force is true)
-    if (!force && cacheRef.current && Date.now() - cacheRef.current.ts < CACHE_TTL) {
-      setBraiders(cacheRef.current.data);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
+      fetchAttemptRef.current++;
+      const attemptNumber = fetchAttemptRef.current;
 
-      // Add cache-busting query parameter
+      console.log(`=== HOOK: Fetch attempt #${attemptNumber} (force=${force}) ===`);
+
+      // HARD FIX: Always fetch fresh, never use cache
       const timestamp = Date.now();
-      const response = await fetch(`/api/braiders?t=${timestamp}`, {
+      const randomId = Math.random().toString(36).substring(7);
+      const url = `/api/braiders?t=${timestamp}&id=${randomId}`;
+      
+      console.log(`=== HOOK: Fetching from ${url} ===`);
+
+      const response = await fetch(url, {
+        method: 'GET',
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
+          'X-Timestamp': timestamp.toString(),
+          'X-Random': randomId,
         },
       });
-      if (!response.ok) throw new Error('Failed to fetch braiders');
+
+      console.log(`=== HOOK: Response status ${response.status} ===`);
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
+      }
 
       const data = await response.json();
+      console.log(`=== HOOK: Received ${Array.isArray(data) ? data.length : 0} braiders ===`, data);
+
       const braidersList: Braider[] = Array.isArray(data) ? data : [];
+
+      if (braidersList.length === 0) {
+        console.warn('=== HOOK: WARNING - No braiders returned from API ===');
+      }
 
       const normalized = braidersList.map((b: any) => ({
         ...b,
@@ -69,10 +84,11 @@ export function useBraiders() {
         available_balance: b.available_balance || 0,
       }));
 
-      cacheRef.current = { data: normalized, ts: Date.now() };
+      console.log(`=== HOOK: Setting ${normalized.length} braiders ===`);
       setBraiders(normalized);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`=== HOOK: Error on attempt #${fetchAttemptRef.current} ===`, message);
       setError(message);
       setBraiders([]);
     } finally {
@@ -81,18 +97,23 @@ export function useBraiders() {
   };
 
   useEffect(() => {
-    // Always fetch fresh data on mount, ignore cache
+    console.log('=== HOOK: Component mounted, fetching braiders ===');
+    // HARD FIX: Always fetch on mount, ignore any cache
     fetchBraiders(true);
 
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn('=== HOOK: Supabase not available ===');
+      return;
+    }
 
-    // Debounce real-time updates — don't refetch on every keystroke/change
+    // Real-time subscription
     let debounceTimer: ReturnType<typeof setTimeout>;
     const subscription = supabase
       .channel('braider_profiles_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'braider_profiles' }, () => {
+        console.log('=== HOOK: Real-time change detected, refetching ===');
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => fetchBraiders(true), 2000);
+        debounceTimer = setTimeout(() => fetchBraiders(true), 1000);
       })
       .subscribe();
 
