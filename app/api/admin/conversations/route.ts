@@ -27,48 +27,68 @@ export async function GET() {
       )
       .order('updated_at', { ascending: false });
 
-    if (convErr) throw convErr;
+    if (convErr) {
+      console.error('Conversations fetch error:', convErr);
+      throw new Error(`Failed to fetch conversations: ${convErr.message}`);
+    }
+
+    // If no conversations, return empty array
+    if (!conversations || conversations.length === 0) {
+      return NextResponse.json([]);
+    }
 
     // Enrich with user names and message counts
     const enrichedConversations = await Promise.all(
-      (conversations || []).map(async (conv) => {
-        // Get customer name
-        const { data: customer } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', conv.customer_id)
-          .single();
+      conversations.map(async (conv) => {
+        try {
+          // Get customer name
+          const { data: customer, error: custErr } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', conv.customer_id)
+            .single();
 
-        // Get braider name
-        const { data: braider } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', conv.braider_id)
-          .single();
+          // Get braider name
+          const { data: braider, error: braiderErr } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', conv.braider_id)
+            .single();
 
-        // Get message count
-        const { count: messageCount } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversation_id', conv.id);
+          // Get message count
+          const { count: messageCount, error: countErr } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conv.id);
 
-        // Get last message
-        const { data: lastMessage } = await supabase
-          .from('messages')
-          .select('content, created_at')
-          .eq('conversation_id', conv.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          // Get last message
+          const { data: lastMessage, error: msgErr } = await supabase
+            .from('messages')
+            .select('content, created_at')
+            .eq('conversation_id', conv.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
 
-        return {
-          ...conv,
-          customer_name: customer?.full_name || 'Unknown',
-          braider_name: braider?.full_name || 'Unknown',
-          message_count: messageCount || 0,
-          last_message: lastMessage?.content || null,
-          last_message_time: lastMessage?.created_at || null,
-        };
+          return {
+            ...conv,
+            customer_name: customer?.full_name || 'Unknown',
+            braider_name: braider?.full_name || 'Unknown',
+            message_count: messageCount || 0,
+            last_message: lastMessage?.content || null,
+            last_message_time: lastMessage?.created_at || null,
+          };
+        } catch (err) {
+          console.error(`Error enriching conversation ${conv.id}:`, err);
+          return {
+            ...conv,
+            customer_name: 'Unknown',
+            braider_name: 'Unknown',
+            message_count: 0,
+            last_message: null,
+            last_message_time: null,
+          };
+        }
       })
     );
 
@@ -76,7 +96,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch conversations' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch conversations' },
       { status: 500 }
     );
   }
