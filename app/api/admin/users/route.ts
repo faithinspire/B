@@ -112,28 +112,33 @@ export async function GET(request: NextRequest) {
         const profile = profilesMap[u.id];
         const braiderProfile = braiderProfilesMap[u.id];
 
+        // Get the best available name (not UUID) - prioritize profile data
+        const fullName = profile?.full_name || 
+                        u.user_metadata?.full_name || 
+                        u.email?.split('@')[0] || 
+                        'Unknown User';
+        
+        const email = u.email || '';
+        const role = profile?.role || u.user_metadata?.role || 'customer';
+        
         return {
           id: u.id,
-          email: u.email || '',
-          full_name: profile?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Unknown',
-          role: profile?.role || u.user_metadata?.role || 'customer',
+          email: email,
+          full_name: fullName,
+          display_name: fullName,
+          role: role,
           created_at: u.created_at,
-          phone: u.phone || profile?.phone || u.user_metadata?.phone || '',
           avatar_url: profile?.avatar_url || null,
           bio: profile?.bio || '',
           
           // Braider-specific fields
           braiderProfile: braiderProfile ? {
             user_id: braiderProfile.user_id,
-            phone_number: braiderProfile.phone_number || '',
-            next_of_kin_name: braiderProfile.next_of_kin_name || '',
-            next_of_kin_phone: braiderProfile.next_of_kin_phone || '',
-            next_of_kin_relationship: braiderProfile.next_of_kin_relationship || '',
-            id_document_url: braiderProfile.id_document_url || '',
-            selfie_url: braiderProfile.selfie_url || '',
+            full_name: braiderProfile.full_name || fullName,
+            email: braiderProfile.email || email,
             bio: braiderProfile.bio || '',
-            rating: braiderProfile.rating || 0,
-            verified: braiderProfile.verified || false,
+            rating: braiderProfile.rating_avg || 0,
+            verified: braiderProfile.verification_status === 'verified',
             verification_status: braiderProfile.verification_status || 'pending',
             created_at: braiderProfile.created_at,
           } : null,
