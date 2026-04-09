@@ -19,7 +19,6 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const type = formData.get('type') as string;
 
     if (!file) {
       return NextResponse.json(
@@ -28,21 +27,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      console.error('Invalid file type:', file.type);
+    // Validate file type - be more permissive
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const isValidType = allowedTypes.includes(file.type) || 
+                       ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'].includes(fileExtension || '');
+    
+    if (!isValidType) {
+      console.error('Invalid file type:', file.type, 'Extension:', fileExtension);
       return NextResponse.json(
-        { error: 'Invalid file type. Only images and PDFs are allowed.' },
+        { error: 'Invalid file type. Only images (JPG, PNG, GIF, WebP) and PDFs are allowed.' },
         { status: 400 }
       );
     }
 
     // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      console.error('File too large:', file.size);
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      console.error('File too large:', file.size, 'Max:', maxSize);
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB.' },
+        { error: `File too large. Maximum size is 5MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.` },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size is not zero
+    if (file.size === 0) {
+      return NextResponse.json(
+        { error: 'File is empty' },
         { status: 400 }
       );
     }
@@ -54,7 +66,9 @@ export async function POST(request: Request) {
     // Generate unique filename
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const sanitizedName = file.name
+      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .substring(0, 50);
     const filename = `braider-id-${timestamp}-${random}-${sanitizedName}`;
 
     console.log('Uploading file:', filename, 'Size:', file.size, 'Type:', file.type);
@@ -63,7 +77,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase.storage
       .from('braider-documents')
       .upload(filename, uint8Array, {
-        contentType: file.type,
+        contentType: file.type || 'application/octet-stream',
         cacheControl: '3600',
         upsert: false,
       });
