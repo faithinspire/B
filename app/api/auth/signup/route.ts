@@ -4,7 +4,18 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, full_name, role } = body
+    const { 
+      email, 
+      password, 
+      full_name, 
+      role,
+      phone,
+      phone_country,
+      specialization,
+      years_experience,
+      services,
+      bio,
+    } = body
 
     if (!email || !password || !full_name || !role) {
       return NextResponse.json(
@@ -35,6 +46,8 @@ export async function POST(request: NextRequest) {
       user_metadata: {
         full_name,
         role,
+        phone,
+        phone_country,
       },
     })
 
@@ -56,6 +69,8 @@ export async function POST(request: NextRequest) {
         email,
         full_name,
         role, // EXPLICIT role - MUST be set here, not defaulting to customer
+        phone,
+        phone_country,
         avatar_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -71,6 +86,8 @@ export async function POST(request: NextRequest) {
           email,
           full_name,
           role, // EXPLICIT role
+          phone,
+          phone_country,
           avatar_url: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -83,7 +100,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. If braider, create braider_profiles record
+    // 3. If braider, create braider_profiles record with specialization
     if (role === 'braider') {
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
@@ -92,16 +109,19 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           full_name,
           email,
+          phone,
           avatar_url: null,
-          bio: '',
-          experience_years: 0,
+          bio: bio || '',
+          experience_years: years_experience || 0,
+          specialization: specialization || '',
+          services: services || '',
           rating_avg: 5.0,
           rating_count: 0,
           verification_status: 'unverified',
           travel_radius_miles: 10,
           is_mobile: true,
           salon_address: null,
-          specialties: [],
+          specialties: specialization ? [specialization] : [],
           total_earnings: 0,
           available_balance: 0,
           created_at: new Date().toISOString(),
@@ -110,7 +130,7 @@ export async function POST(request: NextRequest) {
 
       if (braiderError) {
         console.error('Braider profile error:', braiderError)
-        // Continue
+        // Continue - profile was created, just missing braider details
       }
     }
 
@@ -139,6 +159,8 @@ export async function POST(request: NextRequest) {
         email,
         full_name,
         role,
+        phone,
+        phone_country,
       },
       message: 'User created successfully',
     })

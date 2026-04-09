@@ -64,18 +64,19 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
       }
 
       // Attempt login
-      const { error: signInError } = await signIn(loginEmail, password);
+      try {
+        await signIn(loginEmail, password);
 
-      if (signInError) {
-        setError(signInError.message || 'Login failed');
+        // Success
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.push('/dashboard');
+        }
+      } catch (signInError) {
+        const errorMsg = signInError instanceof Error ? signInError.message : 'Login failed';
+        setError(errorMsg);
         return;
-      }
-
-      // Success
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push('/dashboard');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

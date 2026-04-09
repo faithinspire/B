@@ -26,6 +26,12 @@ export function MultiCountrySignupForm({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Braider-specific fields
+  const [specialization, setSpecialization] = useState('');
+  const [yearsExperience, setYearsExperience] = useState('');
+  const [services, setServices] = useState('');
+  const [bio, setBio] = useState('');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -66,6 +72,22 @@ export function MultiCountrySignupForm({
       return;
     }
 
+    // Braider-specific validation
+    if (userType === 'braider') {
+      if (!specialization.trim()) {
+        setError('Specialization is required');
+        return;
+      }
+      if (!yearsExperience) {
+        setError('Years of experience is required');
+        return;
+      }
+      if (!services.trim()) {
+        setError('Services offered is required');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -83,6 +105,13 @@ export function MultiCountrySignupForm({
           phone_country: country,
           password,
           role: userType,
+          // Braider-specific fields
+          ...(userType === 'braider' && {
+            specialization,
+            years_experience: parseInt(yearsExperience),
+            services,
+            bio,
+          }),
         }),
       });
 
@@ -201,6 +230,88 @@ export function MultiCountrySignupForm({
           disabled={loading}
         />
       </div>
+
+      {/* Braider-Specific Fields */}
+      {userType === 'braider' && (
+        <>
+          <div className="border-t pt-4 mt-4">
+            <h3 className="font-semibold text-gray-900 mb-4">Professional Information</h3>
+          </div>
+
+          {/* Specialization */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Specialization *
+            </label>
+            <select
+              value={specialization}
+              onChange={(e) => setSpecialization(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+              disabled={loading}
+            >
+              <option value="">Select your specialization</option>
+              <option value="box-braids">Box Braids</option>
+              <option value="cornrows">Cornrows</option>
+              <option value="twists">Twists</option>
+              <option value="locs">Locs</option>
+              <option value="weaves">Weaves</option>
+              <option value="natural-hair">Natural Hair Care</option>
+              <option value="extensions">Extensions</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* Years of Experience */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Years of Experience *
+            </label>
+            <select
+              value={yearsExperience}
+              onChange={(e) => setYearsExperience(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+              disabled={loading}
+            >
+              <option value="">Select experience level</option>
+              <option value="1">Less than 1 year</option>
+              <option value="2">1-2 years</option>
+              <option value="5">2-5 years</option>
+              <option value="10">5-10 years</option>
+              <option value="15">10+ years</option>
+            </select>
+          </div>
+
+          {/* Services Offered */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Services Offered *
+            </label>
+            <textarea
+              value={services}
+              onChange={(e) => setServices(e.target.value)}
+              placeholder="List the services you offer (e.g., Box braids, Cornrows, Hair treatment)"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Professional Bio
+            </label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell customers about your experience and style..."
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+        </>
+      )}
 
       {/* Submit Button */}
       <button

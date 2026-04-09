@@ -2,19 +2,19 @@
 
 export const dynamic = 'force-dynamic';
 
-import { MultiCountrySignupForm } from '@/app/components/MultiCountrySignupForm';
+import { BraiderSignupForm } from '@/app/components/BraiderSignupForm';
 import Link from 'next/link';
 
 export default function BraiderSignupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Become a Braider</h1>
-          <p className="text-gray-600">Join our community and start earning</p>
+          <p className="text-gray-600">Join our community and start earning. Complete all steps to get verified.</p>
         </div>
 
-        <MultiCountrySignupForm userType="braider" />
+        <BraiderSignupForm />
 
         <div className="mt-6 text-center">
           <p className="text-gray-600 text-sm">

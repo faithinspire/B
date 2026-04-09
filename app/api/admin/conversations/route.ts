@@ -29,7 +29,10 @@ export async function GET() {
 
     if (convErr) {
       console.error('Conversations fetch error:', convErr);
-      throw new Error(`Failed to fetch conversations: ${convErr.message}`);
+      return NextResponse.json(
+        { error: `Failed to fetch conversations: ${convErr.message}` },
+        { status: 500 }
+      );
     }
 
     // If no conversations, return empty array
@@ -42,27 +45,27 @@ export async function GET() {
       conversations.map(async (conv) => {
         try {
           // Get customer name
-          const { data: customer, error: custErr } = await supabase
+          const { data: customer } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', conv.customer_id)
             .single();
 
           // Get braider name
-          const { data: braider, error: braiderErr } = await supabase
+          const { data: braider } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', conv.braider_id)
             .single();
 
           // Get message count
-          const { count: messageCount, error: countErr } = await supabase
+          const { count: messageCount } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('conversation_id', conv.id);
 
           // Get last message
-          const { data: lastMessage, error: msgErr } = await supabase
+          const { data: lastMessage } = await supabase
             .from('messages')
             .select('content, created_at')
             .eq('conversation_id', conv.id)

@@ -1,122 +1,101 @@
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized: No auth token provided' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // Create admin client
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
-    // Verify user is admin
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message);
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
-
-    // Check if user is admin
-    let userRole = (user.user_metadata as any)?.role;
-
-    if (!userRole || userRole !== 'admin') {
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        if (profile) {
-          userRole = profile.role;
-        }
-      } catch (err) {
-        console.error('Profile fetch error:', err);
-      }
-    }
-
-    if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
-
-    // Get all braiders with their profiles
-    const { data: braiderProfiles, error: braiderError } = await supabaseAdmin
-      .from('braider_profiles')
-      .select('*')
+    // Fetch all braiders with verification documents
+    const { data: braiders, error: braiderErr } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, phone, role')
+      .eq('role', 'braider')
       .order('created_at', { ascending: false });
 
-    if (braiderError) {
-      console.error('Braider profiles fetch error:', braiderError);
-      throw braiderError;
+    if (braiderErr) {
+      console.error('Braiders fetch error:', braiderErr);
+      throw new Error(`Failed to fetch braiders: ${braiderErr.message}`);
     }
 
-    // Get user profiles for braiders
-    const userIds = (braiderProfiles || []).map(bp => bp.user_id);
-    let profilesMap: Record<string, any> = {};
+    if (!braiders || braiders.length === 0) {
+      return NextResponse.json([]);
+    }
 
-    if (userIds.length > 0) {
-      try {
-        const { data: profiles } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
+    // Fetch verification documents for each braider
+    const verifications = await Promise.all(
+      braiders.map(async (braider) => {
+        try {
+          const { data: docs, error: docErr } = await supabase
+            .from('braider_verifications')
+            .select('*')
+            .eq('braider_id', braider.id)
+            .order('submitted_at', { ascending: false })
+            .limit(1)
+            .single();
 
-        if (profiles) {
-          profilesMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+          if (docErr && docErr.code !== 'PGRST116') {
+            throw docErr;
+          }
+
+          if (!docs) {
+            return {
+              id: `${braider.id}-pending`,
+              braider_id: braider.id,
+              braider_name: braider.full_name || 'Unknown',
+              email: braider.email || '',
+              phone: braider.phone || '',
+              status: 'pending',
+              document_type: 'Not submitted',
+              document_url: null,
+              submitted_at: new Date().toISOString(),
+              verified_at: null,
+              verified_by: null,
+              notes: null,
+            };
+          }
+
+          return {
+            id: docs.id,
+            braider_id: braider.id,
+            braider_name: braider.full_name || 'Unknown',
+            email: braider.email || '',
+            phone: braider.phone || '',
+            status: docs.status || 'pending',
+            document_type: docs.document_type || 'Unknown',
+            document_url: docs.document_url,
+            submitted_at: docs.submitted_at,
+            verified_at: docs.verified_at,
+            verified_by: docs.verified_by,
+            notes: docs.notes,
+          };
+        } catch (err) {
+          console.error(`Error fetching verification for ${braider.id}:`, err);
+          return {
+            id: `${braider.id}-error`,
+            braider_id: braider.id,
+            braider_name: braider.full_name || 'Unknown',
+            email: braider.email || '',
+            phone: braider.phone || '',
+            status: 'pending',
+            document_type: 'Error loading',
+            document_url: null,
+            submitted_at: new Date().toISOString(),
+            verified_at: null,
+            verified_by: null,
+            notes: null,
+          };
         }
-      } catch (err) {
-        console.error('Profiles fetch error:', err);
-      }
-    }
+      })
+    );
 
-    // Transform braiders with user info
-    const transformedBraiders = (braiderProfiles || []).map(bp => {
-      const profile = profilesMap[bp.user_id];
-      return {
-        id: bp.id,
-        user_id: bp.user_id,
-        full_name: profile?.full_name || 'Unknown',
-        email: profile?.email || '',
-        phone_number: bp.phone_number || '',
-        next_of_kin_name: bp.next_of_kin_name || '',
-        next_of_kin_phone: bp.next_of_kin_phone || '',
-        next_of_kin_relationship: bp.next_of_kin_relationship || '',
-        id_document_url: bp.id_document_url || '',
-        selfie_url: bp.selfie_url || '',
-        bio: bp.bio || '',
-        rating: bp.rating || 0,
-        verified: bp.verified || false,
-        verification_status: bp.verification_status || 'pending',
-        created_at: bp.created_at,
-      };
-    });
-
-    return NextResponse.json(transformedBraiders);
-  } catch (error: any) {
-    console.error('Verification fetch error:', error);
+    return NextResponse.json(verifications);
+  } catch (error) {
+    console.error('Error fetching verifications:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to fetch braiders' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch verifications' },
       { status: 500 }
     );
   }

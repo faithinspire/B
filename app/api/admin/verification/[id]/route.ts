@@ -1,85 +1,33 @@
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
-export async function PATCH(
-  request: NextRequest,
+export async function PUT(
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    const { status, verified_by, notes } = await request.json();
+
+    if (!status || !['approved', 'rejected'].includes(status)) {
       return NextResponse.json(
-        { error: 'Unauthorized: No auth token provided' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // Create admin client
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
-    // Verify user is admin
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message);
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
-
-    // Check if user is admin
-    let userRole = (user.user_metadata as any)?.role;
-
-    if (!userRole || userRole !== 'admin') {
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        if (profile) {
-          userRole = profile.role;
-        }
-      } catch (err) {
-        console.error('Profile fetch error:', err);
-      }
-    }
-
-    if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const { verification_status } = body;
-
-    if (!verification_status || !['verified', 'rejected', 'pending'].includes(verification_status)) {
-      return NextResponse.json(
-        { error: 'Invalid verification_status' },
+        { error: 'Invalid status' },
         { status: 400 }
       );
     }
 
-    // Update braider verification status
-    const { data, error } = await supabaseAdmin
-      .from('braider_profiles')
-      .update({ 
-        verification_status, 
-        verified: verification_status === 'verified',
-        updated_at: new Date().toISOString() 
+    // Update verification record
+    const { data, error } = await supabase
+      .from('braider_verifications')
+      .update({
+        status,
+        verified_by,
+        verified_at: new Date().toISOString(),
+        notes,
       })
       .eq('id', params.id)
       .select()
@@ -87,14 +35,27 @@ export async function PATCH(
 
     if (error) {
       console.error('Verification update error:', error);
-      throw error;
+      throw new Error(`Failed to update verification: ${error.message}`);
     }
 
-    return NextResponse.json({ success: true, braider: data });
-  } catch (error: any) {
-    console.error('Verification update error:', error);
+    // If approved, update braider profile status
+    if (status === 'approved' && data) {
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ verified: true })
+        .eq('id', data.braider_id);
+
+      if (profileErr) {
+        console.error('Profile update error:', profileErr);
+        // Don't throw - verification was already updated
+      }
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error updating verification:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to update verification status' },
+      { error: error instanceof Error ? error.message : 'Failed to update verification' },
       { status: 500 }
     );
   }
