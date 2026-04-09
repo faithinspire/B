@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+// Disable caching for this API route
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
 // Helper to check if URL is valid
 const isValidUrl = (url: string): boolean => {
   try {

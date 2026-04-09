@@ -34,7 +34,7 @@ export function useBraiders() {
   const CACHE_TTL = 60_000; // 1 minute cache
 
   const fetchBraiders = async (force = false) => {
-    // Return cached data if fresh
+    // Return cached data if fresh (unless force is true)
     if (!force && cacheRef.current && Date.now() - cacheRef.current.ts < CACHE_TTL) {
       setBraiders(cacheRef.current.data);
       setLoading(false);
@@ -45,7 +45,16 @@ export function useBraiders() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/braiders');
+      // Add cache-busting query parameter
+      const timestamp = Date.now();
+      const response = await fetch(`/api/braiders?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch braiders');
 
       const data = await response.json();
@@ -72,7 +81,8 @@ export function useBraiders() {
   };
 
   useEffect(() => {
-    fetchBraiders();
+    // Always fetch fresh data on mount, ignore cache
+    fetchBraiders(true);
 
     if (!supabase) return;
 
