@@ -150,22 +150,46 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Menu Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href}>
-                <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 cursor-pointer h-full">
-                  <div className={`${item.color} w-12 h-12 rounded-lg flex items-center justify-center mb-4`}>
-                    <Icon className="w-6 h-6" />
+        {/* Main Menu Grid - 4 Primary Actions */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {menuItems.slice(0, 4).map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <div className="bg-white rounded-lg shadow hover:shadow-xl transition-all p-8 cursor-pointer h-full hover:scale-105 transform">
+                    <div className={`${item.color} w-16 h-16 rounded-lg flex items-center justify-center mb-4`}>
+                      <Icon className="w-8 h-8" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-lg">{item.label}</h3>
+                    <p className="text-gray-600 text-sm mt-2">Manage {item.label.toLowerCase()}</p>
                   </div>
-                  <h3 className="font-semibold text-gray-900">{item.label}</h3>
-                  <p className="text-gray-600 text-sm mt-1">Manage {item.label.toLowerCase()}</p>
-                </div>
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Additional Actions */}
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Other Management</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {menuItems.slice(4).map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 cursor-pointer h-full">
+                    <div className={`${item.color} w-12 h-12 rounded-lg flex items-center justify-center mb-4`}>
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900">{item.label}</h3>
+                    <p className="text-gray-600 text-sm mt-1">Manage {item.label.toLowerCase()}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

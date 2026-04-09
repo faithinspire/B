@@ -11,6 +11,7 @@ export default function CustomerProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useSupabaseAuthStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
     email: user?.email || '',
@@ -80,14 +81,17 @@ export default function CustomerProfilePage() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Profile Card */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 animate-fade-in">
+        <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 animate-fade-in cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setShowDetails(true)}>
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-serif font-bold text-gray-900 mb-2">{user.full_name}</h2>
-              <p className="text-gray-600">Customer Account</p>
+              <p className="text-gray-600">Customer Account • Click to view full details</p>
             </div>
             <button
-              onClick={() => setIsEditing(!isEditing)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(!isEditing);
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth"
             >
               {isEditing ? (
@@ -161,7 +165,9 @@ export default function CustomerProfilePage() {
 
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => {
+                  setIsEditing(false);
+                }}
                 className="w-full px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold flex items-center justify-center gap-2"
               >
                 <Save className="w-5 h-5" />
@@ -216,6 +222,54 @@ export default function CustomerProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Full Details Modal */}
+      {showDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-primary-600 to-accent-600 text-white p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Full Profile Details</h2>
+              <button onClick={() => setShowDetails(false)} className="p-1 hover:bg-white hover:bg-opacity-20 rounded">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 mb-1">Full Name</p>
+                  <p className="text-lg text-gray-900">{user.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 mb-1">Email</p>
+                  <p className="text-lg text-gray-900">{user.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 mb-1">Phone</p>
+                  <p className="text-lg text-gray-900">{formData.phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 mb-1">Role</p>
+                  <p className="text-lg text-gray-900 capitalize">{user.role}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-600 mb-1">Address</p>
+                <p className="text-lg text-gray-900">{formData.address || 'Not provided'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-600 mb-1">Bio</p>
+                <p className="text-lg text-gray-900">{formData.bio || 'No bio added'}</p>
+              </div>
+              <button
+                onClick={() => setShowDetails(false)}
+                className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
