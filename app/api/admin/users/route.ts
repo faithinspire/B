@@ -5,20 +5,19 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    // Create admin client
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       { auth: { persistSession: false } }
     );
 
-    // Fetch all users
+    // Fetch all users from auth
     const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
 
     if (usersError) {
       console.error('Users fetch error:', usersError);
       return NextResponse.json(
-        { error: 'Failed to fetch users' },
+        { error: 'Failed to fetch users', details: usersError.message },
         { status: 500 }
       );
     }
@@ -38,7 +37,7 @@ export async function GET(request: NextRequest) {
           profilesMap = Object.fromEntries(profiles.map(p => [p.id, p]));
         }
       } catch (err) {
-        console.error('Profiles fetch error:', err);
+        console.warn('Warning: Could not fetch profiles:', err);
       }
     }
 
@@ -56,7 +55,7 @@ export async function GET(request: NextRequest) {
         }, {});
       }
     } catch (err) {
-      console.error('Bookings fetch error:', err);
+      console.warn('Warning: Could not fetch bookings:', err);
     }
 
     // Transform users with all details
@@ -78,6 +77,8 @@ export async function GET(request: NextRequest) {
           created_at: u.created_at,
           avatar_url: profile?.avatar_url || null,
           booking_count: bookingCountMap[u.id] || 0,
+          next_of_kin: profile?.next_of_kin || null,
+          next_of_kin_phone: profile?.next_of_kin_phone || null,
         };
       })
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

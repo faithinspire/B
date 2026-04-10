@@ -14,6 +14,8 @@ import {
   AlertCircle,
   RefreshCw,
   AlertTriangle,
+  CheckCircle,
+  Calendar,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -205,72 +207,78 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Navigation Buttons - Fully Responsive */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-6 sm:mb-8">
+            {/* Navigation Buttons - GRID LAYOUT */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
               <button
                 onClick={() => router.push('/admin')}
-                className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+                className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
               >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Overview</h3>
-                  <BarChart3 className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Dashboard</p>
+                <BarChart3 className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Dashboard</h3>
+                <p className="text-xs text-white/80">Overview</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/verification')}
-                className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+                className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
               >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Verify</h3>
-                  <AlertTriangle className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Braiders</p>
-              </button>
-
-              <button
-                onClick={() => router.push('/admin/conversations')}
-                className="bg-gradient-to-br from-accent-600 to-accent-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
-              >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Bookings</h3>
-                  <MessageSquare className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Monitor</p>
-              </button>
-
-              <button
-                onClick={() => router.push('/admin/payments')}
-                className="bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
-              >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Payments</h3>
-                  <DollarSign className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Revenue</p>
+                <CheckCircle className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Verify</h3>
+                <p className="text-xs text-white/80">Braiders</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/users')}
-                className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+                className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
               >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Users</h3>
-                  <Users className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Manage</p>
+                <Users className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Users</h3>
+                <p className="text-xs text-white/80">Manage</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/conversations')}
+                className="bg-gradient-to-br from-accent-600 to-accent-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
+              >
+                <MessageSquare className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Messages</h3>
+                <p className="text-xs text-white/80">Monitor</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/bookings')}
+                className="bg-gradient-to-br from-orange-600 to-orange-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
+              >
+                <Calendar className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Bookings</h3>
+                <p className="text-xs text-white/80">Track</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/payments')}
+                className="bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
+              >
+                <DollarSign className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Payments</h3>
+                <p className="text-xs text-white/80">Revenue</p>
+              </button>
+
+              <button
+                onClick={() => router.push('/admin/braiders')}
+                className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
+              >
+                <Users className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Braiders</h3>
+                <p className="text-xs text-white/80">Manage</p>
               </button>
 
               <button
                 onClick={() => router.push('/admin/disputes')}
-                className="bg-gradient-to-br from-red-600 to-red-700 rounded-lg shadow-lg p-3 sm:p-4 hover:shadow-xl hover:scale-105 transition-all text-left group text-white"
+                className="bg-gradient-to-br from-red-600 to-red-700 rounded-lg shadow-lg p-4 hover:shadow-xl hover:scale-105 transition-all text-left text-white"
               >
-                <div className="flex items-center justify-between mb-1 sm:mb-2">
-                  <h3 className="text-xs sm:text-sm font-semibold truncate">Disputes</h3>
-                  <AlertTriangle className="w-3 sm:w-4 h-3 sm:h-4 text-white/80 flex-shrink-0" />
-                </div>
-                <p className="text-xs text-white/90 hidden sm:block">Issues</p>
+                <AlertCircle className="w-5 h-5 mb-2" />
+                <h3 className="text-sm font-semibold">Disputes</h3>
+                <p className="text-xs text-white/80">Issues</p>
               </button>
             </div>
 

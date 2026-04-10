@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     // Update braider status
     const { error: updateError } = await db
-      .from('braider_profiles')
+      .from('profiles')
       .update({ verification_status: 'rejected' })
       .eq('id', braider_id);
 
@@ -28,15 +28,15 @@ export async function POST(request: Request) {
 
     // Get braider details for notification
     const { data: braider } = await db
-      .from('braider_profiles')
-      .select('user_id, full_name')
+      .from('profiles')
+      .select('id, full_name')
       .eq('id', braider_id)
       .single();
 
     // Send notification to braider
-    if (braider?.user_id) {
+    if (braider?.id) {
       await db.from('notifications').insert({
-        user_id: braider.user_id,
+        user_id: braider.id,
         type: 'verification_rejected',
         title: 'Verification Rejected',
         message: 'Your braider profile verification was rejected. Please review your documents and try again.',
