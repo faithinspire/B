@@ -19,6 +19,7 @@ import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
+  { icon: CheckCircle, label: 'Verification', href: '/admin/verification' },
   { icon: CheckCircle, label: 'Braiders', href: '/admin/braiders' },
   { icon: Users, label: 'Users', href: '/admin/users' },
   { icon: Calendar, label: 'Bookings', href: '/admin/bookings' },
