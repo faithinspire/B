@@ -279,7 +279,7 @@ export default function AdminConversationsPage() {
                   placeholder="Type a message..."
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-600"
                 />
                 <button

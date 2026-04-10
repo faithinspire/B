@@ -1,61 +1,65 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+export const dynamic = 'force-dynamic';
 
-export async function PUT(
-  request: Request,
+export async function POST(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { status, verified_by, notes } = await request.json();
+    const { approved } = await request.json();
+    const braider_id = params.id;
 
-    if (!status || !['approved', 'rejected'].includes(status)) {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    // Update braider verification status
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        verification_status: approved ? 'verified' : 'rejected',
+        verified_at: new Date().toISOString(),
+      })
+      .eq('id', braider_id);
+
+    if (updateError) {
+      console.error('Error updating verification:', updateError);
       return NextResponse.json(
-        { error: 'Invalid status' },
-        { status: 400 }
+        { error: 'Failed to update verification status' },
+        { status: 500 }
       );
     }
 
-    // Update verification record
-    const { data, error } = await supabase
-      .from('braider_verifications')
-      .update({
-        status,
-        verified_by,
-        verified_at: new Date().toISOString(),
-        notes,
-      })
-      .eq('id', params.id)
-      .select()
-      .single();
+    // Create notification for braider
+    const status_text = approved ? 'approved' : 'rejected';
+    const { error: notifError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: braider_id,
+        type: 'verification_' + status_text,
+        title: `Your verification has been ${status_text}`,
+        message: approved
+          ? 'Congratulations! Your profile has been verified and is now live.'
+          : 'Your verification was not approved. Please review your documents and try again.',
+        read: false,
+      });
 
-    if (error) {
-      console.error('Verification update error:', error);
-      throw new Error(`Failed to update verification: ${error.message}`);
+    if (notifError) {
+      console.warn('Warning: Could not create notification:', notifError);
     }
 
-    // If approved, update braider profile status
-    if (status === 'approved' && data) {
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .update({ verified: true })
-        .eq('id', data.braider_id);
-
-      if (profileErr) {
-        console.error('Profile update error:', profileErr);
-        // Don't throw - verification was already updated
-      }
-    }
-
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error updating verification:', error);
+    return NextResponse.json({
+      success: true,
+      message: `Braider ${status_text} successfully`,
+    });
+  } catch (err) {
+    console.error('Verification API error:', err);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update verification' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

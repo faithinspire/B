@@ -47,9 +47,9 @@ export default function AdminLayout({
         {/* Header */}
         <AdminHeader />
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-6 sm:p-8">
+        {/* Content Area - Fixed scroll */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="p-6 sm:p-8 pb-20">
             {children}
           </div>
         </main>
