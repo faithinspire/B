@@ -139,7 +139,7 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             href="/admin/braiders"
             className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-all hover:border-primary-300 group"
@@ -160,6 +160,17 @@ export default function AdminDashboard() {
               <Users className="w-5 h-5 text-primary-600 group-hover:scale-110 transition-transform" />
             </div>
             <p className="text-sm text-gray-600">View and manage customer accounts</p>
+          </Link>
+
+          <Link
+            href="/admin/bookings"
+            className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-all hover:border-primary-300 group"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Track Bookings</h3>
+              <TrendingUp className="w-5 h-5 text-primary-600 group-hover:scale-110 transition-transform" />
+            </div>
+            <p className="text-sm text-gray-600">Monitor all service bookings</p>
           </Link>
 
           <Link
