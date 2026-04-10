@@ -5,6 +5,7 @@ import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
 import { ServiceWorkerRegister } from './components/ServiceWorkerRegister';
 import './globals.css';
+import './styles/apple-design.css';
 
 // Lazy load heavy components — not needed on initial paint
 const AIAssistant = dynamic(() => import('./components/AIAssistant').then(m => ({ default: m.AIAssistant })), {
@@ -13,6 +14,11 @@ const AIAssistant = dynamic(() => import('./components/AIAssistant').then(m => (
 });
 
 const PageBackground = dynamic(() => import('./components/PageBackground').then(m => ({ default: m.PageBackground })), {
+  ssr: false,
+  loading: () => null,
+});
+
+const AppInitializer = dynamic(() => import('./components/AppInitializer').then(m => ({ default: m.AppInitializer })), {
   ssr: false,
   loading: () => null,
 });
@@ -63,6 +69,7 @@ export default function RootLayout({
         <PageBackground />
         <AuthInitializer />
         <ServiceWorkerRegister />
+        <AppInitializer />
         <AIAssistant />
         
         {/* Fixed container that holds everything */}

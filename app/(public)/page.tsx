@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Search, MapPin, Star, Shield, Clock, Users, Zap, CheckCircle } from 'lucide-react';
 import { useBraiders } from '@/app/hooks/useBraiders';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
+import { PremiumSearchModal } from '@/app/components/PremiumSearchModal';
 
 // Lazy load heavy below-fold components
 const BackgroundAnimator = dynamic(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
@@ -19,6 +20,7 @@ export default function LandingPage(): JSX.Element {
   const [style, setStyle] = useState('');
   const [featuredBraiders, setFeaturedBraiders] = useState<any[]>([]);
   const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   // Update featured braiders when braiders data loads
   useEffect(() => {
@@ -72,6 +74,15 @@ export default function LandingPage(): JSX.Element {
     router.push(`/search?${params.toString()}`);
   };
 
+  const handleModalSearch = (country: string, location: string) => {
+    setLocation(location);
+    const params = new URLSearchParams();
+    params.append('location', location);
+    params.append('country', country);
+    if (style) params.append('style', style);
+    router.push(`/search?${params.toString()}`);
+  };
+
   const categories = [
     { name: 'Box Braids', value: 'box_braids' },
     { name: 'Knotless', value: 'knotless' },
@@ -83,6 +94,11 @@ export default function LandingPage(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-white">
+      <PremiumSearchModal 
+        isOpen={showSearchModal}
+        onClose={() => setSearchModal(false)}
+        onSearch={handleModalSearch}
+      />
       {/* Hero Section */}
       <section className="relative overflow-hidden py-12 sm:py-24 lg:py-32" style={{
         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(236, 72, 153, 0.1) 100%)',
@@ -120,6 +136,26 @@ export default function LandingPage(): JSX.Element {
           {/* Search Bar */}
           <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-8 mb-8 sm:mb-12 animate-slide-up animate-delay-200">
             <p className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Find Braiders</p>
+            
+            {/* Premium Search Button */}
+            <button
+              onClick={() => setShowSearchModal(true)}
+              className="w-full mb-4 px-6 py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white rounded-2xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-3 group"
+            >
+              <span className="text-2xl group-hover:scale-110 transition-transform">✨</span>
+              <span>Find Braiders by Location</span>
+              <span className="text-2xl group-hover:scale-110 transition-transform">→</span>
+            </button>
+
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">or search manually</span>
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-600 w-5 h-5 pointer-events-none" />
