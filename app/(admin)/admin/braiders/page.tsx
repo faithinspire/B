@@ -14,6 +14,11 @@ interface Braider {
   bio: string;
   avatar_url?: string;
   created_at: string;
+  portfolio_images?: string[];
+  years_of_experience?: number;
+  specialties?: string;
+  rating?: number;
+  total_bookings?: number;
 }
 
 export default function BraidersPage() {
@@ -203,7 +208,7 @@ export default function BraidersPage() {
       {/* Detail Modal */}
       {showModal && selectedBraider && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-gradient-to-r from-primary-600 to-accent-600 text-white p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold">{selectedBraider.full_name}</h2>
               <button
@@ -215,6 +220,18 @@ export default function BraidersPage() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Avatar */}
+              {selectedBraider.avatar_url && (
+                <div className="flex justify-center">
+                  <img
+                    src={selectedBraider.avatar_url}
+                    alt={selectedBraider.full_name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-primary-600"
+                  />
+                </div>
+              )}
+
+              {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Email</p>
@@ -234,6 +251,7 @@ export default function BraidersPage() {
                 </div>
               </div>
 
+              {/* Bio */}
               {selectedBraider.bio && (
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-2">Bio</p>
@@ -241,6 +259,24 @@ export default function BraidersPage() {
                 </div>
               )}
 
+              {/* Portfolio Images */}
+              {selectedBraider.portfolio_images && selectedBraider.portfolio_images.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 mb-3">Portfolio</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedBraider.portfolio_images.map((image, idx) => (
+                      <img
+                        key={idx}
+                        src={image}
+                        alt={`Portfolio ${idx + 1}`}
+                        className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
               {selectedBraider.verification_status === 'pending' && (
                 <button
                   onClick={() => handleVerify(selectedBraider)}
