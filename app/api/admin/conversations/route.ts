@@ -8,6 +8,8 @@ const supabase = createClient(
 
 export async function GET() {
   try {
+    console.log('Starting conversations fetch...');
+    
     // Fetch all conversations with related data
     const { data: conversations, error: convErr } = await supabase
       .from('conversations')
@@ -35,8 +37,11 @@ export async function GET() {
       );
     }
 
+    console.log(`Fetched ${conversations?.length || 0} conversations`);
+
     // If no conversations, return empty array
     if (!conversations || conversations.length === 0) {
+      console.log('No conversations found, returning empty array');
       return NextResponse.json([]);
     }
 
@@ -45,33 +50,49 @@ export async function GET() {
       conversations.map(async (conv) => {
         try {
           // Get customer name
-          const { data: customer } = await supabase
+          const { data: customer, error: custErr } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', conv.customer_id)
             .single();
 
+          if (custErr) {
+            console.warn(`Customer fetch error for ${conv.customer_id}:`, custErr);
+          }
+
           // Get braider name
-          const { data: braider } = await supabase
+          const { data: braider, error: braiderErr } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', conv.braider_id)
             .single();
 
+          if (braiderErr) {
+            console.warn(`Braider fetch error for ${conv.braider_id}:`, braiderErr);
+          }
+
           // Get message count
-          const { count: messageCount } = await supabase
+          const { count: messageCount, error: countErr } = await supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('conversation_id', conv.id);
 
+          if (countErr) {
+            console.warn(`Message count error for ${conv.id}:`, countErr);
+          }
+
           // Get last message
-          const { data: lastMessage } = await supabase
+          const { data: lastMessage, error: lastMsgErr } = await supabase
             .from('messages')
             .select('content, created_at')
             .eq('conversation_id', conv.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
+
+          if (lastMsgErr && lastMsgErr.code !== 'PGRST116') {
+            console.warn(`Last message error for ${conv.id}:`, lastMsgErr);
+          }
 
           return {
             ...conv,
@@ -95,6 +116,7 @@ export async function GET() {
       })
     );
 
+    console.log('Enriched conversations successfully');
     return NextResponse.json(enrichedConversations);
   } catch (error) {
     console.error('Error fetching conversations:', error);

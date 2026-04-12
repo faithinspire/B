@@ -4,11 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const conversationId = params.id;
+    console.log(`Fetching messages for conversation: ${conversationId}`);
+    
     if (!conversationId) {
       return NextResponse.json({ error: 'Conversation ID is required' }, { status: 400 });
     }
@@ -27,19 +29,28 @@ export async function GET(
       .order('created_at', { ascending: true });
 
     if (messagesError) {
-      console.error('Messages fetch error:', messagesError);
-      return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+      console.error(`Messages fetch error for ${conversationId}:`, messagesError);
+      return NextResponse.json(
+        { error: `Failed to fetch messages: ${messagesError.message}` },
+        { status: 500 }
+      );
     }
+
+    console.log(`Fetched ${messages?.length || 0} messages for conversation ${conversationId}`);
 
     // Fetch sender names
     const senderIds = [...new Set((messages || []).map(m => m.sender_id))];
     let sendersMap: Record<string, string> = {};
 
     if (senderIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin
+      const { data: profiles, error: profilesError } = await supabaseAdmin
         .from('profiles')
         .select('id, full_name')
         .in('id', senderIds);
+
+      if (profilesError) {
+        console.warn(`Profiles fetch error:`, profilesError);
+      }
 
       if (profiles) {
         sendersMap = Object.fromEntries(profiles.map(p => [p.id, p.full_name]));
@@ -52,6 +63,7 @@ export async function GET(
       sender_name: sendersMap[m.sender_id] || 'Unknown',
     }));
 
+    console.log('Messages transformed successfully');
     return NextResponse.json({ messages: transformedMessages });
   } catch (error: any) {
     console.error('Get conversation messages error:', error);
