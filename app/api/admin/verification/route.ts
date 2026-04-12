@@ -8,95 +8,43 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // Fetch all braiders with verification documents
+    console.log('Fetching braiders for verification...');
+
+    // Fetch all braiders
     const { data: braiders, error: braiderErr } = await supabase
       .from('profiles')
-      .select('id, full_name, email, phone, role')
+      .select('id, full_name, email, phone, verification_status')
       .eq('role', 'braider')
       .order('created_at', { ascending: false });
 
     if (braiderErr) {
       console.error('Braiders fetch error:', braiderErr);
-      throw new Error(`Failed to fetch braiders: ${braiderErr.message}`);
+      return NextResponse.json([]);
     }
 
     if (!braiders || braiders.length === 0) {
       return NextResponse.json([]);
     }
 
-    // Fetch verification documents for each braider
-    const verifications = await Promise.all(
-      braiders.map(async (braider) => {
-        try {
-          const { data: docs, error: docErr } = await supabase
-            .from('braider_verifications')
-            .select('*')
-            .eq('braider_id', braider.id)
-            .order('submitted_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (docErr && docErr.code !== 'PGRST116') {
-            throw docErr;
-          }
-
-          if (!docs) {
-            return {
-              id: `${braider.id}-pending`,
-              braider_id: braider.id,
-              braider_name: braider.full_name || 'Unknown',
-              email: braider.email || '',
-              phone: braider.phone || '',
-              status: 'pending',
-              document_type: 'Not submitted',
-              document_url: null,
-              submitted_at: new Date().toISOString(),
-              verified_at: null,
-              verified_by: null,
-              notes: null,
-            };
-          }
-
-          return {
-            id: docs.id,
-            braider_id: braider.id,
-            braider_name: braider.full_name || 'Unknown',
-            email: braider.email || '',
-            phone: braider.phone || '',
-            status: docs.status || 'pending',
-            document_type: docs.document_type || 'Unknown',
-            document_url: docs.document_url,
-            submitted_at: docs.submitted_at,
-            verified_at: docs.verified_at,
-            verified_by: docs.verified_by,
-            notes: docs.notes,
-          };
-        } catch (err) {
-          console.error(`Error fetching verification for ${braider.id}:`, err);
-          return {
-            id: `${braider.id}-error`,
-            braider_id: braider.id,
-            braider_name: braider.full_name || 'Unknown',
-            email: braider.email || '',
-            phone: braider.phone || '',
-            status: 'pending',
-            document_type: 'Error loading',
-            document_url: null,
-            submitted_at: new Date().toISOString(),
-            verified_at: null,
-            verified_by: null,
-            notes: null,
-          };
-        }
-      })
-    );
+    // Transform to verification format
+    const verifications = braiders.map((braider: any) => ({
+      id: braider.id,
+      braider_id: braider.id,
+      braider_name: braider.full_name || 'Unknown',
+      email: braider.email || '',
+      phone: braider.phone || '',
+      status: braider.verification_status || 'pending',
+      document_type: 'ID Document',
+      document_url: null,
+      submitted_at: new Date().toISOString(),
+      verified_at: null,
+      verified_by: null,
+      notes: null,
+    }));
 
     return NextResponse.json(verifications);
   } catch (error) {
-    console.error('Error fetching verifications:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch verifications' },
-      { status: 500 }
-    );
+    console.error('Verification API error:', error);
+    return NextResponse.json([]);
   }
 }

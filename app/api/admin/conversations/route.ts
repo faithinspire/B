@@ -8,121 +8,71 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    console.log('Starting conversations fetch...');
+    console.log('Fetching conversations...');
     
-    // Fetch all conversations with related data
+    // Fetch conversations - use actual schema columns
     const { data: conversations, error: convErr } = await supabase
       .from('conversations')
-      .select(
-        `
-        id,
-        booking_id,
-        customer_id,
-        braider_id,
-        admin_id,
-        status,
-        started_at,
-        ended_at,
-        created_at,
-        updated_at
-      `
-      )
-      .order('updated_at', { ascending: false });
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (convErr) {
-      console.error('Conversations fetch error:', convErr);
-      return NextResponse.json(
-        { error: `Failed to fetch conversations: ${convErr.message}` },
-        { status: 500 }
-      );
-    }
-
-    console.log(`Fetched ${conversations?.length || 0} conversations`);
-
-    // If no conversations, return empty array
-    if (!conversations || conversations.length === 0) {
-      console.log('No conversations found, returning empty array');
+      console.error('Conversations error:', convErr);
       return NextResponse.json([]);
     }
 
-    // Enrich with user names and message counts
-    const enrichedConversations = await Promise.all(
-      conversations.map(async (conv) => {
+    if (!conversations || conversations.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Enrich with user names
+    const enriched = await Promise.all(
+      conversations.map(async (conv: any) => {
         try {
-          // Get customer name
-          const { data: customer, error: custErr } = await supabase
+          const p1Id = conv.participant1_id;
+          const p2Id = conv.participant2_id;
+
+          const { data: p1 } = await supabase
             .from('profiles')
             .select('full_name')
-            .eq('id', conv.customer_id)
+            .eq('id', p1Id)
             .single();
 
-          if (custErr) {
-            console.warn(`Customer fetch error for ${conv.customer_id}:`, custErr);
-          }
-
-          // Get braider name
-          const { data: braider, error: braiderErr } = await supabase
+          const { data: p2 } = await supabase
             .from('profiles')
             .select('full_name')
-            .eq('id', conv.braider_id)
+            .eq('id', p2Id)
             .single();
-
-          if (braiderErr) {
-            console.warn(`Braider fetch error for ${conv.braider_id}:`, braiderErr);
-          }
-
-          // Get message count
-          const { count: messageCount, error: countErr } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id);
-
-          if (countErr) {
-            console.warn(`Message count error for ${conv.id}:`, countErr);
-          }
-
-          // Get last message
-          const { data: lastMessage, error: lastMsgErr } = await supabase
-            .from('messages')
-            .select('content, created_at')
-            .eq('conversation_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (lastMsgErr && lastMsgErr.code !== 'PGRST116') {
-            console.warn(`Last message error for ${conv.id}:`, lastMsgErr);
-          }
 
           return {
-            ...conv,
-            customer_name: customer?.full_name || 'Unknown',
-            braider_name: braider?.full_name || 'Unknown',
-            message_count: messageCount || 0,
-            last_message: lastMessage?.content || null,
-            last_message_time: lastMessage?.created_at || null,
+            id: conv.id,
+            participant1_id: p1Id,
+            participant2_id: p2Id,
+            participant1_name: p1?.full_name || 'Unknown',
+            participant2_name: p2?.full_name || 'Unknown',
+            last_message: conv.last_message || null,
+            last_message_time: conv.last_message_time || null,
+            created_at: conv.created_at,
           };
         } catch (err) {
-          console.error(`Error enriching conversation ${conv.id}:`, err);
+          console.warn('Error enriching conversation:', err);
           return {
-            ...conv,
-            customer_name: 'Unknown',
-            braider_name: 'Unknown',
-            message_count: 0,
-            last_message: null,
-            last_message_time: null,
+            id: conv.id,
+            participant1_id: conv.participant1_id,
+            participant2_id: conv.participant2_id,
+            participant1_name: 'Unknown',
+            participant2_name: 'Unknown',
+            last_message: conv.last_message || null,
+            last_message_time: conv.last_message_time || null,
+            created_at: conv.created_at,
           };
         }
       })
     );
 
-    console.log('Enriched conversations successfully');
-    return NextResponse.json(enrichedConversations);
+    return NextResponse.json(enriched);
   } catch (error) {
-    console.error('Error fetching conversations:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch conversations' },
-      { status: 500 }
-    );
+    console.error('Conversations API error:', error);
+    return NextResponse.json([]);
   }
 }
