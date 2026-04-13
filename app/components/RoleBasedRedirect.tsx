@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { useRouteRoleVerification } from '@/app/hooks/useRouteRoleVerification';
 
 /**
  * RoleBasedRedirect Component
@@ -19,6 +20,9 @@ export function RoleBasedRedirect() {
   const pathname = usePathname() || '/';
   const { user, loading } = useSupabaseAuthStore();
   const redirectAttempted = useRef(false);
+
+  // Verify role when route changes
+  useRouteRoleVerification();
 
   useEffect(() => {
     // Don't redirect while loading
