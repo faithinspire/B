@@ -67,11 +67,21 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
       try {
         await signIn(loginEmail, password);
 
-        // Success
+        // Get the user from the store to check their role
+        const { user } = useSupabaseAuthStore.getState();
+
+        // Success - redirect based on role
         if (onSuccess) {
           onSuccess();
         } else {
-          router.push('/dashboard');
+          // Redirect based on user role
+          if (user?.role === 'braider') {
+            router.push('/braider/dashboard');
+          } else if (user?.role === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
         }
       } catch (signInError) {
         const errorMsg = signInError instanceof Error ? signInError.message : 'Login failed';

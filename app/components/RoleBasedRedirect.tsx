@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
@@ -18,13 +18,17 @@ export function RoleBasedRedirect() {
   const router = useRouter();
   const pathname = usePathname() || '/';
   const { user, loading } = useSupabaseAuthStore();
+  const redirectAttempted = useRef(false);
 
   useEffect(() => {
     // Don't redirect while loading
     if (loading) return;
 
     // Don't redirect if no user
-    if (!user) return;
+    if (!user) {
+      redirectAttempted.current = false;
+      return;
+    }
 
     // List of paths where we should NOT redirect (public pages, auth pages, etc.)
     const noRedirectPaths = [
@@ -35,9 +39,9 @@ export function RoleBasedRedirect() {
       '/signup/admin',
       '/search',
       '/premium',
-      '/braider/',
       '/terms',
       '/privacy',
+      '/braider/', // Allow viewing other braider profiles
     ];
 
     // Check if current path is a public/auth path
@@ -48,12 +52,15 @@ export function RoleBasedRedirect() {
 
     // If on homepage, redirect based on role
     if (pathname === '/') {
-      if (user.role === 'braider') {
-        router.push('/braider/dashboard');
-      } else if (user.role === 'customer') {
-        router.push('/dashboard');
-      } else if (user.role === 'admin') {
-        router.push('/admin');
+      if (!redirectAttempted.current) {
+        redirectAttempted.current = true;
+        if (user.role === 'braider') {
+          router.push('/braider/dashboard');
+        } else if (user.role === 'customer') {
+          router.push('/dashboard');
+        } else if (user.role === 'admin') {
+          router.push('/admin');
+        }
       }
       return;
     }
@@ -61,11 +68,11 @@ export function RoleBasedRedirect() {
     // If user is on a dashboard that doesn't match their role, redirect
     if (user.role === 'braider' && !pathname?.startsWith('/braider')) {
       // Braider on non-braider page - redirect to braider dashboard
-      if (!pathname?.startsWith('/search') && !pathname?.startsWith('/premium') && !pathname?.startsWith('/braider/')) {
+      if (!pathname?.startsWith('/search') && !pathname?.startsWith('/premium')) {
         router.push('/braider/dashboard');
       }
-    } else if (user.role === 'customer' && pathname?.startsWith('/braider')) {
-      // Customer on braider page - redirect to customer dashboard
+    } else if (user.role === 'customer' && pathname?.startsWith('/braider/dashboard')) {
+      // Customer on braider dashboard - redirect to customer dashboard
       router.push('/dashboard');
     } else if (user.role === 'customer' && pathname?.startsWith('/admin')) {
       // Customer on admin page - redirect to customer dashboard
