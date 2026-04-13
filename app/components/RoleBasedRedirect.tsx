@@ -54,6 +54,7 @@ export function RoleBasedRedirect() {
     if (pathname === '/') {
       if (!redirectAttempted.current) {
         redirectAttempted.current = true;
+        console.log('=== ROLE REDIRECT: On homepage, redirecting based on role ===', { role: user.role });
         if (user.role === 'braider') {
           router.push('/braider/dashboard');
         } else if (user.role === 'customer') {

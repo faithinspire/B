@@ -73,16 +73,21 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
         // Get the user from the store to check their role
         const { user } = useSupabaseAuthStore.getState();
 
+        console.log('=== LOGIN FORM: User role after login ===', { role: user?.role, email: user?.email });
+
         // Success - redirect based on role
         if (onSuccess) {
           onSuccess();
         } else {
           // Redirect based on user role
           if (user?.role === 'braider') {
+            console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
             router.push('/braider/dashboard');
           } else if (user?.role === 'admin') {
+            console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
             router.push('/admin');
           } else {
+            console.log('=== LOGIN FORM: Redirecting customer to /dashboard ===');
             router.push('/dashboard');
           }
         }
