@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { AuthInitializer } from './AuthInitializer';
 import { Navigation } from './components/Navigation';
 import { ServiceWorkerRegister } from './components/ServiceWorkerRegister';
+import { RoleBasedRedirect } from './components/RoleBasedRedirect';
 import './globals.css';
 import './styles/apple-design.css';
 
@@ -68,6 +69,7 @@ export default function RootLayout({
       <body className="font-sans bg-transparent text-gray-900">
         <PageBackground />
         <AuthInitializer />
+        <RoleBasedRedirect />
         <ServiceWorkerRegister />
         <AppInitializer />
         <AIAssistant />
