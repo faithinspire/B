@@ -3,8 +3,12 @@
 import { useEffect } from 'react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { useSupabaseBraiderStore } from '@/store/supabaseBraiderStore';
+import { useRoleVerification } from '@/app/hooks/useRoleVerification';
 
 export function AuthInitializer() {
+  // Verify role on app initialization
+  useRoleVerification();
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
