@@ -190,24 +190,31 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
     try {
       const normalizedPhone = normalizePhoneNumber(phone, country);
 
-      // Upload ID document
+      // Upload ID document - make it optional
       let idDocumentUrl = '';
       if (idDocument) {
-        const formData = new FormData();
-        formData.append('file', idDocument);
-        formData.append('type', 'braider_id');
+        try {
+          const formData = new FormData();
+          formData.append('file', idDocument);
+          formData.append('type', 'braider_id');
 
-        const uploadRes = await fetch('/api/upload/braider-id', {
-          method: 'POST',
-          body: formData,
-        });
+          const uploadRes = await fetch('/api/upload/braider-id', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (!uploadRes.ok) {
-          throw new Error('Failed to upload ID document');
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            idDocumentUrl = uploadData.url;
+          } else {
+            const errorData = await uploadRes.json();
+            console.warn('ID upload warning:', errorData.error);
+            // Continue without URL - don't fail the signup
+          }
+        } catch (uploadErr) {
+          console.warn('ID upload error:', uploadErr);
+          // Continue without URL - don't fail the signup
         }
-
-        const uploadData = await uploadRes.json();
-        idDocumentUrl = uploadData.url;
       }
 
       // Create account

@@ -13,12 +13,12 @@ export async function GET() {
     // Get all braider profiles
     const { data: braiders, error: braiderError } = await supabase
       .from('braider_profiles')
-      .select('user_id, full_name, email, verification_status, rating_avg, rating_count')
+      .select('user_id, full_name, email, verification_status, rating_avg, rating_count, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (braiderError || !braiders) {
       console.error('Braiders error:', braiderError);
-      return NextResponse.json([]);
+      return NextResponse.json({ braiders: [], stats: { total: 0, pending: 0, approved: 0, rejected: 0 } });
     }
 
     // Get profile info for each braider
@@ -37,20 +37,30 @@ export async function GET() {
       const profile = profileMap[braider.user_id];
       return {
         id: braider.user_id,
-        braider_id: braider.user_id,
-        braider_name: braider.full_name || 'Unknown',
+        user_id: braider.user_id,
         email: braider.email || '',
+        full_name: braider.full_name || 'Unknown',
         phone: profile?.phone || '',
-        status: braider.verification_status || 'unverified',
+        verification_status: braider.verification_status || 'pending',
         rating: braider.rating_avg || 0,
         rating_count: braider.rating_count || 0,
         avatar_url: profile?.avatar_url || null,
+        created_at: braider.created_at,
+        updated_at: braider.updated_at,
       };
     });
 
-    return NextResponse.json(result);
+    // Calculate stats
+    const stats = {
+      total: result.length,
+      pending: result.filter(b => b.verification_status === 'pending').length,
+      approved: result.filter(b => b.verification_status === 'approved').length,
+      rejected: result.filter(b => b.verification_status === 'rejected').length,
+    };
+
+    return NextResponse.json({ braiders: result, stats });
   } catch (error) {
     console.error('Verification API error:', error);
-    return NextResponse.json([]);
+    return NextResponse.json({ braiders: [], stats: { total: 0, pending: 0, approved: 0, rejected: 0 } });
   }
 }

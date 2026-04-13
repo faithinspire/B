@@ -15,7 +15,7 @@ export async function GET() {
 
     if (usersError || !users) {
       console.error('Auth users error:', usersError);
-      return NextResponse.json([]);
+      return NextResponse.json({ users: [], stats: { total: 0, admins: 0, braiders: 0, customers: 0 } });
     }
 
     // Get profiles for all users
@@ -27,7 +27,7 @@ export async function GET() {
 
     if (profilesError) {
       console.error('Profiles error:', profilesError);
-      return NextResponse.json([]);
+      return NextResponse.json({ users: [], stats: { total: 0, admins: 0, braiders: 0, customers: 0 } });
     }
 
     // Get braider profiles for braiders
@@ -55,12 +55,21 @@ export async function GET() {
         rating: braider?.rating_avg || null,
         verification_status: braider?.verification_status || null,
         created_at: user.created_at,
+        last_sign_in_at: user.last_sign_in_at,
       };
     });
 
-    return NextResponse.json(result);
+    // Calculate stats
+    const stats = {
+      total: result.length,
+      admins: result.filter(u => u.role === 'admin').length,
+      braiders: result.filter(u => u.role === 'braider').length,
+      customers: result.filter(u => u.role === 'customer').length,
+    };
+
+    return NextResponse.json({ users: result, stats });
   } catch (error) {
     console.error('Users API error:', error);
-    return NextResponse.json([]);
+    return NextResponse.json({ users: [], stats: { total: 0, admins: 0, braiders: 0, customers: 0 } });
   }
 }
