@@ -1,94 +1,66 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+export async function GET() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
+    // Get all users from auth
+    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+
+    if (usersError || !users) {
+      console.error('Auth users error:', usersError);
+      return NextResponse.json([]);
+    }
+
+    // Get profiles for all users
+    const userIds = users.map(u => u.id);
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Profiles error:', profilesError);
+      return NextResponse.json([]);
+    }
+
+    // Get braider profiles for braiders
+    const { data: braiderProfiles } = await supabase
+      .from('braider_profiles')
+      .select('user_id, rating_avg, rating_count, verification_status')
+      .in('user_id', userIds);
+
+    const braiderMap = Object.fromEntries(
+      (braiderProfiles || []).map(bp => [bp.user_id, bp])
     );
 
-    // Fetch all users from auth
-    const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+    // Combine data
+    const result = users.map(user => {
+      const profile = profiles?.find(p => p.id === user.id);
+      const braider = braiderMap[user.id];
 
-    if (usersError) {
-      console.error('Users fetch error:', usersError);
-      return NextResponse.json(
-        { error: 'Failed to fetch users', details: usersError.message },
-        { status: 500 }
-      );
-    }
+      return {
+        id: user.id,
+        email: user.email || '',
+        full_name: profile?.full_name || user.email?.split('@')[0] || 'Unknown',
+        role: profile?.role || 'customer',
+        phone: profile?.phone || '',
+        avatar_url: profile?.avatar_url || null,
+        rating: braider?.rating_avg || null,
+        verification_status: braider?.verification_status || null,
+        created_at: user.created_at,
+      };
+    });
 
-    const userIds = (users?.users || []).map((u: any) => u.id);
-
-    // Fetch profiles
-    let profilesMap: Record<string, any> = {};
-    if (userIds.length > 0) {
-      try {
-        const { data: profiles, error: profilesError } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
-
-        if (!profilesError && profiles) {
-          profilesMap = Object.fromEntries(profiles.map(p => [p.id, p]));
-        }
-      } catch (err) {
-        console.warn('Warning: Could not fetch profiles:', err);
-      }
-    }
-
-    // Fetch bookings count
-    let bookingCountMap: Record<string, number> = {};
-    try {
-      const { data: bookings, error: bookingsError } = await supabaseAdmin
-        .from('bookings')
-        .select('customer_id');
-
-      if (!bookingsError && bookings) {
-        bookingCountMap = bookings.reduce((acc: any, b: any) => {
-          acc[b.customer_id] = (acc[b.customer_id] || 0) + 1;
-          return acc;
-        }, {});
-      }
-    } catch (err) {
-      console.warn('Warning: Could not fetch bookings:', err);
-    }
-
-    // Transform users with all details
-    const transformedUsers = (users?.users || [])
-      .map((u: any) => {
-        const profile = profilesMap[u.id];
-        const fullName = profile?.full_name || u.email?.split('@')[0] || 'Unknown User';
-        const email = u.email || '';
-        const role = profile?.role || u.user_metadata?.role || 'customer';
-        
-        return {
-          id: u.id,
-          email: email,
-          full_name: fullName,
-          phone: profile?.phone || '',
-          location: profile?.location || '',
-          role: role,
-          status: profile?.status || 'active',
-          created_at: u.created_at,
-          avatar_url: profile?.avatar_url || null,
-          booking_count: bookingCountMap[u.id] || 0,
-          next_of_kin: profile?.next_of_kin || null,
-          next_of_kin_phone: profile?.next_of_kin_phone || null,
-        };
-      })
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    return NextResponse.json(transformedUsers);
-  } catch (error: any) {
-    console.error('Admin users API error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Users API error:', error);
+    return NextResponse.json([]);
   }
 }

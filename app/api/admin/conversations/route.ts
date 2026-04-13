@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -8,69 +10,48 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    console.log('Fetching conversations...');
-    
-    // Fetch conversations - use actual schema columns
-    const { data: conversations, error: convErr } = await supabase
-      .from('conversations')
+    // Get all bookings (these are the "conversations" between customers and braiders)
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('bookings')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (convErr) {
-      console.error('Conversations error:', convErr);
+    if (bookingsError || !bookings) {
+      console.error('Bookings error:', bookingsError);
       return NextResponse.json([]);
     }
 
-    if (!conversations || conversations.length === 0) {
-      return NextResponse.json([]);
-    }
+    // Get customer and braider profiles
+    const customerIds = [...new Set(bookings.map(b => b.customer_id))];
+    const braiderIds = [...new Set(bookings.map(b => b.braider_id))];
+    const allIds = [...new Set([...customerIds, ...braiderIds])];
 
-    // Enrich with user names
-    const enriched = await Promise.all(
-      conversations.map(async (conv: any) => {
-        try {
-          const p1Id = conv.participant1_id;
-          const p2Id = conv.participant2_id;
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', allIds);
 
-          const { data: p1 } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', p1Id)
-            .single();
-
-          const { data: p2 } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', p2Id)
-            .single();
-
-          return {
-            id: conv.id,
-            participant1_id: p1Id,
-            participant2_id: p2Id,
-            participant1_name: p1?.full_name || 'Unknown',
-            participant2_name: p2?.full_name || 'Unknown',
-            last_message: conv.last_message || null,
-            last_message_time: conv.last_message_time || null,
-            created_at: conv.created_at,
-          };
-        } catch (err) {
-          console.warn('Error enriching conversation:', err);
-          return {
-            id: conv.id,
-            participant1_id: conv.participant1_id,
-            participant2_id: conv.participant2_id,
-            participant1_name: 'Unknown',
-            participant2_name: 'Unknown',
-            last_message: conv.last_message || null,
-            last_message_time: conv.last_message_time || null,
-            created_at: conv.created_at,
-          };
-        }
-      })
+    const profileMap = Object.fromEntries(
+      (profiles || []).map(p => [p.id, p])
     );
 
-    return NextResponse.json(enriched);
+    // Transform bookings to conversation format
+    const result = bookings.map(booking => ({
+      id: booking.id,
+      booking_id: booking.id,
+      customer_id: booking.customer_id,
+      braider_id: booking.braider_id,
+      customer_name: profileMap[booking.customer_id]?.full_name || 'Unknown Customer',
+      braider_name: profileMap[booking.braider_id]?.full_name || 'Unknown Braider',
+      status: booking.status,
+      appointment_date: booking.appointment_date,
+      total_amount: booking.total_amount,
+      notes: booking.notes,
+      created_at: booking.created_at,
+      updated_at: booking.updated_at,
+    }));
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Conversations API error:', error);
     return NextResponse.json([]);

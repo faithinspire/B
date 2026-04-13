@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -8,41 +10,45 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    console.log('Fetching braiders for verification...');
-
-    // Fetch all braiders
-    const { data: braiders, error: braiderErr } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone, verification_status')
-      .eq('role', 'braider')
+    // Get all braider profiles
+    const { data: braiders, error: braiderError } = await supabase
+      .from('braider_profiles')
+      .select('user_id, full_name, email, verification_status, rating_avg, rating_count')
       .order('created_at', { ascending: false });
 
-    if (braiderErr) {
-      console.error('Braiders fetch error:', braiderErr);
+    if (braiderError || !braiders) {
+      console.error('Braiders error:', braiderError);
       return NextResponse.json([]);
     }
 
-    if (!braiders || braiders.length === 0) {
-      return NextResponse.json([]);
-    }
+    // Get profile info for each braider
+    const userIds = braiders.map(b => b.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, phone, avatar_url')
+      .in('id', userIds);
 
-    // Transform to verification format
-    const verifications = braiders.map((braider: any) => ({
-      id: braider.id,
-      braider_id: braider.id,
-      braider_name: braider.full_name || 'Unknown',
-      email: braider.email || '',
-      phone: braider.phone || '',
-      status: braider.verification_status || 'pending',
-      document_type: 'ID Document',
-      document_url: null,
-      submitted_at: new Date().toISOString(),
-      verified_at: null,
-      verified_by: null,
-      notes: null,
-    }));
+    const profileMap = Object.fromEntries(
+      (profiles || []).map(p => [p.id, p])
+    );
 
-    return NextResponse.json(verifications);
+    // Combine data
+    const result = braiders.map(braider => {
+      const profile = profileMap[braider.user_id];
+      return {
+        id: braider.user_id,
+        braider_id: braider.user_id,
+        braider_name: braider.full_name || 'Unknown',
+        email: braider.email || '',
+        phone: profile?.phone || '',
+        status: braider.verification_status || 'unverified',
+        rating: braider.rating_avg || 0,
+        rating_count: braider.rating_count || 0,
+        avatar_url: profile?.avatar_url || null,
+      };
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Verification API error:', error);
     return NextResponse.json([]);

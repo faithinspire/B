@@ -8,60 +8,67 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const conversationId = params.id;
-    console.log(`Fetching messages for conversation: ${conversationId}`);
+    const bookingId = params.id;
 
-    if (!conversationId) {
-      return NextResponse.json({ messages: [] });
+    if (!bookingId) {
+      return NextResponse.json({ booking: null, notes: [] });
     }
 
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
+      process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     );
 
-    // Fetch messages - try both possible column names
-    let messages: any[] = [];
-    
-    // Try with conversation_id first
-    const { data: msgData1, error: err1 } = await supabaseAdmin
-      .from('messages')
+    // Get booking details
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
       .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .eq('id', bookingId)
+      .single();
 
-    if (!err1 && msgData1) {
-      messages = msgData1;
-    } else {
-      console.warn('conversation_id query failed, trying alternative...');
-      // Fallback - return empty
-      messages = [];
+    if (bookingError || !booking) {
+      console.error('Booking error:', bookingError);
+      return NextResponse.json({ booking: null, notes: [] });
     }
 
-    // Get sender names
-    const senderIds = [...new Set((messages || []).map((m: any) => m.sender_id))];
-    let sendersMap: Record<string, string> = {};
+    // Get customer and braider profiles
+    const { data: customerProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', booking.customer_id)
+      .single();
 
-    if (senderIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', senderIds);
+    const { data: braiderProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', booking.braider_id)
+      .single();
 
-      if (profiles) {
-        sendersMap = Object.fromEntries(profiles.map((p: any) => [p.id, p.full_name]));
-      }
-    }
+    // Get reviews for this booking (these are like "messages" about the booking)
+    const { data: reviews } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('booking_id', bookingId);
 
-    const transformed = (messages || []).map((m: any) => ({
-      ...m,
-      sender_name: sendersMap[m.sender_id] || 'Unknown',
+    const notes = (reviews || []).map(review => ({
+      id: review.id,
+      booking_id: review.booking_id,
+      reviewer_id: review.reviewer_id,
+      rating: review.rating,
+      comment: review.comment,
+      created_at: review.created_at,
     }));
 
-    return NextResponse.json({ messages: transformed });
+    return NextResponse.json({
+      booking: {
+        ...booking,
+        customer_name: customerProfile?.full_name || 'Unknown',
+        braider_name: braiderProfile?.full_name || 'Unknown',
+      },
+      notes,
+    });
   } catch (error) {
-    console.error('Messages API error:', error);
-    return NextResponse.json({ messages: [] });
+    console.error('Booking details API error:', error);
+    return NextResponse.json({ booking: null, notes: [] });
   }
 }
