@@ -47,9 +47,10 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       // Fetch user profile - CRITICAL for getting correct role
       let profile = null;
+      let role = 'customer'; // Default role
       
       // Try to fetch profile with aggressive retries
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 15; i++) {
         try {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
@@ -60,47 +61,63 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           if (profileError) {
             if (profileError.code === 'PGRST116') {
               // No rows returned - profile doesn't exist yet
-              console.warn('=== AUTH STORE: Profile not found, using auth metadata ===');
-              if (session.user.user_metadata?.role) {
-                profile = {
-                  id: session.user.id,
-                  email: session.user.email,
-                  full_name: session.user.user_metadata?.full_name || session.user.email,
-                  role: session.user.user_metadata?.role,
-                  created_at: session.user.created_at,
-                  updated_at: new Date().toISOString(),
-                };
-                break;
-              }
-              if (i < 9) {
-                await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+              console.warn('=== AUTH STORE: Profile not found on attempt', i + 1);
+              if (i < 14) {
+                await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
                 continue;
               }
             } else {
               throw profileError;
             }
-          } else {
-            console.log('=== AUTH STORE: Profile found ===', { role: profileData?.role });
+          } else if (profileData) {
+            console.log('=== AUTH STORE: Profile found ===', { role: profileData.role, email: profileData.email });
             profile = profileData;
+            role = profileData.role || 'customer';
             break;
           }
         } catch (err) {
-          if (i < 9) {
-            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          console.warn('=== AUTH STORE: Profile fetch error on attempt', i + 1, err instanceof Error ? err.message : err);
+          if (i < 14) {
+            await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
           }
         }
       }
 
-      // CRITICAL: Get role from profile.role FIRST, then auth metadata
-      const role = profile?.role || session.user.user_metadata?.role || 'customer';
+      // If profile still not found, check braider_profiles as fallback
+      if (!profile) {
+        console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
+        try {
+          const { data: braiderProfile } = await supabase
+            .from('braider_profiles')
+            .select('user_id')
+            .eq('user_id', session.user.id)
+            .single();
+
+          if (braiderProfile) {
+            console.log('=== AUTH STORE: Found braider_profiles record, user is a braider ===');
+            role = 'braider';
+          }
+        } catch (err) {
+          console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
+        }
+      }
+
+      // CRITICAL: Get role from profile.role FIRST, then braider check, then auth metadata, then default
+      const finalRole = profile?.role || role || session.user.user_metadata?.role || 'customer';
       
-      console.log('=== AUTH STORE: Setting user with role ===', { role, email: session.user.email });
+      console.log('=== AUTH STORE: Final role determination ===', { 
+        profileRole: profile?.role,
+        braiderCheckRole: role,
+        authRole: session.user.user_metadata?.role,
+        finalRole,
+        email: session.user.email 
+      });
 
       set({
         user: {
           id: session.user.id,
           email: session.user.email || '',
-          role: role as 'customer' | 'braider' | 'admin',
+          role: finalRole as 'customer' | 'braider' | 'admin',
           full_name: profile?.full_name || session.user.user_metadata?.full_name || '',
           avatar_url: profile?.avatar_url,
         },
@@ -233,14 +250,36 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       // If profile doesn't exist, create a default one with correct role from auth metadata
       if (!profile) {
-        console.log('=== AUTH STORE: Profile not found, creating default ===', { role: authData.user.user_metadata?.role });
+        console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
+        
+        // Check if user is a braider
+        let isBraider = false;
+        try {
+          const { data: braiderProfile } = await supabase
+            .from('braider_profiles')
+            .select('user_id')
+            .eq('user_id', authData.user.id)
+            .single();
+
+          if (braiderProfile) {
+            console.log('=== AUTH STORE: Found braider_profiles record, user is a braider ===');
+            isBraider = true;
+          }
+        } catch (err) {
+          console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
+        }
+
+        console.log('=== AUTH STORE: Creating default profile ===', { 
+          role: isBraider ? 'braider' : (authData.user.user_metadata?.role || 'customer')
+        });
+
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .upsert({
             id: authData.user.id,
             email: authData.user.email || '',
             full_name: authData.user.user_metadata?.full_name || '',
-            role: authData.user.user_metadata?.role || 'customer',
+            role: isBraider ? 'braider' : (authData.user.user_metadata?.role || 'customer'),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }, {
@@ -339,8 +378,26 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           console.error('Failed to fetch profile:', err);
         }
 
-        // Get role from profile.role first, then auth metadata, then default to customer
-        const role = profile?.role || session.user.user_metadata?.role || 'customer';
+        // Get role from profile.role first, then check braider_profiles, then auth metadata, then default to customer
+        let role = profile?.role || session.user.user_metadata?.role || 'customer';
+
+        // If role is still customer, check if user is a braider
+        if (role === 'customer') {
+          try {
+            const { data: braiderProfile } = await supabase
+              .from('braider_profiles')
+              .select('user_id')
+              .eq('user_id', session.user.id)
+              .single();
+
+            if (braiderProfile) {
+              console.log('=== AUTH STORE: fetchUser found braider_profiles record ===');
+              role = 'braider';
+            }
+          } catch (err) {
+            // Silent fail - braider profile doesn't exist
+          }
+        }
 
         set({
           user: {
