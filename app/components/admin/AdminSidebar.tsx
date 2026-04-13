@@ -18,12 +18,12 @@ import {
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/admin/dashboard' },
   { icon: CheckCircle, label: 'Verification', href: '/admin/verification' },
   { icon: CheckCircle, label: 'Braiders', href: '/admin/braiders' },
   { icon: Users, label: 'Users', href: '/admin/users' },
   { icon: Calendar, label: 'Bookings', href: '/admin/bookings' },
-  { icon: MessageSquare, label: 'Messages', href: '/admin/messages' },
+  { icon: MessageSquare, label: 'Conversations', href: '/admin/conversations' },
   { icon: CreditCard, label: 'Payments', href: '/admin/payments' },
   { icon: AlertCircle, label: 'Disputes', href: '/admin/disputes' },
 ];
@@ -71,7 +71,7 @@ export function AdminSidebar() {
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const isActive = pathname ? (pathname === item.href || pathname.startsWith(item.href + '/')) : false;
 
               return (
                 <Link
