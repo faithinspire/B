@@ -20,6 +20,7 @@ interface AuthStore {
   initializeSession: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
+  forceRefreshRole: () => Promise<void>;
 }
 
 export const useSupabaseAuthStore = create<AuthStore>((set) => ({
@@ -460,6 +461,39 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       throw error;
     } finally {
       set({ loading: false });
+    }
+  },
+
+  forceRefreshRole: async () => {
+    const { user } = useSupabaseAuthStore.getState();
+    if (!user) return;
+
+    try {
+      console.log('=== AUTH STORE: Force refreshing role ===', { userId: user.id });
+      
+      // Call the refresh-role endpoint to get the correct role
+      const response = await fetch('/api/auth/refresh-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh role');
+      }
+
+      const data = await response.json();
+      console.log('=== AUTH STORE: Force refresh result ===', data);
+
+      // Update the store with the correct role
+      if (data.correctRole && data.correctRole !== user.role) {
+        console.log('=== AUTH STORE: Updating role from', user.role, 'to', data.correctRole);
+        set({
+          user: { ...user, role: data.correctRole as 'customer' | 'braider' | 'admin' }
+        });
+      }
+    } catch (error) {
+      console.error('=== AUTH STORE: Force refresh failed ===', error);
     }
   },
 }));

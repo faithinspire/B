@@ -40,6 +40,35 @@ export function RoleBasedRedirect() {
 
     console.log('=== ROLE REDIRECT: Checking redirect ===', { role: user.role, pathname, redirectAttempted: redirectAttempted.current });
 
+    // If on braider dashboard but role is not braider, verify the role first
+    if (pathname?.startsWith('/braider/dashboard') && user.role !== 'braider') {
+      console.log('=== ROLE REDIRECT: On braider dashboard but role is not braider, verifying ===', { role: user.role });
+      fetch('/api/auth/refresh-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log('=== ROLE REDIRECT: Role verification result ===', data);
+          if (data.correctRole === 'braider') {
+            // User should be a braider, update store and reload
+            useSupabaseAuthStore.setState({
+              user: { ...user, role: 'braider' }
+            });
+            window.location.href = '/braider/dashboard';
+          } else {
+            // Not a braider, redirect to customer dashboard
+            router.push('/dashboard');
+          }
+        })
+        .catch(err => {
+          console.error('=== ROLE REDIRECT: Role verification failed ===', err);
+          router.push('/dashboard');
+        });
+      return;
+    }
+
     // List of paths where we should NOT redirect (public pages, auth pages, etc.)
     const noRedirectPaths = [
       '/login',
