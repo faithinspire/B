@@ -21,8 +21,45 @@ export default function BraiderDashboard() {
 
   // Check auth
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'braider')) {
+    if (authLoading) return;
+
+    if (!user) {
+      console.log('=== BRAIDER DASHBOARD: No user, redirecting to login ===');
       router.push('/login');
+      return;
+    }
+
+    if (user.role !== 'braider') {
+      console.log('=== BRAIDER DASHBOARD: User role is not braider ===', { role: user.role, userId: user.id });
+      // Check what the correct role should be
+      fetch('/api/auth/refresh-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log('=== BRAIDER DASHBOARD: Refresh role result ===', data);
+          
+          if (data.correctRole === 'braider') {
+            // User should be a braider, update the store and do a hard reload
+            console.log('=== BRAIDER DASHBOARD: User should be braider, updating store and reloading ===');
+            useSupabaseAuthStore.setState({
+              user: { ...user, role: 'braider' }
+            });
+            // Hard reload to get fresh data from server
+            window.location.href = '/braider/dashboard';
+          } else {
+            // Not a braider, redirect to customer dashboard
+            console.log('=== BRAIDER DASHBOARD: User is not a braider, redirecting ===');
+            router.push('/dashboard');
+          }
+        })
+        .catch(err => {
+          console.error('=== BRAIDER DASHBOARD: Role refresh failed ===', err);
+          router.push('/dashboard');
+        });
+      return;
     }
   }, [user, authLoading, router]);
 
