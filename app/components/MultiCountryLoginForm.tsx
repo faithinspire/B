@@ -7,6 +7,7 @@ import { CountrySelector } from './CountrySelector';
 import { PhoneInput } from './PhoneInput';
 import { AlertCircle, Loader } from 'lucide-react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { supabase } from '@/lib/supabase';
 
 interface MultiCountryLoginFormProps {
   onSuccess?: () => void;
@@ -75,15 +76,36 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
 
         console.log('=== LOGIN FORM: User role after login ===', { role: user?.role, email: user?.email });
 
+        // If role is still customer but user has braider_profiles, they're a braider
+        if (user?.role === 'customer' && user?.id) {
+          console.log('=== LOGIN FORM: Role is customer, checking braider_profiles ===');
+          const { data: braiderProfile } = await supabase
+            .from('braider_profiles')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (braiderProfile) {
+            console.log('=== LOGIN FORM: Found braider_profiles record, user is actually a braider ===');
+            // Update the store with correct role
+            useSupabaseAuthStore.setState({
+              user: { ...user, role: 'braider' }
+            });
+          }
+        }
+
+        // Get updated user
+        const { user: updatedUser } = useSupabaseAuthStore.getState();
+
         // Success - redirect based on role
         if (onSuccess) {
           onSuccess();
         } else {
           // Redirect based on user role
-          if (user?.role === 'braider') {
+          if (updatedUser?.role === 'braider') {
             console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
             router.push('/braider/dashboard');
-          } else if (user?.role === 'admin') {
+          } else if (updatedUser?.role === 'admin') {
             console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
             router.push('/admin');
           } else {

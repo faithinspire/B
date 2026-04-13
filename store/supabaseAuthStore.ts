@@ -196,6 +196,8 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       if (authError) throw authError;
       if (!authData.user) throw new Error('Failed to sign in');
 
+      console.log('=== AUTH STORE: User signed in ===', { userId: authData.user.id, email: authData.user.email });
+
       // Fetch user profile with aggressive retry logic
       let profile = null;
       let retries = 15; // Increased from 10 to 15 for better reliability
@@ -213,9 +215,13 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
             throw profileError;
           }
 
-          profile = profileData;
-          break;
+          if (profileData) {
+            console.log('=== AUTH STORE: Profile fetched ===', { role: profileData.role, email: profileData.email });
+            profile = profileData;
+            break;
+          }
         } catch (err) {
+          console.warn('=== AUTH STORE: Profile fetch attempt failed ===', { retries, error: err instanceof Error ? err.message : err });
           retries--;
           if (retries > 0) {
             // Exponential backoff with longer delays
@@ -225,9 +231,10 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         }
       }
 
-      // If profile doesn't exist, create a default one with correct role
+      // If profile doesn't exist, create a default one with correct role from auth metadata
       if (!profile) {
-        const { data: newProfile } = await supabase
+        console.log('=== AUTH STORE: Profile not found, creating default ===', { role: authData.user.user_metadata?.role });
+        const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .upsert({
             id: authData.user.id,
@@ -242,11 +249,21 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           .select()
           .single();
 
+        if (createError) {
+          console.error('=== AUTH STORE: Failed to create profile ===', createError);
+        }
         profile = newProfile;
       }
 
-      // CRITICAL: Get role from profile.role FIRST, then auth metadata
+      // CRITICAL: Get role from profile.role FIRST, then auth metadata, then default to customer
       const role = profile?.role || authData.user.user_metadata?.role || 'customer';
+
+      console.log('=== AUTH STORE: Final role determination ===', { 
+        profileRole: profile?.role, 
+        authRole: authData.user.user_metadata?.role,
+        finalRole: role,
+        email: authData.user.email 
+      });
 
       set({
         user: {
@@ -259,6 +276,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
+      console.error('=== AUTH STORE: Sign in error ===', errorMessage);
       set({ error: errorMessage });
       throw error;
     } finally {
