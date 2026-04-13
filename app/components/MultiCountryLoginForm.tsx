@@ -76,6 +76,34 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
 
         console.log('=== LOGIN FORM: User role after login ===', { role: user?.role, email: user?.email });
 
+        // Verify and fix role if needed
+        if (user?.id) {
+          try {
+            console.log('=== LOGIN FORM: Verifying user role ===');
+            const verifyResponse = await fetch('/api/auth/verify-role', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user.id }),
+            });
+
+            if (verifyResponse.ok) {
+              const verifyData = await verifyResponse.json();
+              console.log('=== LOGIN FORM: Role verification result ===', verifyData);
+
+              // If role was updated, update the store
+              if (verifyData.action === 'updated' && verifyData.newRole) {
+                console.log('=== LOGIN FORM: Role was updated, updating store ===', { newRole: verifyData.newRole });
+                useSupabaseAuthStore.setState({
+                  user: { ...user, role: verifyData.newRole as 'customer' | 'braider' | 'admin' }
+                });
+              }
+            }
+          } catch (verifyErr) {
+            console.warn('=== LOGIN FORM: Role verification failed ===', verifyErr instanceof Error ? verifyErr.message : verifyErr);
+            // Continue anyway - don't block login
+          }
+        }
+
         // If role is still customer but user has braider_profiles, they're a braider
         if (user?.role === 'customer' && user?.id) {
           console.log('=== LOGIN FORM: Role is customer, checking braider_profiles ===');
