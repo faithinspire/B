@@ -67,6 +67,9 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
       try {
         await signIn(loginEmail, password);
 
+        // Wait a moment for the store to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Get the user from the store to check their role
         const { user } = useSupabaseAuthStore.getState();
 

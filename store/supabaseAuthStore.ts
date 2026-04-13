@@ -198,7 +198,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       // Fetch user profile with aggressive retry logic
       let profile = null;
-      let retries = 10;
+      let retries = 15; // Increased from 10 to 15 for better reliability
       
       while (retries > 0 && !profile) {
         try {
@@ -218,8 +218,8 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         } catch (err) {
           retries--;
           if (retries > 0) {
-            // Exponential backoff
-            const delay = (11 - retries) * 500;
+            // Exponential backoff with longer delays
+            const delay = (16 - retries) * 400; // Increased delay for better reliability
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
