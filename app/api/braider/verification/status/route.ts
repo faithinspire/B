@@ -9,18 +9,30 @@ export async function GET(request: NextRequest) {
       { auth: { persistSession: false } }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Get user from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify token and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data: verification, error } = await supabase
       .from('braider_verification')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (error && error.code !== 'PGRST116') {
+      console.error('Verification fetch error:', error);
       throw error;
     }
 

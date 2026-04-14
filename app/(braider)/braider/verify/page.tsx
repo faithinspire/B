@@ -60,29 +60,46 @@ export default function BraiderVerificationPage() {
 
   const fetchVerificationStatus = async () => {
     try {
+      // Get the auth token from Supabase
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        setError('Authentication required');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('/api/braider/verification/status', {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       });
 
-      if (response.ok) {
+      if (!response.ok) {
         const data = await response.json();
-        setStatus(data.status || 'not_started');
-        if (data.verification) {
-          setFormData(prev => ({
-            ...prev,
-            ...data.verification,
-          }));
-          if (data.verification.id_document_url) {
-            setIdPreview(data.verification.id_document_url);
-          }
-          if (data.verification.selfie_url) {
-            setSelfiePreview(data.verification.selfie_url);
-          }
+        throw new Error(data.error || 'Failed to fetch verification status');
+      }
+
+      const data = await response.json();
+      setStatus(data.status || 'not_started');
+      if (data.verification) {
+        setFormData(prev => ({
+          ...prev,
+          ...data.verification,
+        }));
+        if (data.verification.id_document_url) {
+          setIdPreview(data.verification.id_document_url);
+        }
+        if (data.verification.selfie_url) {
+          setSelfiePreview(data.verification.selfie_url);
         }
       }
     } catch (err) {
       console.error('Failed to fetch verification status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load verification status');
     } finally {
       setLoading(false);
     }

@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         action: 'created',
+        correctRole,
         role: correctRole,
         message: `Created profile with role ${correctRole}`,
       })
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         action: 'updated',
+        correctRole,
         oldRole: profile.role,
         newRole: correctRole,
         message: `Updated role from ${profile.role} to ${correctRole}`,
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       action: 'verified',
+      correctRole,
       role: profile.role,
       message: `Role is correct: ${profile.role}`,
     })

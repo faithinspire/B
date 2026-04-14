@@ -160,7 +160,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
     set({ loading: true, error: null });
     try {
-      // Create auth user
+      // Create auth user with role in metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -174,6 +174,8 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       if (authError) throw authError;
       if (!authData.user) throw new Error('Failed to create user');
+
+      console.log('=== AUTH STORE: User signed up ===', { userId: authData.user.id, email, role });
 
       // Upsert profile in database (insert or update if exists)
       const { error: profileError } = await supabase
@@ -190,6 +192,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         });
 
       if (profileError) {
+        console.warn('=== AUTH STORE: Profile upsert error (may be RLS) ===', profileError);
         // If upsert fails, try to fetch existing profile
         const { data: existingProfile } = await supabase
           .from('profiles')
@@ -198,18 +201,22 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           .single();
 
         if (!existingProfile) {
-          throw profileError;
+          console.warn('=== AUTH STORE: Profile does not exist, but continuing with auth metadata ===');
+          // Continue anyway - we'll use auth metadata as source of truth
         }
       }
 
+      // Set user with role from auth metadata (source of truth for new users)
       set({
         user: {
           id: authData.user.id,
           email,
-          role,
+          role: role as 'customer' | 'braider' | 'admin',
           full_name: fullName,
         },
       });
+
+      console.log('=== AUTH STORE: Sign up complete, user set with role ===', { role });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       set({ error: errorMessage });
