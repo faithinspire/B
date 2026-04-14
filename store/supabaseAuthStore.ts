@@ -103,8 +103,16 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         }
       }
 
-      // CRITICAL: Get role from profile.role FIRST, then braider check, then auth metadata, then default
-      const finalRole = profile?.role || role || session.user.user_metadata?.role || 'customer';
+      // CRITICAL FIX: If auth metadata says 'braider' but profile not found, trust auth metadata
+      // This handles the race condition where profile replication is delayed
+      if (!profile && session.user.user_metadata?.role === 'braider') {
+        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, trusting auth metadata ===');
+        role = 'braider';
+      }
+
+      // CRITICAL: Get role from profile.role FIRST, then auth metadata, then braider check, then default
+      // NOTE: Check auth metadata BEFORE braider check to avoid defaulting to 'customer' too early
+      const finalRole = profile?.role || session.user.user_metadata?.role || role || 'customer';
       
       console.log('=== AUTH STORE: Final role determination ===', { 
         profileRole: profile?.role,
@@ -295,8 +303,14 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         profile = newProfile;
       }
 
-      // CRITICAL: Get role from profile.role FIRST, then auth metadata, then default to customer
-      const role = profile?.role || authData.user.user_metadata?.role || 'customer';
+      // CRITICAL FIX: If profile not found but auth metadata says 'braider', trust auth metadata
+      // This handles the race condition where profile replication is delayed
+      let role = profile?.role || authData.user.user_metadata?.role || 'customer';
+      
+      if (!profile && authData.user.user_metadata?.role === 'braider') {
+        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, trusting auth metadata ===');
+        role = 'braider';
+      }
 
       console.log('=== AUTH STORE: Final role determination ===', { 
         profileRole: profile?.role, 
