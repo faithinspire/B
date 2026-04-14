@@ -38,7 +38,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      console.log('=== AUTH STORE: Session check ===', { hasSession: !!session, userId: session?.user?.id });
+      console.log('=== AUTH STORE: Session check ===', { hasSession: !!session, userId: session?.user?.id, authRole: session?.user?.user_metadata?.role });
 
       if (!session?.user) {
         console.log('=== AUTH STORE: No session, setting user to null ===');
@@ -46,12 +46,15 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         return;
       }
 
+      // CRITICAL: Check auth metadata FIRST for role - this is the source of truth for newly registered users
+      const authRole = session.user.user_metadata?.role;
+      console.log('=== AUTH STORE: Auth metadata role ===', { authRole });
+
       // Fetch user profile - CRITICAL for getting correct role
       let profile = null;
-      let role = 'customer'; // Default role
       
       // Try to fetch profile with aggressive retries
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 20; i++) {
         try {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
@@ -63,7 +66,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
             if (profileError.code === 'PGRST116') {
               // No rows returned - profile doesn't exist yet
               console.warn('=== AUTH STORE: Profile not found on attempt', i + 1);
-              if (i < 14) {
+              if (i < 19) {
                 await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
                 continue;
               }
@@ -73,18 +76,18 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           } else if (profileData) {
             console.log('=== AUTH STORE: Profile found ===', { role: profileData.role, email: profileData.email });
             profile = profileData;
-            role = profileData.role || 'customer';
             break;
           }
         } catch (err) {
           console.warn('=== AUTH STORE: Profile fetch error on attempt', i + 1, err instanceof Error ? err.message : err);
-          if (i < 14) {
+          if (i < 19) {
             await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
           }
         }
       }
 
       // If profile still not found, check braider_profiles as fallback
+      let isBraider = false;
       if (!profile) {
         console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
         try {
@@ -96,28 +99,38 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
           if (braiderProfile) {
             console.log('=== AUTH STORE: Found braider_profiles record, user is a braider ===');
-            role = 'braider';
+            isBraider = true;
           }
         } catch (err) {
           console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
         }
       }
 
-      // CRITICAL FIX: If auth metadata says 'braider' but profile not found, trust auth metadata
-      // This handles the race condition where profile replication is delayed
-      if (!profile && session.user.user_metadata?.role === 'braider') {
-        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, trusting auth metadata ===');
-        role = 'braider';
+      // CRITICAL FIX: Determine role with proper priority
+      // 1. If profile exists, use profile.role
+      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider'
+      // 3. If profile doesn't exist but braider_profiles exists, use 'braider'
+      // 4. Otherwise use auth metadata role or default to 'customer'
+      let finalRole: 'customer' | 'braider' | 'admin' = 'customer';
+      
+      if (profile?.role) {
+        finalRole = profile.role as 'customer' | 'braider' | 'admin';
+        console.log('=== AUTH STORE: Using profile role ===', { finalRole });
+      } else if (authRole === 'braider') {
+        finalRole = 'braider';
+        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, using braider ===');
+      } else if (isBraider) {
+        finalRole = 'braider';
+        console.log('=== AUTH STORE: Profile not found but braider_profiles exists, using braider ===');
+      } else if (authRole) {
+        finalRole = authRole as 'customer' | 'braider' | 'admin';
+        console.log('=== AUTH STORE: Using auth metadata role ===', { finalRole });
       }
 
-      // CRITICAL: Get role from profile.role FIRST, then auth metadata, then braider check, then default
-      // NOTE: Check auth metadata BEFORE braider check to avoid defaulting to 'customer' too early
-      const finalRole = profile?.role || session.user.user_metadata?.role || role || 'customer';
-      
       console.log('=== AUTH STORE: Final role determination ===', { 
         profileRole: profile?.role,
-        braiderCheckRole: role,
-        authRole: session.user.user_metadata?.role,
+        authRole,
+        isBraider,
         finalRole,
         email: session.user.email 
       });
@@ -126,7 +139,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         user: {
           id: session.user.id,
           email: session.user.email || '',
-          role: finalRole as 'customer' | 'braider' | 'admin',
+          role: finalRole,
           full_name: profile?.full_name || session.user.user_metadata?.full_name || '',
           avatar_url: profile?.avatar_url,
         },
@@ -222,11 +235,15 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       if (authError) throw authError;
       if (!authData.user) throw new Error('Failed to sign in');
 
-      console.log('=== AUTH STORE: User signed in ===', { userId: authData.user.id, email: authData.user.email });
+      console.log('=== AUTH STORE: User signed in ===', { userId: authData.user.id, email: authData.user.email, authRole: authData.user.user_metadata?.role });
+
+      // CRITICAL: Check auth metadata FIRST for role - this is the source of truth for newly registered users
+      const authRole = authData.user.user_metadata?.role;
+      console.log('=== AUTH STORE: Auth metadata role ===', { authRole });
 
       // Fetch user profile with aggressive retry logic
       let profile = null;
-      let retries = 15; // Increased from 10 to 15 for better reliability
+      let retries = 20; // Increased to 20 for better reliability with replication delays
       
       while (retries > 0 && !profile) {
         try {
@@ -251,18 +268,17 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           retries--;
           if (retries > 0) {
             // Exponential backoff with longer delays
-            const delay = (16 - retries) * 400; // Increased delay for better reliability
+            const delay = (21 - retries) * 300; // Increased delay for better reliability
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
 
-      // If profile doesn't exist, create a default one with correct role from auth metadata
+      // If profile doesn't exist, check braider_profiles as fallback
+      let isBraider = false;
       if (!profile) {
         console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
         
-        // Check if user is a braider
-        let isBraider = false;
         try {
           const { data: braiderProfile } = await supabase
             .from('braider_profiles')
@@ -277,45 +293,34 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         } catch (err) {
           console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
         }
-
-        console.log('=== AUTH STORE: Creating default profile ===', { 
-          role: isBraider ? 'braider' : (authData.user.user_metadata?.role || 'customer')
-        });
-
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: authData.user.id,
-            email: authData.user.email || '',
-            full_name: authData.user.user_metadata?.full_name || '',
-            role: isBraider ? 'braider' : (authData.user.user_metadata?.role || 'customer'),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id',
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('=== AUTH STORE: Failed to create profile ===', createError);
-        }
-        profile = newProfile;
       }
 
-      // CRITICAL FIX: If profile not found but auth metadata says 'braider', trust auth metadata
-      // This handles the race condition where profile replication is delayed
-      let role = profile?.role || authData.user.user_metadata?.role || 'customer';
+      // CRITICAL FIX: Determine role with proper priority
+      // 1. If profile exists, use profile.role
+      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider'
+      // 3. If profile doesn't exist but braider_profiles exists, use 'braider'
+      // 4. Otherwise use auth metadata role or default to 'customer'
+      let finalRole: 'customer' | 'braider' | 'admin' = 'customer';
       
-      if (!profile && authData.user.user_metadata?.role === 'braider') {
-        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, trusting auth metadata ===');
-        role = 'braider';
+      if (profile?.role) {
+        finalRole = profile.role as 'customer' | 'braider' | 'admin';
+        console.log('=== AUTH STORE: Using profile role ===', { finalRole });
+      } else if (authRole === 'braider') {
+        finalRole = 'braider';
+        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, using braider ===');
+      } else if (isBraider) {
+        finalRole = 'braider';
+        console.log('=== AUTH STORE: Profile not found but braider_profiles exists, using braider ===');
+      } else if (authRole) {
+        finalRole = authRole as 'customer' | 'braider' | 'admin';
+        console.log('=== AUTH STORE: Using auth metadata role ===', { finalRole });
       }
 
       console.log('=== AUTH STORE: Final role determination ===', { 
-        profileRole: profile?.role, 
-        authRole: authData.user.user_metadata?.role,
-        finalRole: role,
+        profileRole: profile?.role,
+        authRole,
+        isBraider,
+        finalRole,
         email: authData.user.email 
       });
 
@@ -323,8 +328,8 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
         user: {
           id: authData.user.id,
           email: authData.user.email || '',
-          role: role as 'customer' | 'braider' | 'admin',
-          full_name: profile?.full_name || '',
+          role: finalRole,
+          full_name: profile?.full_name || authData.user.user_metadata?.full_name || '',
           avatar_url: profile?.avatar_url,
         },
       });
