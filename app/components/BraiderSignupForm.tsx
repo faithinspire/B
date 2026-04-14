@@ -252,6 +252,31 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
         return;
       }
 
+      // CRITICAL: Ensure profile is created with correct role immediately after signup
+      // This handles the case where the profile table hasn't replicated yet
+      try {
+        const ensureRes = await fetch('/api/auth/ensure-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email,
+            fullName,
+            role: 'braider',
+          }),
+        });
+
+        if (!ensureRes.ok) {
+          console.warn('Failed to ensure profile:', await ensureRes.json());
+          // Continue anyway - profile might already exist
+        } else {
+          console.log('Profile ensured:', await ensureRes.json());
+        }
+      } catch (err) {
+        console.warn('Ensure profile error:', err);
+        // Continue anyway - profile might already exist
+      }
+
       if (onSuccess) {
         onSuccess();
       } else {

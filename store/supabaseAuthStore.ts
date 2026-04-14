@@ -108,7 +108,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       // CRITICAL FIX: Determine role with proper priority
       // 1. If profile exists, use profile.role
-      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider'
+      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider' (NEWLY REGISTERED)
       // 3. If profile doesn't exist but braider_profiles exists, use 'braider'
       // 4. Otherwise use auth metadata role or default to 'customer'
       let finalRole: 'customer' | 'braider' | 'admin' = 'customer';
