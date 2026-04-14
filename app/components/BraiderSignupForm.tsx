@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CountryCode, normalizePhoneNumber, validatePhoneNumber } from '@/lib/countries';
 import { NIGERIAN_STATES, BRAIDING_SERVICES, IDENTIFICATION_TYPES, NigerianState } from '@/lib/nigerian-locations';
+import { USA_STATES, USAState } from '@/lib/usa-locations';
 import { CountrySelector } from './CountrySelector';
 import { PhoneInput } from './PhoneInput';
 import { AlertCircle, Loader, CheckCircle, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -27,7 +28,7 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   
   // Location Info
-  const [state, setState] = useState<NigerianState>('Lagos');
+  const [state, setState] = useState<NigerianState | USAState>('Lagos');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   
@@ -277,8 +278,14 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
     }
   };
 
-  const statesList = Object.keys(NIGERIAN_STATES) as NigerianState[];
-  const citiesList = state ? NIGERIAN_STATES[state] : [];
+  // Get states and cities based on country
+  const statesList = country === 'NG' 
+    ? Object.keys(NIGERIAN_STATES) as NigerianState[]
+    : Object.keys(USA_STATES) as USAState[];
+  
+  const citiesList = country === 'NG'
+    ? (state ? NIGERIAN_STATES[state as NigerianState] : [])
+    : (state ? USA_STATES[state as USAState] : []);
 
   return (
     <div className="space-y-6">
@@ -334,7 +341,16 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
           <>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</h2>
             
-            <CountrySelector value={country} onChange={setCountry} label="Country" />
+            <CountrySelector 
+              value={country} 
+              onChange={(newCountry) => {
+                setCountry(newCountry);
+                // Reset state and city when country changes
+                setState(newCountry === 'NG' ? 'Lagos' : 'Alabama');
+                setCity('');
+              }} 
+              label="Country" 
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>

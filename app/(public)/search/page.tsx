@@ -69,19 +69,33 @@ function SearchContent() {
       });
 
       // Search by location or style
-      const location = searchParams.get('location');
-      const style = searchParams.get('style');
+      const location = searchParams?.get('location');
+      const style = searchParams?.get('style');
+      const country = searchParams?.get('country') || 'NG';
 
       if (location) {
-        results = results.filter(b => 
-          b.full_name.toLowerCase().includes(location.toLowerCase()) ||
-          b.bio.toLowerCase().includes(location.toLowerCase())
-        );
+        // Filter by state/city/country
+        results = results.filter(b => {
+          const locationMatch = 
+            b.state?.toLowerCase().includes(location.toLowerCase()) ||
+            b.city?.toLowerCase().includes(location.toLowerCase()) ||
+            b.full_name.toLowerCase().includes(location.toLowerCase()) ||
+            b.bio.toLowerCase().includes(location.toLowerCase());
+          
+          // Also filter by country if specified
+          const countryMatch = !country || b.country === country;
+          
+          return locationMatch && countryMatch;
+        });
+      } else if (country) {
+        // Filter by country even if no specific location
+        results = results.filter(b => b.country === country);
       }
 
       if (style) {
         results = results.filter(b =>
-          b.specialties?.some((s: string) => s.toLowerCase().includes(style.toLowerCase()))
+          b.specialties?.some((s: string) => s.toLowerCase().includes(style.toLowerCase())) ||
+          b.specialization?.toLowerCase().includes(style.toLowerCase())
         );
       }
 
