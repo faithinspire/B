@@ -1,459 +1,601 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { BraiderPageLayout } from '@/app/components/BraiderPageLayout';
-import { CheckCircle, Clock, AlertCircle, Upload, Download, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { AlertCircle, CheckCircle, Clock, Upload, X, Eye, Download } from 'lucide-react';
 
-interface VerificationStep {
-  id: number;
-  title: string;
-  description: string;
-  completed: boolean;
-  required: boolean;
+type VerificationStep = 'info' | 'documents' | 'review' | 'submitted';
+type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'not_started';
+
+interface VerificationData {
+  full_name: string;
+  phone: string;
+  location_country: string;
+  location_state: string;
+  location_city: string;
+  years_experience: string;
+  specialization: string;
+  id_document_type: string;
+  id_number: string;
+  id_document_url?: string;
+  selfie_url?: string;
 }
 
-export default function BraiderVerify() {
+export default function BraiderVerificationPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useSupabaseAuthStore();
-  
-  const [profile, setProfile] = useState<any>(null);
+  const { user } = useSupabaseAuthStore();
+  const [currentStep, setCurrentStep] = useState<VerificationStep>('info');
+  const [status, setStatus] = useState<VerificationStatus>('not_started');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [steps, setSteps] = useState<VerificationStep[]>([
-    { id: 1, title: 'Profile Information', description: 'Your basic profile details', completed: false, required: true },
-    { id: 2, title: 'ID Document', description: 'Upload a valid ID (Driver\'s License, Passport, or National ID)', completed: false, required: true },
-    { id: 3, title: 'Selfie Verification', description: 'Take a selfie for identity verification', completed: false, required: true },
-    { id: 4, title: 'Background Check', description: 'Optional background check consent', completed: false, required: false },
-    { id: 5, title: 'Admin Review', description: 'Awaiting admin approval', completed: false, required: true },
-  ]);
-  const [showIdPreview, setShowIdPreview] = useState(false);
-  const [showSelfiePreview, setShowSelfiePreview] = useState(false);
+  const [success, setSuccess] = useState('');
 
-  // Check auth
+  const [formData, setFormData] = useState<VerificationData>({
+    full_name: user?.full_name || '',
+    phone: '',
+    location_country: 'NG',
+    location_state: '',
+    location_city: '',
+    years_experience: '',
+    specialization: '',
+    id_document_type: '',
+    id_number: '',
+  });
+
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [idPreview, setIdPreview] = useState<string>('');
+  const [selfiePreview, setSelfiePreview] = useState<string>('');
+
+  // Fetch current verification status
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'braider')) {
+    if (!user) {
       router.push('/login');
+      return;
     }
-  }, [user, authLoading, router]);
+    fetchVerificationStatus();
+  }, [user, router]);
 
-  // Load profile
-  useEffect(() => {
-    if (!user || user.role !== 'braider') return;
-
-    const loadProfile = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        if (!supabase) return;
-
-        const { data, error: err } = await supabase
-          .from('braider_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (err) throw err;
-        setProfile(data);
-
-        // Update steps based on profile data
-        const newSteps = [...steps];
-        newSteps[0].completed = !!data.full_name;
-        newSteps[1].completed = !!data.id_document_url;
-        newSteps[2].completed = !!data.selfie_url;
-        newSteps[3].completed = !!data.background_check_consent;
-        newSteps[4].completed = data.verification_status === 'verified';
-        setSteps(newSteps);
-      } catch (err) {
-        console.error('Error loading profile:', err);
-        setError('Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [user]);
-
-  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: 'id' | 'selfie') => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
+  const fetchVerificationStatus = async () => {
     try {
-      setUploading(true);
-      setError('');
-      setUploadProgress(0);
+      const response = await fetch('/api/braider/verification/status', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
-      if (!supabase) throw new Error('Supabase not initialized');
-
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        throw new Error('File size must be less than 10MB');
-      }
-
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-      if (!validTypes.includes(file.type)) {
-        throw new Error('File must be JPEG, PNG, WebP, or PDF');
-      }
-
-      // Upload to Supabase storage
-      const fileName = `${user.id}/${docType}/${Date.now()}-${file.name}`;
-      
-      setUploadProgress(30);
-
-      const { error: uploadErr } = await supabase.storage
-        .from('verification-documents')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadErr) throw uploadErr;
-
-      setUploadProgress(70);
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('verification-documents')
-        .getPublicUrl(fileName);
-
-      setUploadProgress(90);
-
-      // Update braider profile with document URL
-      const updateData: any = {};
-      if (docType === 'id') {
-        updateData.id_document_url = publicUrl;
-      } else {
-        updateData.selfie_url = publicUrl;
-      }
-      updateData.verification_status = 'pending';
-
-      const { error: updateErr } = await supabase
-        .from('braider_profiles')
-        .update(updateData)
-        .eq('user_id', user.id);
-
-      if (updateErr) throw updateErr;
-
-      setUploadProgress(100);
-
-      // Reload profile
-      const { data: updatedProfile } = await supabase
-        .from('braider_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (updatedProfile) {
-        setProfile(updatedProfile);
-        
-        // Update steps
-        const newSteps = [...steps];
-        if (docType === 'id') {
-          newSteps[1].completed = true;
-        } else {
-          newSteps[2].completed = true;
+      if (response.ok) {
+        const data = await response.json();
+        setStatus(data.status || 'not_started');
+        if (data.verification) {
+          setFormData(prev => ({
+            ...prev,
+            ...data.verification,
+          }));
+          if (data.verification.id_document_url) {
+            setIdPreview(data.verification.id_document_url);
+          }
+          if (data.verification.selfie_url) {
+            setSelfiePreview(data.verification.selfie_url);
+          }
         }
-        setSteps(newSteps);
       }
-
-      // Reset file input
-      e.target.value = '';
-      
-      setTimeout(() => setUploadProgress(0), 1000);
     } catch (err) {
-      console.error('Error uploading document:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload document');
-      setUploadProgress(0);
+      console.error('Failed to fetch verification status:', err);
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
-  const handleBackgroundCheckConsent = async (consent: boolean) => {
-    if (!user) return;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'id' | 'selfie') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB');
+      return;
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Only JPG, PNG, and WebP images are allowed');
+      return;
+    }
+
+    if (type === 'id') {
+      setIdFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setIdPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setSelfieFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setSelfiePreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+    setSubmitting(true);
 
     try {
-      setError('');
-
-      if (!supabase) throw new Error('Supabase not initialized');
-
-      const { error: updateErr } = await supabase
-        .from('braider_profiles')
-        .update({ background_check_consent: consent })
-        .eq('user_id', user.id);
-
-      if (updateErr) throw updateErr;
-
-      // Reload profile
-      const { data: updatedProfile } = await supabase
-        .from('braider_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (updatedProfile) {
-        setProfile(updatedProfile);
-        
-        // Update steps
-        const newSteps = [...steps];
-        newSteps[3].completed = consent;
-        setSteps(newSteps);
+      // Validate required fields
+      if (!formData.full_name || !formData.phone || !formData.id_document_type || !formData.id_number) {
+        setError('Please fill in all required fields');
+        setSubmitting(false);
+        return;
       }
+
+      if (!idFile && !idPreview) {
+        setError('ID document is required');
+        setSubmitting(false);
+        return;
+      }
+
+      // Upload ID document if new
+      let idDocumentUrl = idPreview;
+      if (idFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', idFile);
+        formDataUpload.append('type', 'verification_id');
+
+        const uploadRes = await fetch('/api/upload/verification-document', {
+          method: 'POST',
+          body: formDataUpload,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload ID document');
+        }
+
+        const uploadData = await uploadRes.json();
+        idDocumentUrl = uploadData.url;
+      }
+
+      // Upload selfie if provided
+      let selfieUrl = selfiePreview;
+      if (selfieFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', selfieFile);
+        formDataUpload.append('type', 'verification_selfie');
+
+        const uploadRes = await fetch('/api/upload/verification-document', {
+          method: 'POST',
+          body: formDataUpload,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          selfieUrl = uploadData.url;
+        }
+      }
+
+      // Submit verification
+      const response = await fetch('/api/braider/verification/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          id_document_url: idDocumentUrl,
+          selfie_url: selfieUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to submit verification');
+      }
+
+      setSuccess('Verification submitted successfully! An admin will review your documents within 24-48 hours.');
+      setStatus('pending');
+      setCurrentStep('submitted');
+      setTimeout(() => {
+        router.push('/braider/dashboard');
+      }, 3000);
     } catch (err) {
-      console.error('Error updating background check:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update background check');
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <BraiderPageLayout>
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full" />
-            <p className="text-gray-600 font-semibold">Loading verification...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading verification status...</p>
         </div>
-      </BraiderPageLayout>
+      </div>
     );
   }
 
-  if (!user || user.role !== 'braider') {
-    return null;
+  // If already verified
+  if (status === 'approved') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Account Verified</h1>
+            <p className="text-gray-600 mb-6">Your account has been verified. You can now receive bookings!</p>
+            <button
+              onClick={() => router.push('/braider/dashboard')}
+              className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const verificationStatus = profile?.verification_status || 'unverified';
-  const completedSteps = steps.filter(s => s.completed).length;
-  const progressPercent = (completedSteps / steps.length) * 100;
-
-  return (
-    <BraiderPageLayout>
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Verification</h1>
-          <p className="text-gray-600 text-sm sm:text-base">Complete your verification to start accepting bookings</p>
-        </div>
-
-        {/* Status Badge */}
-        <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-lg sm:rounded-xl bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Verification Status</h2>
-            {verificationStatus === 'verified' && (
-              <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-2 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold">
-                <CheckCircle className="w-4 h-4" />
-                Verified
-              </span>
-            )}
-            {verificationStatus === 'pending' && (
-              <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs sm:text-sm font-semibold">
-                <Clock className="w-4 h-4" />
-                Pending Review
-              </span>
-            )}
-            {verificationStatus === 'unverified' && (
-              <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-2 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm font-semibold">
-                <AlertCircle className="w-4 h-4" />
-                Not Started
-              </span>
-            )}
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-primary-600 to-accent-600 transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <p className="text-xs sm:text-sm text-gray-600 mt-2">{completedSteps} of {steps.length} steps completed</p>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 sm:p-5 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-red-900 font-semibold text-sm sm:text-base">Error</p>
-              <p className="text-red-700 text-xs sm:text-sm mt-1">{error}</p>
+  // If rejected
+  if (status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-600" />
             </div>
-          </div>
-        )}
-
-        {/* Verification Steps */}
-        <div className="space-y-4 sm:space-y-6">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className="bg-white rounded-lg sm:rounded-xl shadow p-4 sm:p-6 border-l-4"
-              style={{
-                borderColor: step.completed ? '#10b981' : step.required ? '#f59e0b' : '#d1d5db',
-              }}
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">Verification Rejected</h1>
+            <p className="text-gray-600 mb-6 text-center">Your verification was not approved. Please contact support for more information.</p>
+            <button
+              onClick={() => router.push('/braider/dashboard')}
+              className="w-full px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
             >
-              <div className="flex items-start gap-4 sm:gap-6">
-                {/* Step Number */}
-                <div className="flex-shrink-0">
-                  <div
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base"
-                    style={{
-                      backgroundColor: step.completed ? '#10b981' : '#e5e7eb',
-                      color: step.completed ? 'white' : '#6b7280',
-                    }}
-                  >
-                    {step.completed ? <CheckCircle className="w-5 sm:w-6 h-5 sm:h-6" /> : step.id}
-                  </div>
-                </div>
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-                {/* Step Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">{step.title}</h3>
-                    {step.required && !step.completed && (
-                      <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">Required</span>
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-600 mb-4">{step.description}</p>
+  // If pending
+  if (status === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-yellow-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">Verification Pending</h1>
+            <p className="text-gray-600 mb-6 text-center">Your verification is under review. An admin will review your documents within 24-48 hours.</p>
+            <button
+              onClick={() => router.push('/braider/dashboard')}
+              className="w-full px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-                  {/* Step-specific content */}
-                  {step.id === 1 && (
-                    <div className="bg-gray-50 rounded p-3 sm:p-4 text-xs sm:text-sm text-gray-700">
-                      <p><strong>Name:</strong> {profile?.full_name || 'Not set'}</p>
-                      <p className="mt-2"><strong>Email:</strong> {user?.email || 'Not set'}</p>
-                      <p className="mt-2"><strong>Phone:</strong> {profile?.phone || 'Not set'}</p>
-                    </div>
-                  )}
+  // Verification form
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Verify Your Account</h1>
+          <p className="text-gray-600">Complete your verification to start receiving bookings</p>
+        </div>
 
-                  {step.id === 2 && (
-                    <div className="space-y-3">
-                      <label className="block">
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(e) => handleDocumentUpload(e, 'id')}
-                          disabled={uploading}
-                          className="hidden"
-                          id="id-upload"
-                        />
-                        <label
-                          htmlFor="id-upload"
-                          className="flex items-center justify-center gap-2 px-4 py-3 sm:py-4 border-2 border-dashed border-primary-300 rounded-lg cursor-pointer hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                        >
-                          <Upload className="w-4 sm:w-5 h-4 sm:h-5" />
-                          {uploading ? `Uploading... ${uploadProgress}%` : 'Click to upload ID document'}
-                        </label>
-                      </label>
-                      {profile?.id_document_url && (
-                        <div className="flex items-center justify-between p-3 bg-green-50 rounded border border-green-200">
-                          <span className="text-xs sm:text-sm text-green-700 font-semibold">✓ ID document uploaded</span>
-                          <button
-                            onClick={() => setShowIdPreview(!showIdPreview)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            {showIdPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      )}
-                      {showIdPreview && profile?.id_document_url && (
-                        <div className="mt-3 p-3 bg-gray-100 rounded">
-                          <img src={profile.id_document_url} alt="ID Document" className="max-w-full h-auto rounded" />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {step.id === 3 && (
-                    <div className="space-y-3">
-                      <label className="block">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleDocumentUpload(e, 'selfie')}
-                          disabled={uploading}
-                          className="hidden"
-                          id="selfie-upload"
-                        />
-                        <label
-                          htmlFor="selfie-upload"
-                          className="flex items-center justify-center gap-2 px-4 py-3 sm:py-4 border-2 border-dashed border-accent-300 rounded-lg cursor-pointer hover:bg-accent-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                        >
-                          <Upload className="w-4 sm:w-5 h-4 sm:h-5" />
-                          {uploading ? `Uploading... ${uploadProgress}%` : 'Click to upload selfie'}
-                        </label>
-                      </label>
-                      {profile?.selfie_url && (
-                        <div className="flex items-center justify-between p-3 bg-green-50 rounded border border-green-200">
-                          <span className="text-xs sm:text-sm text-green-700 font-semibold">✓ Selfie uploaded</span>
-                          <button
-                            onClick={() => setShowSelfiePreview(!showSelfiePreview)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            {showSelfiePreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      )}
-                      {showSelfiePreview && profile?.selfie_url && (
-                        <div className="mt-3 p-3 bg-gray-100 rounded">
-                          <img src={profile.selfie_url} alt="Selfie" className="max-w-full h-auto rounded" />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {step.id === 4 && (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="background-check"
-                        checked={profile?.background_check_consent || false}
-                        onChange={(e) => handleBackgroundCheckConsent(e.target.checked)}
-                        className="w-4 h-4 rounded"
-                      />
-                      <label htmlFor="background-check" className="text-xs sm:text-sm text-gray-700 cursor-pointer">
-                        I consent to a background check
-                      </label>
-                    </div>
-                  )}
-
-                  {step.id === 5 && (
-                    <div className="text-xs sm:text-sm text-gray-600">
-                      {verificationStatus === 'verified' && (
-                        <p className="text-green-600 font-semibold">✓ Your verification has been approved!</p>
-                      )}
-                      {verificationStatus === 'pending' && (
-                        <p className="text-yellow-600 font-semibold">Your verification is under review. This usually takes 24-48 hours.</p>
-                      )}
-                      {verificationStatus === 'unverified' && (
-                        <p className="text-gray-600">Complete the steps above to submit for verification.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* Progress Steps */}
+        <div className="flex gap-2 mb-8">
+          {(['info', 'documents', 'review'] as const).map((step, idx) => (
+            <div key={step} className="flex-1">
+              <button
+                onClick={() => setCurrentStep(step)}
+                className={`w-full py-3 rounded-lg font-semibold transition-all ${
+                  currentStep === step
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white text-gray-700 border-2 border-gray-200'
+                }`}
+              >
+                {step === 'info' && 'Personal Info'}
+                {step === 'documents' && 'Documents'}
+                {step === 'review' && 'Review'}
+              </button>
             </div>
           ))}
         </div>
 
-        {/* Submit Button */}
-        {verificationStatus === 'unverified' && steps.slice(0, 3).every(s => s.completed) && (
-          <div className="mt-8 p-4 sm:p-6 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm sm:text-base text-green-700 mb-4">
-              All required documents have been uploaded. Your verification is ready for admin review.
-            </p>
-            <button
-              onClick={() => router.push('/braider/dashboard')}
-              className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-smooth"
-            >
-              Continue to Dashboard
-            </button>
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
+
+        {/* Success Alert */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <p className="text-green-700 text-sm">{success}</p>
+          </div>
+        )}
+
+        {/* Form Content */}
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          {/* Personal Info Step */}
+          {currentStep === 'info' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                <input
+                  type="text"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                  placeholder="Your full name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                  placeholder="Your phone number"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">State *</label>
+                  <input
+                    type="text"
+                    value={formData.location_state}
+                    onChange={(e) => setFormData({ ...formData, location_state: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                    placeholder="State"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">City *</label>
+                  <input
+                    type="text"
+                    value={formData.location_city}
+                    onChange={(e) => setFormData({ ...formData, location_city: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Years of Experience *</label>
+                  <select
+                    value={formData.years_experience}
+                    onChange={(e) => setFormData({ ...formData, years_experience: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                  >
+                    <option value="">Select</option>
+                    <option value="1">Less than 1 year</option>
+                    <option value="2">1-2 years</option>
+                    <option value="5">2-5 years</option>
+                    <option value="10">5-10 years</option>
+                    <option value="15">10+ years</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Specialization *</label>
+                  <select
+                    value={formData.specialization}
+                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                  >
+                    <option value="">Select</option>
+                    <option value="box-braids">Box Braids</option>
+                    <option value="cornrows">Cornrows</option>
+                    <option value="twists">Twists</option>
+                    <option value="locs">Locs</option>
+                    <option value="weaves">Weaves</option>
+                    <option value="natural-hair">Natural Hair Care</option>
+                    <option value="extensions">Extensions</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setCurrentStep('documents')}
+                className="w-full py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+              >
+                Continue to Documents
+              </button>
+            </div>
+          )}
+
+          {/* Documents Step */}
+          {currentStep === 'documents' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Upload Documents</h2>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID Type *</label>
+                <select
+                  value={formData.id_document_type}
+                  onChange={(e) => setFormData({ ...formData, id_document_type: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                >
+                  <option value="">Select ID type</option>
+                  <option value="passport">Passport</option>
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="national_id">National ID</option>
+                  <option value="voters_card">Voter's Card</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID Number *</label>
+                <input
+                  type="text"
+                  value={formData.id_number}
+                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
+                  placeholder="Your ID number"
+                />
+              </div>
+
+              {/* ID Document Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID Document *</label>
+                {idPreview ? (
+                  <div className="relative">
+                    <img src={idPreview} alt="ID Preview" className="w-full h-48 object-cover rounded-lg" />
+                    <button
+                      onClick={() => {
+                        setIdFile(null);
+                        setIdPreview('');
+                      }}
+                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary-600 transition-colors">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, WebP (max 5MB)</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'id')}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Selfie Upload (Optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Selfie (Optional)</label>
+                {selfiePreview ? (
+                  <div className="relative">
+                    <img src={selfiePreview} alt="Selfie Preview" className="w-full h-48 object-cover rounded-lg" />
+                    <button
+                      onClick={() => {
+                        setSelfieFile(null);
+                        setSelfiePreview('');
+                      }}
+                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary-600 transition-colors">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, WebP (max 5MB)</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'selfie')}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setCurrentStep('info')}
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => setCurrentStep('review')}
+                  className="flex-1 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+                >
+                  Review
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Review Step */}
+          {currentStep === 'review' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Review Your Information</h2>
+
+              <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600">Full Name</p>
+                  <p className="text-lg font-semibold text-gray-900">{formData.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Phone</p>
+                  <p className="text-lg font-semibold text-gray-900">{formData.phone}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Location</p>
+                  <p className="text-lg font-semibold text-gray-900">{formData.location_city}, {formData.location_state}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Specialization</p>
+                  <p className="text-lg font-semibold text-gray-900">{formData.specialization}</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <p className="text-sm text-blue-900">
+                  ✓ Your documents will be reviewed by our admin team within 24-48 hours. You'll receive a notification once your account is verified.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setCurrentStep('documents')}
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="flex-1 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {submitting ? 'Submitting...' : 'Submit for Verification'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Submitted Step */}
+          {currentStep === 'submitted' && (
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Submitted Successfully</h2>
+              <p className="text-gray-600">Your verification has been submitted. You'll be redirected to your dashboard shortly.</p>
+            </div>
+          )}
+        </div>
       </div>
-    </BraiderPageLayout>
+    </div>
   );
 }

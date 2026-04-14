@@ -1,74 +1,59 @@
-import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!url || !key) {
-    throw new Error('Supabase credentials not configured');
-  }
-  
-  return createClient(url, key);
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
-    
-    // Get all braider profiles
-    const { data: braiders, error: braiderError } = await supabase
-      .from('braider_profiles')
-      .select('user_id, full_name, email, verification_status, rating_avg, rating_count, created_at, updated_at')
-      .order('created_at', { ascending: false });
-
-    if (braiderError || !braiders) {
-      console.error('Braiders error:', braiderError);
-      return NextResponse.json({ braiders: [], stats: { total: 0, pending: 0, approved: 0, rejected: 0 } });
-    }
-
-    // Get profile info for each braider
-    const userIds = braiders.map(b => b.user_id);
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, phone, avatar_url')
-      .in('id', userIds);
-
-    const profileMap = Object.fromEntries(
-      (profiles || []).map(p => [p.id, p])
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
     );
 
-    // Combine data
-    const result = braiders.map(braider => {
-      const profile = profileMap[braider.user_id];
-      return {
-        id: braider.user_id,
-        user_id: braider.user_id,
-        email: braider.email || '',
-        full_name: braider.full_name || 'Unknown',
-        phone: profile?.phone || '',
-        verification_status: braider.verification_status || 'pending',
-        rating: braider.rating_avg || 0,
-        rating_count: braider.rating_count || 0,
-        avatar_url: profile?.avatar_url || null,
-        created_at: braider.created_at,
-        updated_at: braider.updated_at,
-      };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Get filter from query params
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status') || 'all';
+
+    // Build query
+    let query = supabase
+      .from('braider_verification')
+      .select('*')
+      .order('submitted_at', { ascending: false });
+
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data: verifications, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({
+      verifications: verifications || [],
+      count: verifications?.length || 0,
     });
-
-    // Calculate stats
-    const stats = {
-      total: result.length,
-      pending: result.filter(b => b.verification_status === 'pending').length,
-      approved: result.filter(b => b.verification_status === 'approved').length,
-      rejected: result.filter(b => b.verification_status === 'rejected').length,
-    };
-
-    return NextResponse.json({ braiders: result, stats });
   } catch (error) {
-    console.error('Verification API error:', error);
-    return NextResponse.json({ braiders: [], stats: { total: 0, pending: 0, approved: 0, rejected: 0 } });
+    console.error('Verification list error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch verifications' },
+      { status: 500 }
+    );
   }
 }

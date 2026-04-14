@@ -1,58 +1,98 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { braider_id } = await request.json();
+    const body = await request.json();
+    const { user_id, reason } = body;
 
-    if (!braider_id) {
+    if (!user_id || !reason) {
       return NextResponse.json(
-        { error: 'Missing braider_id' },
+        { error: 'user_id and reason are required' },
         { status: 400 }
       );
     }
 
-    const db = createClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       { auth: { persistSession: false } }
     );
 
-    // Update braider status
-    const { error: updateError } = await db
-      .from('profiles')
-      .update({ verification_status: 'rejected' })
-      .eq('id', braider_id);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (updateError) throw updateError;
-
-    // Get braider details for notification
-    const { data: braider } = await db
+    // Check if user is admin
+    const { data: profile } = await supabase
       .from('profiles')
-      .select('id, full_name')
-      .eq('id', braider_id)
+      .select('role')
+      .eq('id', session.user.id)
       .single();
 
-    // Send notification to braider
-    if (braider?.id) {
-      await db.from('notifications').insert({
-        user_id: braider.id,
-        type: 'verification_rejected',
-        title: 'Verification Rejected',
-        message: 'Your braider profile verification was rejected. Please review your documents and try again.',
-        read: false,
-        created_at: new Date().toISOString(),
-      });
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Update verification status
+    const { data: verification, error: updateError } = await supabase
+      .from('braider_verification')
+      .update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: session.user.id,
+        rejection_reason: reason,
+      })
+      .eq('user_id', user_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Update braider profile status
+    await supabase
+      .from('braider_profiles')
+      .update({
+        verification_status: 'rejected',
+        verified: false,
+      })
+      .eq('user_id', user_id);
+
+    // Create notification for braider
+    await supabase
+      .from('verification_notifications')
+      .insert({
+        user_id,
+        type: 'rejected',
+        title: 'Verification Rejected',
+        message: `Your verification was not approved. Reason: ${reason}`,
+        is_read: false,
+      });
+
+    // Create audit log
+    await supabase
+      .from('verification_audit_log')
+      .insert({
+        user_id,
+        action: 'rejected',
+        old_status: 'pending',
+        new_status: 'rejected',
+        admin_id: session.user.id,
+        reason: `Admin rejected verification: ${reason}`,
+      });
 
     return NextResponse.json({
       success: true,
-      message: 'Braider rejected',
+      verification,
+      message: 'Verification rejected successfully',
     });
-  } catch (error: any) {
-    console.error('Rejection error:', error);
+  } catch (error) {
+    console.error('Verification reject error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to reject braider' },
+      { error: 'Failed to reject verification' },
       { status: 500 }
     );
   }
