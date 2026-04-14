@@ -31,6 +31,21 @@ export default function BraiderDashboard() {
 
     if (user.role !== 'braider') {
       console.log('=== BRAIDER DASHBOARD: User role is not braider ===', { role: user.role, userId: user.id });
+      
+      // Set a flag to prevent multiple refresh attempts
+      const refreshKey = `braider_refresh_${user.id}`;
+      const lastRefresh = sessionStorage.getItem(refreshKey);
+      const now = Date.now();
+      
+      // Only refresh if we haven't refreshed in the last 2 seconds
+      if (lastRefresh && now - parseInt(lastRefresh) < 2000) {
+        console.log('=== BRAIDER DASHBOARD: Already refreshed recently, redirecting to customer dashboard ===');
+        router.push('/dashboard');
+        return;
+      }
+      
+      sessionStorage.setItem(refreshKey, now.toString());
+      
       // Check what the correct role should be
       fetch('/api/auth/refresh-role', {
         method: 'POST',
@@ -48,7 +63,9 @@ export default function BraiderDashboard() {
               user: { ...user, role: 'braider' }
             });
             // Hard reload to get fresh data from server
-            window.location.href = '/braider/dashboard';
+            setTimeout(() => {
+              window.location.href = '/braider/dashboard';
+            }, 100);
           } else {
             // Not a braider, redirect to customer dashboard
             console.log('=== BRAIDER DASHBOARD: User is not a braider, redirecting ===');

@@ -43,6 +43,21 @@ export function RoleBasedRedirect() {
     // If on braider dashboard but role is not braider, verify the role first
     if (pathname?.startsWith('/braider/dashboard') && user.role !== 'braider') {
       console.log('=== ROLE REDIRECT: On braider dashboard but role is not braider, verifying ===', { role: user.role });
+      
+      // Set a flag to prevent multiple verification attempts
+      const verifyKey = `braider_verify_${user.id}`;
+      const lastVerify = sessionStorage.getItem(verifyKey);
+      const now = Date.now();
+      
+      // Only verify if we haven't verified in the last 2 seconds
+      if (lastVerify && now - parseInt(lastVerify) < 2000) {
+        console.log('=== ROLE REDIRECT: Already verified recently, redirecting to customer dashboard ===');
+        router.push('/dashboard');
+        return;
+      }
+      
+      sessionStorage.setItem(verifyKey, now.toString());
+      
       fetch('/api/auth/refresh-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,12 +68,16 @@ export function RoleBasedRedirect() {
           console.log('=== ROLE REDIRECT: Role verification result ===', data);
           if (data.correctRole === 'braider') {
             // User should be a braider, update store and reload
+            console.log('=== ROLE REDIRECT: Correct role is braider, updating store and reloading ===');
             useSupabaseAuthStore.setState({
               user: { ...user, role: 'braider' }
             });
-            window.location.href = '/braider/dashboard';
+            setTimeout(() => {
+              window.location.href = '/braider/dashboard';
+            }, 100);
           } else {
             // Not a braider, redirect to customer dashboard
+            console.log('=== ROLE REDIRECT: Correct role is not braider, redirecting to customer dashboard ===');
             router.push('/dashboard');
           }
         })
