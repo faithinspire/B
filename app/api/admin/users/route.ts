@@ -24,11 +24,15 @@ export async function GET() {
     const pageSize = 50;
     let hasMore = true;
 
+    console.log('=== USERS API: Starting pagination ===');
+
     while (hasMore) {
       const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
         page: pageNumber,
         perPage: pageSize,
       });
+
+      console.log(`=== USERS API: Page ${pageNumber} - Got ${users?.length || 0} users ===`);
 
       if (usersError) {
         console.error('Auth users error:', usersError);
@@ -48,6 +52,8 @@ export async function GET() {
         pageNumber++;
       }
     }
+
+    console.log(`=== USERS API: Total users fetched: ${allUsers.length} ===`);
 
     if (allUsers.length === 0) {
       console.error('No users found');
@@ -102,6 +108,9 @@ export async function GET() {
       braiders: result.filter(u => u.role === 'braider').length,
       customers: result.filter(u => u.role === 'customer').length,
     };
+
+    console.log(`=== USERS API: Final stats ===`, stats);
+    console.log(`=== USERS API: Returning ${result.length} users ===`);
 
     return NextResponse.json({ users: result, stats });
   } catch (error) {

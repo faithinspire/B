@@ -4,14 +4,14 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { braider_id, user_id, reason } = body;
+    const { braider_id, user_id, reason = 'Admin rejected verification' } = body;
 
     // Accept either braider_id or user_id
     const targetId = braider_id || user_id;
 
-    if (!targetId || !reason) {
+    if (!targetId) {
       return NextResponse.json(
-        { error: 'braider_id (or user_id) and reason are required' },
+        { error: 'braider_id (or user_id) is required' },
         { status: 400 }
       );
     }
