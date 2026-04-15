@@ -1,218 +1,134 @@
-# Immediate Deployment Checklist ✅
+# Immediate Deployment Checklist
 
-**Status**: ALL CRITICAL ISSUES FIXED - READY FOR DEPLOYMENT  
-**Date**: March 16, 2026  
-**Commits**: 3887e8c, 602a55a, 9fea6d9
+## Pre-Deployment (5 minutes)
 
----
+- [ ] **Backup Database**
+  ```
+  Supabase Dashboard → Settings → Backups → Create backup
+  ```
 
-## What Was Fixed
+- [ ] **Review Changes**
+  ```bash
+  git diff HEAD~1
+  ```
 
-### 1. ✅ Verification Page
-- ID document upload to Supabase storage
-- Selfie upload to Supabase storage
-- Background check option
-- Real-time status display
+## Deployment (5 minutes)
 
-### 2. ✅ Braiders Display
-- Grid layout (1/2/3 columns responsive)
-- Avatar, name, rating, bio, price
-- Verification badge
-- "Book Now" button
+- [ ] **Fix Existing Data**
+  ```bash
+  npx ts-node scripts/fix-data-consistency.ts
+  ```
 
-### 3. ✅ Maps Integration
-- Location map in customer messages
-- MapPin toggle button
-- Real-time location tracking
-- Booking info sidebar
+- [ ] **Commit Changes**
+  ```bash
+  git add -A
+  git commit -m "fix: critical system fixes - role misclassification, data consistency, API failures"
+  ```
 
-### 4. ✅ Admin Dashboard Grid
-- Users page: Grid cards
-- Payments page: Grid cards
-- Conversations page: Grid cards
-- All responsive (1/2/3 columns)
+- [ ] **Push to Master**
+  ```bash
+  git push origin master
+  ```
 
-### 5. ✅ Stripe API
-- Payment intent creation
-- Webhook handling
-- Booking status updates
-- Error handling
+## Post-Deployment (10 minutes)
 
----
+- [ ] **Wait for Deployment**
+  - Vercel will automatically deploy
+  - Check deployment status in Vercel dashboard
 
-## Pre-Deployment Testing
+- [ ] **Run Tests**
+  ```bash
+  npx ts-node scripts/test-system-fixes.ts
+  ```
 
-### Quick Test (5 minutes)
+- [ ] **Manual Testing**
+  1. Test braider signup
+  2. Check dashboard stats
+  3. Verify braiders page
+  4. Check verification page
+
+- [ ] **Run Audit**
+  ```bash
+  curl -X GET https://your-domain.com/api/admin/audit/data-consistency \
+    -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+  ```
+
+## Verification Checklist
+
+- [ ] ✅ Braiders appear in braiders page
+- [ ] ✅ Users count updates after signup
+- [ ] ✅ Dashboard stats are accurate
+- [ ] ✅ Verification page loads
+- [ ] ✅ Role separation works
+- [ ] ✅ No data mismatches
+- [ ] ✅ All APIs respond correctly
+- [ ] ✅ Signup is atomic
+
+## If Issues Occur
+
+### Quick Rollback
 ```bash
-npm run dev
+git revert HEAD
+git push origin master
 ```
 
-1. **Verification Page**
-   - Go to `/braider/verify`
-   - Upload ID document
-   - Upload selfie
-   - Verify status shows "pending"
-
-2. **Braiders Display**
-   - Go to `/search`
-   - Check grid layout on mobile/tablet/desktop
-   - Verify braiders display correctly
-
-3. **Admin Dashboard**
-   - Go to `/admin/users`
-   - Go to `/admin/payments`
-   - Go to `/admin/conversations`
-   - Verify grid layout on all pages
-
-4. **Maps**
-   - Go to customer messages
-   - Click MapPin icon
-   - Verify map appears
-
----
-
-## Deployment to Netlify
-
-### Step 1: Push to Git
+### Run Auto-Fix
 ```bash
-git push origin main
+curl -X POST https://your-domain.com/api/admin/audit/auto-fix \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
-### Step 2: Verify Netlify Build
-- Go to Netlify dashboard
-- Check build status
-- Verify no build errors
-
-### Step 3: Test Live Site
-- Visit deployed URL
-- Test all 5 features
-- Verify responsive design
-
-### Step 4: Monitor
-- Check error logs
-- Monitor performance
-- Gather user feedback
-
----
+### Restore Database
+```
+Supabase Dashboard → Settings → Backups → Restore backup
+```
 
 ## Files Modified
 
-```
-✅ app/(braider)/braider/verify/page.tsx
-✅ app/(public)/search/page.tsx
-✅ app/(customer)/messages/[booking_id]/page.tsx
-✅ app/(admin)/admin/users/page.tsx
-✅ app/(admin)/admin/payments/page.tsx
-✅ app/(admin)/admin/conversations/page.tsx
-```
+1. ✅ `app/api/auth/signup/route.ts`
+2. ✅ `app/api/admin/dashboard/stats/route.ts`
+3. ✅ `app/api/braiders/route.ts`
+4. ✅ `app/api/auth/verify-role/route.ts`
+5. ✅ `app/api/admin/verification/route.ts`
+6. ✅ `app/api/admin/audit/data-consistency/route.ts`
+7. ✅ `app/api/admin/audit/auto-fix/route.ts`
 
----
+## Files Created
 
-## Database Requirements
-
-Ensure these columns exist in Supabase:
-
-```sql
-ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS id_document_url TEXT;
-ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS selfie_url TEXT;
-ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS background_check_consent BOOLEAN DEFAULT false;
-ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS cities TEXT[] DEFAULT '{}';
-```
-
----
-
-## Environment Variables
-
-Ensure these are set in Netlify:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-STRIPE_SECRET_KEY=your_stripe_secret
-STRIPE_PUBLISHABLE_KEY=your_stripe_public
-```
-
----
-
-## Rollback Plan
-
-If issues occur:
-
-```bash
-# Revert to previous commit
-git revert 9fea6d9
-
-# Or reset to specific commit
-git reset --hard 3887e8c
-```
-
----
+1. ✅ `scripts/fix-data-consistency.ts`
+2. ✅ `scripts/test-system-fixes.ts`
+3. ✅ `DEPLOYMENT_GUIDE_CRITICAL_FIXES.md`
+4. ✅ `CRITICAL_FIXES_SUMMARY.md`
+5. ✅ `IMMEDIATE_DEPLOYMENT_CHECKLIST.md`
 
 ## Success Criteria
 
-- ✅ All 5 features working
-- ✅ No console errors
-- ✅ Responsive on mobile/tablet/desktop
-- ✅ Stripe payments processing
-- ✅ Verification uploads working
-- ✅ Admin dashboard displaying correctly
-- ✅ Maps showing locations
-- ✅ Braiders displaying in grid
+After deployment, all of these should be true:
+
+- [ ] Signup creates braider_profiles record
+- [ ] Stats API queries braider_profiles table
+- [ ] Braiders API only returns verified braiders
+- [ ] Verification page loads without error
+- [ ] Role is correctly assigned during signup
+- [ ] No data inconsistencies detected
+- [ ] All tests pass
+- [ ] No errors in logs
+
+## Estimated Time
+
+- Pre-Deployment: 5 minutes
+- Deployment: 5 minutes
+- Post-Deployment: 10 minutes
+- **Total: 20 minutes**
+
+## Support
+
+If you need help:
+1. Check `DEPLOYMENT_GUIDE_CRITICAL_FIXES.md` for detailed instructions
+2. Check `CRITICAL_FIXES_SUMMARY.md` for what was fixed
+3. Run audit endpoint to identify issues
+4. Use auto-fix endpoint to repair issues
 
 ---
 
-## Post-Deployment
-
-1. **Monitor Logs**
-   - Check Netlify logs for errors
-   - Monitor Supabase for issues
-   - Check Stripe webhook logs
-
-2. **User Testing**
-   - Have users test verification
-   - Test payment flow
-   - Test admin features
-   - Test mobile experience
-
-3. **Performance**
-   - Check page load times
-   - Monitor API response times
-   - Check database queries
-
-4. **Feedback**
-   - Gather user feedback
-   - Fix any issues
-   - Plan next features
-
----
-
-## Contact & Support
-
-If issues occur during deployment:
-
-1. Check error logs in Netlify
-2. Check Supabase logs
-3. Check Stripe webhook logs
-4. Review commit changes
-5. Rollback if necessary
-
----
-
-## Final Checklist
-
-- [ ] All code committed to Git
-- [ ] All tests passed locally
-- [ ] Database schema updated
-- [ ] Environment variables set
-- [ ] Netlify build successful
-- [ ] Live site tested
-- [ ] All 5 features working
-- [ ] No console errors
-- [ ] Responsive design verified
-- [ ] Ready for production
-
----
-
-**Status**: ✅ READY FOR DEPLOYMENT  
-**Last Updated**: March 16, 2026  
-**Commits**: 3887e8c, 602a55a, 9fea6d9
+**Ready to deploy?** Follow the checklist above in order.

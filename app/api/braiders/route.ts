@@ -38,13 +38,13 @@ export async function GET(request: Request) {
 
     console.log('=== API: Fetching braiders from braider_profiles table ===');
 
-    // Fetch all braiders from braider_profiles table
+    // Fetch verified braiders from braider_profiles table
     const { data, error } = await serviceSupabase
       .from('braider_profiles')
       .select('*')
-      .order('is_premium', { ascending: false })
-      .order('featured_order', { ascending: false })
-      .order('rating_avg', { ascending: false });
+      .eq('verification_status', 'verified') // CRITICAL: Only return verified braiders
+      .order('rating_avg', { ascending: false })
+      .order('created_at', { ascending: false });
 
     console.log('=== API: Braiders fetch result ===', { dataCount: data?.length, hasError: !!error });
 

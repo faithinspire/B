@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
       correctRole = 'braider'
     } else if (profile?.role === 'admin') {
       correctRole = 'admin'
+    } else if (profile?.role === 'braider') {
+      // If profile says braider but no braider_profiles record, still trust profile
+      correctRole = 'braider'
     }
 
     // 3. If profile doesn't exist, create it

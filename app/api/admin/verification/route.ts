@@ -45,9 +45,31 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
+    // Get stats
+    const { count: totalPending } = await supabase
+      .from('braider_verification')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    const { count: totalApproved } = await supabase
+      .from('braider_verification')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'approved');
+
+    const { count: totalRejected } = await supabase
+      .from('braider_verification')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'rejected');
+
     return NextResponse.json({
       verifications: verifications || [],
       count: verifications?.length || 0,
+      stats: {
+        pending: totalPending || 0,
+        approved: totalApproved || 0,
+        rejected: totalRejected || 0,
+        total: (totalPending || 0) + (totalApproved || 0) + (totalRejected || 0),
+      },
     });
   } catch (error) {
     console.error('Verification list error:', error);

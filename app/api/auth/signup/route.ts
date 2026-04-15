@@ -76,9 +76,10 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
 
-    if (profileError) {
-      console.error('Profile error:', profileError);
-      // If insert fails, try upsert to ensure role is set
+    if (profileError && profileError.code !== 'PGRST103') {
+      // PGRST103 = duplicate key, which is ok if profile already exists
+      console.error('Profile creation error:', profileError);
+      // Try upsert to ensure role is set correctly
       const { error: upsertError } = await serviceSupabase
         .from('profiles')
         .upsert({
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
       
       if (upsertError) {
         console.error('Profile upsert error:', upsertError);
+        throw new Error(`Failed to create profile: ${upsertError.message}`);
       }
     }
 
@@ -114,11 +116,10 @@ export async function POST(request: NextRequest) {
         next_of_kin_relationship,
       } = body
 
-      // Create braider profile
+      // Create braider profile - CRITICAL: This MUST succeed for braider to be visible
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
         .insert({
-          id: `braider_${userId}`,
           user_id: userId,
           full_name,
           email,
@@ -144,66 +145,44 @@ export async function POST(request: NextRequest) {
           next_of_kin_name: next_of_kin_name || null,
           next_of_kin_phone: next_of_kin_phone || null,
           next_of_kin_relationship: next_of_kin_relationship || null,
+          id_type: id_type || null,
+          id_number: id_number || null,
+          id_document_url: id_document_url || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
 
       if (braiderError) {
-        console.error('Braider profile error:', braiderError)
-        // Try upsert as fallback
-        const { error: upsertError } = await serviceSupabase
-          .from('braider_profiles')
-          .upsert({
-            id: `braider_${userId}`,
-            user_id: userId,
-            full_name,
-            email,
-            phone,
-            avatar_url: null,
-            bio: bio || '',
-            experience_years: years_experience || 0,
-            specialization: specialization || '',
-            services: services || [],
-            rating_avg: 5.0,
-            rating_count: 0,
-            verification_status: 'pending',
-            travel_radius_miles: 10,
-            is_mobile: true,
-            salon_address: address || null,
-            specialties: specialization ? [specialization] : [],
-            total_earnings: 0,
-            available_balance: 0,
-            state: state || null,
-            city: city || null,
-            address: address || null,
-            verified: false,
-            next_of_kin_name: next_of_kin_name || null,
-            next_of_kin_phone: next_of_kin_phone || null,
-            next_of_kin_relationship: next_of_kin_relationship || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id',
-          })
-        
-        if (upsertError) {
-          console.error('Braider profile upsert error:', upsertError)
-        }
+        console.error('Braider profile creation error:', braiderError);
+        // CRITICAL: If braider_profiles creation fails, we must fail the entire signup
+        // because the braider won't be visible in the system
+        throw new Error(`Failed to create braider profile: ${braiderError.message}`);
       }
 
-      // Create braider verification record - ALWAYS create this for admin verification
+      // Create braider verification record in braider_verification table
       const { error: verificationError } = await serviceSupabase
-        .from('braider_profiles')
-        .update({
-          verification_status: 'pending',
-          id_type: id_type || null,
+        .from('braider_verification')
+        .insert({
+          user_id: userId,
+          status: 'pending',
+          full_name,
+          phone,
+          location_country: 'NG',
+          location_state: state || null,
+          location_city: city || null,
+          years_experience: years_experience || 0,
+          specialization: specialization || '',
+          id_document_type: id_type || null,
           id_number: id_number || null,
           id_document_url: id_document_url || null,
+          submitted_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
-        .eq('user_id', userId)
 
       if (verificationError) {
-        console.error('Verification update error:', verificationError)
+        console.error('Verification record creation error:', verificationError);
+        // Log but don't fail - verification can be created later
       }
     }
 

@@ -13,30 +13,34 @@ export async function GET() {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
 
-    // Get total users
-    const { count: totalUsers } = await serviceSupabase
+    // Get total users (customers only)
+    const { count: totalCustomers } = await serviceSupabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('role', 'customer');
 
-    // Get total braiders
+    // Get total braiders from braider_profiles table (source of truth)
     const { count: totalBraiders } = await serviceSupabase
-      .from('profiles')
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true });
+
+    // Get verified braiders
+    const { count: verifiedBraiders } = await serviceSupabase
+      .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('role', 'braider');
+      .eq('verification_status', 'verified');
+
+    // Get pending verifications from braider_verification table
+    const { count: pendingVerifications } = await serviceSupabase
+      .from('braider_verification')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
 
     // Get active bookings
     const { count: activeBookings } = await serviceSupabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
       .in('status', ['confirmed', 'in_progress']);
-
-    // Get pending verifications
-    const { count: pendingVerifications } = await serviceSupabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'braider')
-      .eq('verification_status', 'pending');
 
     // Get total revenue
     const { data: payments } = await serviceSupabase
@@ -47,8 +51,10 @@ export async function GET() {
     const totalRevenue = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
 
     return NextResponse.json({
-      totalUsers: totalUsers || 0,
+      totalUsers: (totalCustomers || 0) + (totalBraiders || 0),
+      totalCustomers: totalCustomers || 0,
       totalBraiders: totalBraiders || 0,
+      verifiedBraiders: verifiedBraiders || 0,
       activeBookings: activeBookings || 0,
       pendingVerifications: pendingVerifications || 0,
       totalRevenue: totalRevenue || 0,
