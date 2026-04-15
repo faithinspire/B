@@ -12,11 +12,17 @@ import { createClient } from '@supabase/supabase-js';
 export default function CustomerDashboard() {
   const router = useRouter();
   
-  // Create Supabase client inside component to avoid build-time errors
-  const sb = useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  // Create Supabase client only if environment variables are available
+  const sb = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!url || !key) {
+      return null;
+    }
+    
+    return createClient(url, key);
+  }, []);
   const { user, loading: authLoading } = useSupabaseAuthStore();
   const { braiders } = useBraiders();
   
@@ -51,6 +57,9 @@ export default function CustomerDashboard() {
     const saved = localStorage.getItem(`favorites_${user.id}`);
     if (saved) setFavorites(JSON.parse(saved));
     
+    // Only load bookings if Supabase client is available
+    if (!sb) return;
+    
     // Load bookings from Supabase
     sb.from('bookings')
       .select('*')
@@ -67,7 +76,7 @@ export default function CustomerDashboard() {
       .then(({ data }) => {
         if (data) setReviewedBookings(new Set(data.map((r: any) => r.booking_id)));
       });
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, sb]);
 
   // Filter and search braiders in real-time
   const filterBraiders = useCallback(() => {
