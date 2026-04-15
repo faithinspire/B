@@ -4,16 +4,17 @@ import { NextResponse } from 'next/server';
 // GET /api/admin/dashboard - Get dashboard statistics
 export async function GET() {
   try {
-    // Use service role client to bypass RLS
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!serviceSupabase) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
+
+    // Use service role client to bypass RLS
+    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
 
     // Get total users from profiles table
     const { count: totalUsers } = await serviceSupabase

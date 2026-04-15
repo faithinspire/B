@@ -3,15 +3,16 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!serviceSupabase) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
+
+    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
 
     // Get total users (customers only)
     const { count: totalCustomers } = await serviceSupabase
