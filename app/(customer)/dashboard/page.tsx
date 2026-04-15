@@ -1,5 +1,8 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -14,14 +17,20 @@ export default function CustomerDashboard() {
   
   // Create Supabase client only if environment variables are available
   const sb = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!url || !key) {
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!url || !key) {
+        console.warn('Supabase credentials not available');
+        return null;
+      }
+      
+      return createClient(url, key);
+    } catch (error) {
+      console.warn('Failed to create Supabase client:', error);
       return null;
     }
-    
-    return createClient(url, key);
   }, []);
   const { user, loading: authLoading } = useSupabaseAuthStore();
   const { braiders } = useBraiders();

@@ -38,6 +38,8 @@ const nextConfig = {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
   },
+  // Disable static generation for protected routes
+  staticPageGenerationTimeout: 0,
 };
 
 module.exports = nextConfig;
