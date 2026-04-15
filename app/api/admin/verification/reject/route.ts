@@ -4,11 +4,14 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_id, reason } = body;
+    const { braider_id, user_id, reason } = body;
 
-    if (!user_id || !reason) {
+    // Accept either braider_id or user_id
+    const targetId = braider_id || user_id;
+
+    if (!targetId || !reason) {
       return NextResponse.json(
-        { error: 'user_id and reason are required' },
+        { error: 'braider_id (or user_id) and reason are required' },
         { status: 400 }
       );
     }
@@ -35,37 +38,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Update verification status
-    const { data: verification, error: updateError } = await supabase
-      .from('braider_verification')
-      .update({
-        status: 'rejected',
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: session.user.id,
-        rejection_reason: reason,
-      })
-      .eq('user_id', user_id)
-      .select()
-      .single();
-
-    if (updateError) {
-      throw updateError;
+    // If braider_id is provided, get the user_id from braider_profiles
+    let actualUserId = targetId;
+    if (braider_id) {
+      const { data: braiderProfile } = await supabase
+        .from('braider_profiles')
+        .select('user_id')
+        .eq('id', braider_id)
+        .single();
+      
+      if (braiderProfile?.user_id) {
+        actualUserId = braiderProfile.user_id;
+      }
     }
 
     // Update braider profile status
-    await supabase
+    const { error: updateError } = await supabase
       .from('braider_profiles')
       .update({
         verification_status: 'rejected',
         verified: false,
       })
-      .eq('user_id', user_id);
+      .eq(braider_id ? 'id' : 'user_id', targetId);
+
+    if (updateError) {
+      throw updateError;
+    }
 
     // Create notification for braider
     await supabase
       .from('verification_notifications')
       .insert({
-        user_id,
+        user_id: actualUserId,
         type: 'rejected',
         title: 'Verification Rejected',
         message: `Your verification was not approved. Reason: ${reason}`,
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('verification_audit_log')
       .insert({
-        user_id,
+        user_id: actualUserId,
         action: 'rejected',
         old_status: 'pending',
         new_status: 'rejected',
@@ -86,13 +90,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      verification,
       message: 'Verification rejected successfully',
     });
   } catch (error) {
     console.error('Verification reject error:', error);
     return NextResponse.json(
-      { error: 'Failed to reject verification' },
+      { error: 'Failed to reject verification', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
