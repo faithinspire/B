@@ -29,23 +29,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
-    // Build query to get braider profiles with verification data
+    // Query braider_profiles table (source of truth for braider data)
     let query = supabase
       .from('braider_profiles')
       .select(`
         id,
         user_id,
+        full_name,
+        email,
+        phone,
         bio,
         specialization,
-        state,
-        city,
-        address,
         verification_status,
         created_at,
         updated_at
       `)
       .order('created_at', { ascending: false });
 
+    // Filter by verification status
     if (status !== 'all') {
       query = query.eq('verification_status', status);
     }
@@ -53,46 +54,11 @@ export async function GET(request: NextRequest) {
     const { data: braiderProfiles, error: profilesError } = await query;
 
     if (profilesError) {
+      console.error('Braider profiles query error:', profilesError);
       throw profilesError;
     }
 
-    // Get user data for these braiders
-    const userIds = (braiderProfiles || []).map(bp => bp.user_id);
-    
-    let userProfiles: any[] = [];
-    if (userIds.length > 0) {
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, phone')
-        .in('id', userIds);
-
-      if (profileError) {
-        throw profileError;
-      }
-      userProfiles = profiles || [];
-    }
-
-    // Combine braider and user data
-    const braiders = (braiderProfiles || []).map(bp => {
-      const userProfile = userProfiles.find(up => up.id === bp.user_id);
-      return {
-        id: bp.id,
-        user_id: bp.user_id,
-        email: userProfile?.email || '',
-        full_name: userProfile?.full_name || '',
-        phone: userProfile?.phone || '',
-        bio: bp.bio || '',
-        specialization: bp.specialization || '',
-        state: bp.state || '',
-        city: bp.city || '',
-        address: bp.address || '',
-        verification_status: bp.verification_status || 'pending',
-        created_at: bp.created_at,
-        updated_at: bp.updated_at,
-      };
-    });
-
-    // Get stats
+    // Get stats for all verification statuses
     const { count: totalPending } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
@@ -108,6 +74,13 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('verification_status', 'rejected');
 
+    const { count: totalUnverified } = await supabase
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('verification_status', 'unverified');
+
+    const braiders = braiderProfiles || [];
+
     return NextResponse.json({
       braiders: braiders,
       count: braiders.length,
@@ -115,7 +88,8 @@ export async function GET(request: NextRequest) {
         pending: totalPending || 0,
         approved: totalApproved || 0,
         rejected: totalRejected || 0,
-        total: (totalPending || 0) + (totalApproved || 0) + (totalRejected || 0),
+        unverified: totalUnverified || 0,
+        total: (totalPending || 0) + (totalApproved || 0) + (totalRejected || 0) + (totalUnverified || 0),
       },
     });
   } catch (error) {

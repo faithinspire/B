@@ -18,16 +18,44 @@ export async function GET() {
   try {
     const supabase = getSupabaseClient();
     
-    // Get all users from auth
-    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+    // Get all users from auth with pagination (default limit is 50)
+    let allUsers: any[] = [];
+    let pageNumber = 0;
+    const pageSize = 50;
+    let hasMore = true;
 
-    if (usersError || !users) {
-      console.error('Auth users error:', usersError);
+    while (hasMore) {
+      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
+        page: pageNumber,
+        perPage: pageSize,
+      });
+
+      if (usersError) {
+        console.error('Auth users error:', usersError);
+        break;
+      }
+
+      if (!users || users.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allUsers = allUsers.concat(users);
+      
+      if (users.length < pageSize) {
+        hasMore = false;
+      } else {
+        pageNumber++;
+      }
+    }
+
+    if (allUsers.length === 0) {
+      console.error('No users found');
       return NextResponse.json({ users: [], stats: { total: 0, admins: 0, braiders: 0, customers: 0 } });
     }
 
     // Get profiles for all users
-    const userIds = users.map(u => u.id);
+    const userIds = allUsers.map(u => u.id);
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
@@ -49,7 +77,7 @@ export async function GET() {
     );
 
     // Combine data
-    const result = users.map(user => {
+    const result = allUsers.map(user => {
       const profile = profiles?.find(p => p.id === user.id);
       const braider = braiderMap[user.id];
 

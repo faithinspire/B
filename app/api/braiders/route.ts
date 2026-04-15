@@ -14,7 +14,7 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -38,11 +38,12 @@ export async function GET(request: Request) {
 
     console.log('=== API: Fetching braiders from braider_profiles table ===');
 
-    // Fetch verified braiders from braider_profiles table
+    // Fetch braiders from braider_profiles table - include all statuses except rejected
+    // New braiders start as 'pending' or 'unverified', so they need to be visible
     const { data, error } = await serviceSupabase
       .from('braider_profiles')
       .select('*')
-      .eq('verification_status', 'verified') // CRITICAL: Only return verified braiders
+      .neq('verification_status', 'rejected') // Exclude only rejected braiders
       .order('rating_avg', { ascending: false })
       .order('created_at', { ascending: false });
 
