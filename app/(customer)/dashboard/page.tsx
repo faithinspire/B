@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
@@ -11,13 +9,14 @@ import { Heart, Star, MapPin, Search, Loader, Calendar, Clock, AlertCircle } fro
 import { ReviewSubmissionModal } from '@/app/components/ReviewSubmissionModal';
 import { createClient } from '@supabase/supabase-js';
 
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function CustomerDashboard() {
   const router = useRouter();
+  
+  // Create Supabase client inside component to avoid build-time errors
+  const sb = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
   const { user, loading: authLoading } = useSupabaseAuthStore();
   const { braiders } = useBraiders();
   

@@ -60,12 +60,16 @@ export async function GET() {
       return NextResponse.json({ users: [], stats: { total: 0, admins: 0, braiders: 0, customers: 0 } });
     }
 
+    console.log(`=== USERS API: Got ${allUsers.length} auth users, fetching profiles ===`);
+
     // Get profiles for all users
     const userIds = allUsers.map(u => u.id);
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
       .in('id', userIds);
+
+    console.log(`=== USERS API: Got ${profiles?.length || 0} profiles ===`);
 
     if (profilesError) {
       console.error('Profiles error:', profilesError);
@@ -77,6 +81,8 @@ export async function GET() {
       .from('braider_profiles')
       .select('user_id, rating_avg, rating_count, verification_status')
       .in('user_id', userIds);
+
+    console.log(`=== USERS API: Got ${braiderProfiles?.length || 0} braider profiles ===`);
 
     const braiderMap = Object.fromEntries(
       (braiderProfiles || []).map(bp => [bp.user_id, bp])
