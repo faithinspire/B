@@ -18,8 +18,7 @@ export async function POST(request: NextRequest) {
     // 1. Find all braiders (users with braider_profiles records)
     const { data: braiders, error: braiderError } = await serviceSupabase
       .from('braider_profiles')
-      .select('user_id')
-      .distinct()
+      .select('user_id', { distinct: true })
 
     if (braiderError) {
       return NextResponse.json(

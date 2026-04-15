@@ -36,8 +36,7 @@ export async function GET(request: NextRequest) {
     // 2. Check braiders
     const { data: braiders, error: braidersError } = await serviceSupabase
       .from('braider_profiles')
-      .select('user_id')
-      .distinct()
+      .select('user_id', { distinct: true })
 
     if (braidersError) {
       diagnostics.issues.push(`Failed to fetch braiders: ${braidersError.message}`)

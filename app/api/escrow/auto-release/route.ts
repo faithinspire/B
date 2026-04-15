@@ -5,9 +5,11 @@ import { createClient } from '@supabase/supabase-js';
  * Automatic Escrow Release Job
  * Runs every hour to release escrowed funds after 48 hours of booking completion
  * 
- * Triggered by: Vercel Cron or external scheduler
+ * Triggered: Vercel Cron or external scheduler
  * Authorization: Requires CRON_SECRET header
  */
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
