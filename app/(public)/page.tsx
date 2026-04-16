@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Star, Shield, Clock, Users, Zap, CheckCircle } from 'lucide-react';
+import { Search, MapPin, Star, Shield, Users, Zap, CheckCircle } from 'lucide-react';
 import { useBraiders } from '@/app/hooks/useBraiders';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 import { PremiumSearchModal } from '@/app/components/PremiumSearchModal';
@@ -229,12 +229,6 @@ export default function LandingPage(): JSX.Element {
         </div>
       </section>
 
-      {/* Marketplace Carousel - Moved to prominent position */}
-      <MarketplaceCarousel 
-        title="Trending Accessories & Products"
-        subtitle="Premium hair products, braiding supplies, and exclusive items from verified braiders"
-      />
-
       {/* Featured Braiders */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -374,6 +368,12 @@ export default function LandingPage(): JSX.Element {
       </section>
 
 
+
+      {/* Marketplace Carousel - Prominent position before gallery */}
+      <MarketplaceCarousel 
+        title="Trending Accessories & Products"
+        subtitle="Premium hair products, braiding supplies, and exclusive items from verified braiders"
+      />
 
       {/* Braiding Styles Gallery */}
       <BraidingStylesGallery />

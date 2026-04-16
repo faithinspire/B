@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
@@ -11,6 +11,7 @@ export default function BraiderLayout({
 }) {
   const router = useRouter();
   const { user, loading } = useSupabaseAuthStore();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -30,11 +31,15 @@ export default function BraiderLayout({
       } else {
         router.push('/dashboard');
       }
+      return;
     }
+
+    // User is a braider, allow access
+    setIsAuthorized(true);
   }, [user, loading, router]);
 
-  // Show nothing while loading or if user is not a braider
-  if (loading || !user || user.role !== 'braider') {
+  // Show nothing while loading or if not authorized
+  if (loading || !isAuthorized) {
     return null;
   }
 

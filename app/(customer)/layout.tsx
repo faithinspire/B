@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
@@ -11,6 +11,7 @@ export default function CustomerLayout({
 }) {
   const router = useRouter();
   const { user, loading } = useSupabaseAuthStore();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -34,10 +35,15 @@ export default function CustomerLayout({
       router.push('/admin');
       return;
     }
+
+    // User is a customer, allow access
+    if (user.role === 'customer') {
+      setIsAuthorized(true);
+    }
   }, [user, loading, router]);
 
-  // Show nothing while loading or if user is not a customer
-  if (loading || !user || (user.role !== 'customer' && user.role !== 'admin')) {
+  // Show nothing while loading or if not authorized
+  if (loading || !isAuthorized) {
     return null;
   }
 
