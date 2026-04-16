@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Wand2, Upload, Loader } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+import { COUNTRIES, type CountryCode } from '@/lib/countries';
 
 const CATEGORIES = [
   'Hair Extensions',
@@ -17,17 +18,41 @@ const CATEGORIES = [
   'Other Products',
 ];
 
+const NIGERIAN_STATES = [
+  'Lagos', 'Abuja', 'Kano', 'Ibadan', 'Port Harcourt', 'Enugu', 'Benin City',
+  'Katsina', 'Kaduna', 'Kogi', 'Kwara', 'Oyo', 'Osun', 'Ondo', 'Ekiti',
+  'Delta', 'Rivers', 'Bayelsa', 'Cross River', 'Akwa Ibom', 'Calabar',
+  'Abia', 'Imo', 'Ebonyi', 'Anambra', 'Nasarawa', 'Plateau', 'Taraba',
+  'Adamawa', 'Yobe', 'Borno', 'Jigawa', 'Kebbi', 'Sokoto', 'Zamfara',
+  'Niger', 'Gombe', 'Bauchi', 'Benue', 'Gusau', 'Zaria', 'Katsina',
+];
+
+const USA_STATES = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
+  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
+  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
+  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
+  'Wisconsin', 'Wyoming', 'District of Columbia',
+];
+
 export default function AddProduct() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [country, setCountry] = useState<CountryCode>('NG');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category: '',
     price: '',
+    currency: 'NGN',
     stock_quantity: '',
     image_url: '',
+    location_state: '',
+    location_city: '',
   });
   const [imagePrompt, setImagePrompt] = useState('');
 
@@ -36,6 +61,17 @@ export default function AddProduct() {
     setFormData(prev => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const handleCountryChange = (newCountry: CountryCode) => {
+    setCountry(newCountry);
+    const countryConfig = COUNTRIES[newCountry];
+    setFormData(prev => ({
+      ...prev,
+      currency: countryConfig.currency,
+      location_state: '',
+      location_city: '',
     }));
   };
 
@@ -129,9 +165,13 @@ export default function AddProduct() {
           description: formData.description,
           category: formData.category,
           price: parseFloat(formData.price),
+          currency: formData.currency,
           stock_quantity: parseInt(formData.stock_quantity),
           image_url: formData.image_url,
           is_active: true,
+          country_code: country,
+          location_state: formData.location_state,
+          location_city: formData.location_city,
         });
 
       if (error) throw error;
@@ -153,6 +193,31 @@ export default function AddProduct() {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Add New Product</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Country Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Selling Country *
+              </label>
+              <div className="flex gap-4">
+                {Object.entries(COUNTRIES).map(([code, config]) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => handleCountryChange(code as CountryCode)}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                      country === code
+                        ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{config.flag}</div>
+                    <div className="text-sm">{config.name}</div>
+                    <div className="text-xs font-semibold">{config.currency}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Product Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -203,11 +268,47 @@ export default function AddProduct() {
               </select>
             </div>
 
-            {/* Price */}
+            {/* Location */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price (₦) *
+                  {country === 'NG' ? 'State' : 'State/Province'} *
+                </label>
+                <select
+                  name="location_state"
+                  value={formData.location_state}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                >
+                  <option value="">Select {country === 'NG' ? 'state' : 'state'}</option>
+                  {(country === 'NG' ? NIGERIAN_STATES : USA_STATES).map(state => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {country === 'NG' ? 'City' : 'City'} *
+                </label>
+                <input
+                  type="text"
+                  name="location_city"
+                  value={formData.location_city}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  placeholder={country === 'NG' ? 'e.g., Ikoyi' : 'e.g., New York'}
+                />
+              </div>
+            </div>
+
+            {/* Price and Currency */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Price ({COUNTRIES[country].currencySymbol}) *
                 </label>
                 <input
                   type="number"

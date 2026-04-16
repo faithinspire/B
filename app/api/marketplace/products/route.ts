@@ -14,6 +14,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
+    const country_code = searchParams.get('country_code') || 'NG';
+    const state = searchParams.get('state');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
@@ -22,11 +24,16 @@ export async function GET(request: Request) {
       .from('marketplace_products')
       .select('*', { count: 'exact' })
       .eq('is_active', true)
+      .eq('country_code', country_code)
       .order('created_at', { ascending: false });
 
     // Apply filters
     if (category) {
       query = query.eq('category', category);
+    }
+
+    if (state) {
+      query = query.eq('location_state', state);
     }
 
     if (search) {
@@ -80,6 +87,9 @@ export async function POST(request: Request) {
       category,
       price,
       currency,
+      country_code,
+      location_state,
+      location_city,
       stock_quantity,
       image_url,
     } = body;
@@ -100,6 +110,9 @@ export async function POST(request: Request) {
         category: category || 'General',
         price,
         currency: currency || 'NGN',
+        country_code: country_code || 'NG',
+        location_state,
+        location_city,
         stock_quantity: stock_quantity || 0,
         image_url,
         is_active: true,

@@ -4,17 +4,19 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Filter, Star, ShoppingBag, MapPin } from 'lucide-react';
+import { COUNTRIES, type CountryCode } from '@/lib/countries';
 
 interface Product {
   id: string;
   name: string;
   price: number;
   currency: string;
-  images: string[];
+  image_url: string;
   rating_avg: number;
   rating_count: number;
   location_state: string;
   location_city: string;
+  country_code: string;
 }
 
 interface Category {
@@ -24,6 +26,26 @@ interface Category {
   icon_emoji: string;
 }
 
+const NIGERIAN_STATES = [
+  'Lagos', 'Abuja', 'Kano', 'Ibadan', 'Port Harcourt', 'Enugu', 'Benin City',
+  'Katsina', 'Kaduna', 'Kogi', 'Kwara', 'Oyo', 'Osun', 'Ondo', 'Ekiti',
+  'Delta', 'Rivers', 'Bayelsa', 'Cross River', 'Akwa Ibom', 'Calabar',
+  'Abia', 'Imo', 'Ebonyi', 'Anambra', 'Nasarawa', 'Plateau', 'Taraba',
+  'Adamawa', 'Yobe', 'Borno', 'Jigawa', 'Kebbi', 'Sokoto', 'Zamfara',
+  'Niger', 'Gombe', 'Bauchi', 'Benue', 'Gusau', 'Zaria', 'Katsina',
+];
+
+const USA_STATES = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
+  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
+  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
+  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
+  'Wisconsin', 'Wyoming', 'District of Columbia',
+];
+
 function MarketplaceContent() {
   const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,6 +53,7 @@ function MarketplaceContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(searchParams?.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams?.get('category') || '');
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>('NG');
   const [selectedState, setSelectedState] = useState(searchParams?.get('state') || '');
   const [page, setPage] = useState(1);
 
@@ -55,6 +78,7 @@ function MarketplaceContent() {
         const url = new URL('/api/marketplace/products', window.location.origin);
         if (searchTerm) url.searchParams.append('search', searchTerm);
         if (selectedCategory) url.searchParams.append('category', selectedCategory);
+        if (selectedCountry) url.searchParams.append('country_code', selectedCountry);
         if (selectedState) url.searchParams.append('state', selectedState);
         url.searchParams.append('page', page.toString());
         url.searchParams.append('limit', '20');
@@ -70,7 +94,7 @@ function MarketplaceContent() {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory, selectedState, page]);
+  }, [searchTerm, selectedCategory, selectedCountry, selectedState, page]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-purple-50 to-white">
@@ -78,7 +102,7 @@ function MarketplaceContent() {
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-12 px-4 md:px-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">BraidMee Marketplace</h1>
-          <p className="text-lg text-purple-100 mb-8">Discover premium hair accessories, extensions, and braiding materials from verified braiders</p>
+          <p className="text-lg text-purple-100 mb-8">Discover premium hair accessories, extensions, and braiding materials from verified braiders worldwide</p>
 
           {/* Search Bar */}
           <div className="flex gap-2">
@@ -107,9 +131,37 @@ function MarketplaceContent() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-20">
+            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-20 space-y-6">
+              {/* Country Selection */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Country</h3>
+                <div className="space-y-2">
+                  {Object.entries(COUNTRIES).map(([code, config]) => (
+                    <button
+                      key={code}
+                      onClick={() => {
+                        setSelectedCountry(code as CountryCode);
+                        setSelectedState('');
+                        setPage(1);
+                      }}
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                        selectedCountry === code
+                          ? 'bg-purple-100 text-purple-700 font-semibold'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-xl">{config.flag}</span>
+                      <div>
+                        <div className="font-semibold">{config.name}</div>
+                        <div className="text-xs">{config.currency}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Categories */}
-              <div className="mb-8">
+              <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Categories</h3>
                 <div className="space-y-2">
                   <button
@@ -157,11 +209,9 @@ function MarketplaceContent() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">All Locations</option>
-                  <option value="Lagos">Lagos</option>
-                  <option value="Abuja">Abuja</option>
-                  <option value="Kano">Kano</option>
-                  <option value="Ibadan">Ibadan</option>
-                  <option value="Port Harcourt">Port Harcourt</option>
+                  {(selectedCountry === 'NG' ? NIGERIAN_STATES : USA_STATES).map(state => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -192,9 +242,9 @@ function MarketplaceContent() {
                       <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:scale-105 hover:-translate-y-2">
                         {/* Image */}
                         <div className="relative h-64 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
-                          {product.images && product.images.length > 0 ? (
+                          {product.image_url ? (
                             <img
-                              src={product.images[0]}
+                              src={product.image_url}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                             />
@@ -216,7 +266,7 @@ function MarketplaceContent() {
                             <MapPin className="w-4 h-4" />
                             {product.location_city && product.location_state
                               ? `${product.location_city}, ${product.location_state}`
-                              : 'Nigeria'}
+                              : 'Location not specified'}
                           </div>
 
                           {/* Rating */}
@@ -234,7 +284,7 @@ function MarketplaceContent() {
                           <div className="mt-auto">
                             {product.price ? (
                               <div className="text-2xl font-bold text-purple-600 mb-4">
-                                ₦{product.price.toLocaleString()}
+                                {product.currency === 'NGN' ? '₦' : '$'}{product.price.toLocaleString()}
                               </div>
                             ) : (
                               <div className="text-lg text-gray-600 mb-4">Contact for price</div>
