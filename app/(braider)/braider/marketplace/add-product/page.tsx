@@ -118,29 +118,29 @@ export default function AddProduct() {
     if (!file) return;
 
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const fileName = `marketplace/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('braider-uploads')
-        .upload(fileName, file);
+      const response = await fetch('/api/marketplace/upload-product-image', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('braider-uploads')
-        .getPublicUrl(fileName);
+      if (!data.success) {
+        throw new Error(data.error || 'Upload failed');
+      }
 
       setFormData(prev => ({
         ...prev,
-        image_url: publicUrl,
+        image_url: data.data.imageUrl,
       }));
+
+      alert('Image uploaded successfully!');
     } catch (err) {
       console.error('Error uploading image:', err);
-      alert('Failed to upload image');
+      alert(`Failed to upload image: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -154,33 +154,40 @@ export default function AddProduct() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
       );
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('marketplace_products')
-        .insert({
-          braider_id: user.id,
+      const response = await fetch('/api/marketplace/add-product', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           name: formData.name,
           description: formData.description,
           category: formData.category,
-          price: parseFloat(formData.price),
+          price: formData.price,
           currency: formData.currency,
-          stock_quantity: parseInt(formData.stock_quantity),
+          stock_quantity: formData.stock_quantity,
           image_url: formData.image_url,
-          is_active: true,
           country_code: country,
           location_state: formData.location_state,
           location_city: formData.location_city,
-        });
+        }),
+      });
 
-      if (error) throw error;
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to add product');
+      }
 
       alert('Product added successfully!');
       router.push('/braider/marketplace');
     } catch (err) {
       console.error('Error adding product:', err);
-      alert('Failed to add product');
+      alert(`Failed to add product: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
