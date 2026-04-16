@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, Star, Shield, Users, Zap, CheckCircle } from 'lucide-react';
 import { useBraiders } from '@/app/hooks/useBraiders';
@@ -15,8 +15,8 @@ export const revalidate = 0;
 export const dynamic = 'force-dynamic';
 
 // Lazy load heavy below-fold components
-const BackgroundAnimator = dynamic(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
-const BraidingStylesGallery = dynamic(() => import('@/app/components/BraidingStylesGallery').then(m => ({ default: m.BraidingStylesGallery })), { ssr: false, loading: () => null });
+const BackgroundAnimator = dynamicImport(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
+const BraidingStylesGallery = dynamicImport(() => import('@/app/components/BraidingStylesGallery').then(m => ({ default: m.BraidingStylesGallery })), { ssr: false, loading: () => null });
 
 export default function LandingPage(): JSX.Element {
   const router = useRouter();
