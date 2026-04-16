@@ -1,82 +1,60 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
+/**
+ * HARD FIX: Approve braider verification
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { braider_id, user_id } = body;
+    const { braider_id } = body;
 
-    // Accept either braider_id or user_id
-    const targetId = braider_id || user_id;
-
-    if (!targetId) {
+    if (!braider_id) {
       return NextResponse.json(
-        { error: 'braider_id (or user_id) is required' },
+        { success: false, error: 'braider_id required' },
         { status: 400 }
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Skip auth check - service role key is sufficient for server-side operations
-    // The service role key is only available server-side and provides full access
-
-    // If braider_id is provided, get the user_id from braider_profiles
-    let actualUserId = targetId;
-    if (braider_id) {
-      const { data: braiderProfile } = await supabase
-        .from('braider_profiles')
-        .select('user_id')
-        .eq('id', braider_id)
-        .single();
-      
-      if (braiderProfile?.user_id) {
-        actualUserId = braiderProfile.user_id;
-      }
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { success: false, error: 'Server not configured' },
+        { status: 500 }
+      );
     }
 
-    // Update braider profile status
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
+
+    // Update braider_profiles with CORRECT field names
     const { error: updateError } = await supabase
       .from('braider_profiles')
       .update({
         verification_status: 'approved',
-        verified: true,
       })
-      .eq(braider_id ? 'id' : 'user_id', targetId);
+      .eq('id', braider_id);
 
     if (updateError) {
-      throw updateError;
-    }
-
-    // Create notification for braider using the notifications table
-    try {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: actualUserId,
-          type: 'verification_approved',
-          title: 'Account Verified',
-          message: 'Your account has been verified! You can now receive bookings.',
-          is_read: false,
-          created_at: new Date().toISOString(),
-        });
-    } catch (notifError) {
-      console.warn('Failed to create notification:', notifError);
-      // Continue anyway - notification is not critical
+      return NextResponse.json(
+        { success: false, error: updateError.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Verification approved successfully',
+      message: 'Braider approved',
     });
   } catch (error) {
-    console.error('Verification approve error:', error);
+    console.error('Approve error:', error);
     return NextResponse.json(
-      { error: 'Failed to approve verification', details: error instanceof Error ? error.message : 'Unknown error' },
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }

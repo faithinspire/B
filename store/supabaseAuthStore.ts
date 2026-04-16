@@ -20,7 +20,6 @@ interface AuthStore {
   initializeSession: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
-  forceRefreshRole: () => Promise<void>;
 }
 
 export const useSupabaseAuthStore = create<AuthStore>((set) => ({
@@ -37,115 +36,38 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
     set({ loading: true, error: null });
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      console.log('=== AUTH STORE: Session check ===', { hasSession: !!session, userId: session?.user?.id, authRole: session?.user?.user_metadata?.role });
 
       if (!session?.user) {
-        console.log('=== AUTH STORE: No session, setting user to null ===');
         set({ user: null });
         return;
       }
 
-      // CRITICAL: Check auth metadata FIRST for role - this is the source of truth for newly registered users
-      const authRole = session.user.user_metadata?.role;
-      console.log('=== AUTH STORE: Auth metadata role ===', { authRole });
+      // HARD FIX: Fetch profile from database - this is the source of truth
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, avatar_url')
+        .eq('id', session.user.id)
+        .single();
 
-      // Fetch user profile - CRITICAL for getting correct role
-      let profile = null;
-      
-      // Try to fetch profile with aggressive retries
-      for (let i = 0; i < 20; i++) {
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError) {
-            if (profileError.code === 'PGRST116') {
-              // No rows returned - profile doesn't exist yet
-              console.warn('=== AUTH STORE: Profile not found on attempt', i + 1);
-              if (i < 19) {
-                await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
-                continue;
-              }
-            } else {
-              throw profileError;
-            }
-          } else if (profileData) {
-            console.log('=== AUTH STORE: Profile found ===', { role: profileData.role, email: profileData.email });
-            profile = profileData;
-            break;
-          }
-        } catch (err) {
-          console.warn('=== AUTH STORE: Profile fetch error on attempt', i + 1, err instanceof Error ? err.message : err);
-          if (i < 19) {
-            await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
-          }
-        }
-      }
-
-      // If profile still not found, check braider_profiles as fallback
-      let isBraider = false;
       if (!profile) {
-        console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
-        try {
-          const { data: braiderProfile } = await supabase
-            .from('braider_profiles')
-            .select('user_id')
-            .eq('user_id', session.user.id)
-            .single();
-
-          if (braiderProfile) {
-            console.log('=== AUTH STORE: Found braider_profiles record, user is a braider ===');
-            isBraider = true;
-          }
-        } catch (err) {
-          console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
-        }
+        set({ user: null });
+        return;
       }
 
-      // CRITICAL FIX: Determine role with proper priority
-      // 1. If profile exists, use profile.role
-      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider' (NEWLY REGISTERED)
-      // 3. If profile doesn't exist but braider_profiles exists, use 'braider'
-      // 4. Otherwise use auth metadata role or default to 'customer'
-      let finalRole: 'customer' | 'braider' | 'admin' = 'customer';
-      
-      if (profile?.role) {
-        finalRole = profile.role as 'customer' | 'braider' | 'admin';
-        console.log('=== AUTH STORE: Using profile role ===', { finalRole });
-      } else if (authRole === 'braider') {
-        finalRole = 'braider';
-        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, using braider ===');
-      } else if (isBraider) {
-        finalRole = 'braider';
-        console.log('=== AUTH STORE: Profile not found but braider_profiles exists, using braider ===');
-      } else if (authRole) {
-        finalRole = authRole as 'customer' | 'braider' | 'admin';
-        console.log('=== AUTH STORE: Using auth metadata role ===', { finalRole });
-      }
-
-      console.log('=== AUTH STORE: Final role determination ===', { 
-        profileRole: profile?.role,
-        authRole,
-        isBraider,
-        finalRole,
-        email: session.user.email 
-      });
+      // Determine role: profile.role is source of truth
+      let role = (profile.role || 'customer') as 'customer' | 'braider' | 'admin';
 
       set({
         user: {
           id: session.user.id,
-          email: session.user.email || '',
-          role: finalRole,
-          full_name: profile?.full_name || session.user.user_metadata?.full_name || '',
-          avatar_url: profile?.avatar_url,
+          email: profile.email || '',
+          role,
+          full_name: profile.full_name || '',
+          avatar_url: profile.avatar_url || undefined,
         },
       });
     } catch (error) {
-      console.error('=== AUTH STORE: Failed to initialize session ===', error);
+      console.error('Failed to initialize session:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to initialize session' });
     } finally {
       set({ loading: false });
@@ -160,63 +82,34 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
     set({ loading: true, error: null });
     try {
-      // Create auth user with role in metadata
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role,
-          },
-        },
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
-
-      console.log('=== AUTH STORE: User signed up ===', { userId: authData.user.id, email, role });
-
-      // Upsert profile in database (insert or update if exists)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
+      // Call backend signup endpoint
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email,
+          password,
           full_name: fullName,
           role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id',
-        });
-
-      if (profileError) {
-        console.warn('=== AUTH STORE: Profile upsert error (may be RLS) ===', profileError);
-        // If upsert fails, try to fetch existing profile
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (!existingProfile) {
-          console.warn('=== AUTH STORE: Profile does not exist, but continuing with auth metadata ===');
-          // Continue anyway - we'll use auth metadata as source of truth
-        }
-      }
-
-      // Set user with role from auth metadata (source of truth for new users)
-      set({
-        user: {
-          id: authData.user.id,
-          email,
-          role: role as 'customer' | 'braider' | 'admin',
-          full_name: fullName,
-        },
+        }),
       });
 
-      console.log('=== AUTH STORE: Sign up complete, user set with role ===', { role });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Signup failed');
+      }
+
+      const data = await response.json();
+
+      // Set user with role from response
+      set({
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          role: data.user.role,
+          full_name: data.user.full_name,
+        },
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       set({ error: errorMessage });
@@ -234,115 +127,32 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
     set({ loading: true, error: null });
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Call backend login endpoint
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to sign in');
-
-      console.log('=== AUTH STORE: User signed in ===', { userId: authData.user.id, email: authData.user.email, authRole: authData.user.user_metadata?.role });
-
-      // CRITICAL: Check auth metadata FIRST for role - this is the source of truth for newly registered users
-      const authRole = authData.user.user_metadata?.role;
-      console.log('=== AUTH STORE: Auth metadata role ===', { authRole });
-
-      // Fetch user profile with aggressive retry logic
-      let profile = null;
-      let retries = 20; // Increased to 20 for better reliability with replication delays
-      
-      while (retries > 0 && !profile) {
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
-
-          if (profileError && profileError.code !== 'PGRST116') {
-            // PGRST116 = no rows returned, which is ok
-            throw profileError;
-          }
-
-          if (profileData) {
-            console.log('=== AUTH STORE: Profile fetched ===', { role: profileData.role, email: profileData.email });
-            profile = profileData;
-            break;
-          }
-        } catch (err) {
-          console.warn('=== AUTH STORE: Profile fetch attempt failed ===', { retries, error: err instanceof Error ? err.message : err });
-          retries--;
-          if (retries > 0) {
-            // Exponential backoff with longer delays
-            const delay = (21 - retries) * 300; // Increased delay for better reliability
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Login failed');
       }
 
-      // If profile doesn't exist, check braider_profiles as fallback
-      let isBraider = false;
-      if (!profile) {
-        console.log('=== AUTH STORE: Profile not found, checking braider_profiles ===');
-        
-        try {
-          const { data: braiderProfile } = await supabase
-            .from('braider_profiles')
-            .select('user_id')
-            .eq('user_id', authData.user.id)
-            .single();
+      const data = await response.json();
 
-          if (braiderProfile) {
-            console.log('=== AUTH STORE: Found braider_profiles record, user is a braider ===');
-            isBraider = true;
-          }
-        } catch (err) {
-          console.warn('=== AUTH STORE: Braider profile check failed ===', err instanceof Error ? err.message : err);
-        }
-      }
-
-      // CRITICAL FIX: Determine role with proper priority
-      // 1. If profile exists, use profile.role
-      // 2. If profile doesn't exist but auth metadata says 'braider', use 'braider'
-      // 3. If profile doesn't exist but braider_profiles exists, use 'braider'
-      // 4. Otherwise use auth metadata role or default to 'customer'
-      let finalRole: 'customer' | 'braider' | 'admin' = 'customer';
-      
-      if (profile?.role) {
-        finalRole = profile.role as 'customer' | 'braider' | 'admin';
-        console.log('=== AUTH STORE: Using profile role ===', { finalRole });
-      } else if (authRole === 'braider') {
-        finalRole = 'braider';
-        console.log('=== AUTH STORE: Profile not found but auth metadata says braider, using braider ===');
-      } else if (isBraider) {
-        finalRole = 'braider';
-        console.log('=== AUTH STORE: Profile not found but braider_profiles exists, using braider ===');
-      } else if (authRole) {
-        finalRole = authRole as 'customer' | 'braider' | 'admin';
-        console.log('=== AUTH STORE: Using auth metadata role ===', { finalRole });
-      }
-
-      console.log('=== AUTH STORE: Final role determination ===', { 
-        profileRole: profile?.role,
-        authRole,
-        isBraider,
-        finalRole,
-        email: authData.user.email 
-      });
-
+      // Set user with role from response
       set({
         user: {
-          id: authData.user.id,
-          email: authData.user.email || '',
-          role: finalRole,
-          full_name: profile?.full_name || authData.user.user_metadata?.full_name || '',
-          avatar_url: profile?.avatar_url,
+          id: data.user.id,
+          email: data.user.email,
+          role: data.user.role,
+          full_name: data.user.full_name,
+          avatar_url: data.user.avatar_url,
         },
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
-      console.error('=== AUTH STORE: Sign in error ===', errorMessage);
       set({ error: errorMessage });
       throw error;
     } finally {
@@ -358,19 +168,10 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
     set({ loading: true, error: null });
     try {
-      // Clear local state first
       set({ user: null });
-      
-      // Then sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Signout error:', error);
-        // Don't throw - user is already cleared locally
-      }
+      await supabase.auth.signOut();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
-      console.error('Signout error:', errorMessage);
-      // Don't throw - user is already cleared locally
+      console.error('Signout error:', error);
     } finally {
       set({ loading: false });
     }
@@ -385,62 +186,34 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
     set({ loading: true });
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        let profile = null;
-        
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
 
-          if (profileError && profileError.code !== 'PGRST116') {
-            throw profileError;
-          }
-
-          profile = profileData;
-        } catch (err) {
-          console.error('Failed to fetch profile:', err);
-        }
-
-        // Get role from profile.role first, then check braider_profiles, then auth metadata, then default to customer
-        let role = profile?.role || session.user.user_metadata?.role || 'customer';
-
-        // If role is still customer, check if user is a braider
-        if (role === 'customer') {
-          try {
-            const { data: braiderProfile } = await supabase
-              .from('braider_profiles')
-              .select('user_id')
-              .eq('user_id', session.user.id)
-              .single();
-
-            if (braiderProfile) {
-              console.log('=== AUTH STORE: fetchUser found braider_profiles record ===');
-              role = 'braider';
-            }
-          } catch (err) {
-            // Silent fail - braider profile doesn't exist
-          }
-        }
-
-        set({
-          user: {
-            id: session.user.id,
-            email: session.user.email || '',
-            role: role as 'customer' | 'braider' | 'admin',
-            full_name: profile?.full_name || session.user.user_metadata?.full_name || '',
-            avatar_url: profile?.avatar_url,
-          },
-        });
-      } else {
+      if (!session?.user) {
         set({ user: null });
+        return;
       }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, avatar_url')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile) {
+        set({ user: null });
+        return;
+      }
+
+      set({
+        user: {
+          id: session.user.id,
+          email: profile.email || '',
+          role: (profile.role || 'customer') as 'customer' | 'braider' | 'admin',
+          full_name: profile.full_name || '',
+          avatar_url: profile.avatar_url || undefined,
+        },
+      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user';
-      set({ error: errorMessage });
+      console.error('Failed to fetch user:', error);
     } finally {
       set({ loading: false });
     }
@@ -487,39 +260,6 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
       throw error;
     } finally {
       set({ loading: false });
-    }
-  },
-
-  forceRefreshRole: async () => {
-    const { user } = useSupabaseAuthStore.getState();
-    if (!user) return;
-
-    try {
-      console.log('=== AUTH STORE: Force refreshing role ===', { userId: user.id });
-      
-      // Call the refresh-role endpoint to get the correct role
-      const response = await fetch('/api/auth/refresh-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh role');
-      }
-
-      const data = await response.json();
-      console.log('=== AUTH STORE: Force refresh result ===', data);
-
-      // Update the store with the correct role
-      if (data.correctRole && data.correctRole !== user.role) {
-        console.log('=== AUTH STORE: Updating role from', user.role, 'to', data.correctRole);
-        set({
-          user: { ...user, role: data.correctRole as 'customer' | 'braider' | 'admin' }
-        });
-      }
-    } catch (error) {
-      console.error('=== AUTH STORE: Force refresh failed ===', error);
     }
   },
 }));

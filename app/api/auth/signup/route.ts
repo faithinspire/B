@@ -73,47 +73,28 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // Add phone_country if provided (may not exist in schema yet)
+    // Add phone_country if provided
     if (phone_country) {
       profileData.phone_country = phone_country;
     }
 
-    const { error: profileError } = await serviceSupabase
+    // HARD FIX: Use upsert from the start to ensure profile is created
+    const { error: profileError, data: profileResult } = await serviceSupabase
       .from('profiles')
-      .insert(profileData)
+      .upsert(profileData, { onConflict: 'id' })
+      .select()
+      .single();
 
-    if (profileError && profileError.code !== 'PGRST103') {
-      // PGRST103 = duplicate key, which is ok if profile already exists
+    if (profileError) {
       console.error('Profile creation error:', profileError);
-      
-      // Try upsert to ensure role is set correctly
-      const upsertData: any = {
-        id: userId,
-        email,
-        full_name,
-        role, // EXPLICIT role
-        phone,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Add phone_country if provided
-      if (phone_country) {
-        upsertData.phone_country = phone_country;
-      }
-
-      const { error: upsertError } = await serviceSupabase
-        .from('profiles')
-        .upsert(upsertData, {
-          onConflict: 'id',
-        });
-      
-      if (upsertError) {
-        console.error('Profile upsert error:', upsertError);
-        throw new Error(`Failed to create profile: ${upsertError.message}`);
-      }
+      throw new Error(`Failed to create profile: ${profileError.message}`);
     }
+
+    if (!profileResult) {
+      throw new Error('Profile creation returned no data');
+    }
+
+    console.log('✅ Profile created successfully:', { userId, role, email });
 
     // 3. If braider, create braider_profiles record with specialization
     if (role === 'braider') {
