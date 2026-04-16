@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
@@ -19,63 +17,18 @@ export default function BraiderDashboard() {
   const [error, setError] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // Check auth
+  // Check auth - layout already handles role protection, just verify here
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      console.log('=== BRAIDER DASHBOARD: No user, redirecting to login ===');
       router.push('/login');
       return;
     }
 
+    // Layout already redirects if not braider, so this is just a safety check
     if (user.role !== 'braider') {
-      console.log('=== BRAIDER DASHBOARD: User role is not braider ===', { role: user.role, userId: user.id });
-      
-      // Set a flag to prevent multiple refresh attempts
-      const refreshKey = `braider_refresh_${user.id}`;
-      const lastRefresh = sessionStorage.getItem(refreshKey);
-      const now = Date.now();
-      
-      // Only refresh if we haven't refreshed in the last 2 seconds
-      if (lastRefresh && now - parseInt(lastRefresh) < 2000) {
-        console.log('=== BRAIDER DASHBOARD: Already refreshed recently, redirecting to customer dashboard ===');
-        router.push('/dashboard');
-        return;
-      }
-      
-      sessionStorage.setItem(refreshKey, now.toString());
-      
-      // Check what the correct role should be
-      fetch('/api/auth/refresh-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          console.log('=== BRAIDER DASHBOARD: Refresh role result ===', data);
-          
-          if (data.correctRole === 'braider') {
-            // User should be a braider, update the store and do a hard reload
-            console.log('=== BRAIDER DASHBOARD: User should be braider, updating store and reloading ===');
-            useSupabaseAuthStore.setState({
-              user: { ...user, role: 'braider' }
-            });
-            // Hard reload to get fresh data from server
-            setTimeout(() => {
-              window.location.href = '/braider/dashboard';
-            }, 100);
-          } else {
-            // Not a braider, redirect to customer dashboard
-            console.log('=== BRAIDER DASHBOARD: User is not a braider, redirecting ===');
-            router.push('/dashboard');
-          }
-        })
-        .catch(err => {
-          console.error('=== BRAIDER DASHBOARD: Role refresh failed ===', err);
-          router.push('/dashboard');
-        });
+      router.push('/dashboard');
       return;
     }
   }, [user, authLoading, router]);

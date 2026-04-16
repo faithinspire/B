@@ -25,11 +25,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let user;
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !authUser) {
+        console.error('Auth error:', authError);
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
+    } catch (err) {
+      console.error('Token verification error:', err);
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const { data: verification, error } = await supabase
