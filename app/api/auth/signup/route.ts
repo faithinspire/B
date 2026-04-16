@@ -111,40 +111,43 @@ export async function POST(request: NextRequest) {
       } = body
 
       // Create braider profile - CRITICAL: This MUST succeed for braider to be visible
+      // Only insert columns that are guaranteed to exist
+      const braiderProfileData: any = {
+        user_id: userId,
+        full_name,
+        email,
+        avatar_url: null,
+        bio: bio || '',
+        experience_years: years_experience || 0,
+        rating_avg: 5.0,
+        rating_count: 0,
+        verification_status: 'pending',
+        travel_radius_miles: 10,
+        is_mobile: true,
+        salon_address: address || null,
+        specialties: specialization ? [specialization] : [],
+        total_earnings: 0,
+        available_balance: 0,
+      };
+
+      // Add optional columns if they exist in the schema
+      if (phone) braiderProfileData.phone = phone;
+      if (specialization) braiderProfileData.specialization = specialization;
+      if (services) braiderProfileData.services = services;
+      if (state) braiderProfileData.state = state;
+      if (city) braiderProfileData.city = city;
+      if (address) braiderProfileData.address = address;
+      braiderProfileData.verified = false;
+      if (next_of_kin_name) braiderProfileData.next_of_kin_name = next_of_kin_name;
+      if (next_of_kin_phone) braiderProfileData.next_of_kin_phone = next_of_kin_phone;
+      if (next_of_kin_relationship) braiderProfileData.next_of_kin_relationship = next_of_kin_relationship;
+      if (id_type) braiderProfileData.id_type = id_type;
+      if (id_number) braiderProfileData.id_number = id_number;
+      if (id_document_url) braiderProfileData.id_document_url = id_document_url;
+
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
-        .insert({
-          user_id: userId,
-          full_name,
-          email,
-          phone,
-          avatar_url: null,
-          bio: bio || '',
-          experience_years: years_experience || 0,
-          specialization: specialization || '',
-          services: services || [],
-          rating_avg: 5.0,
-          rating_count: 0,
-          verification_status: 'pending',
-          travel_radius_miles: 10,
-          is_mobile: true,
-          salon_address: address || null,
-          specialties: specialization ? [specialization] : [],
-          total_earnings: 0,
-          available_balance: 0,
-          state: state || null,
-          city: city || null,
-          address: address || null,
-          verified: false,
-          next_of_kin_name: next_of_kin_name || null,
-          next_of_kin_phone: next_of_kin_phone || null,
-          next_of_kin_relationship: next_of_kin_relationship || null,
-          id_type: id_type || null,
-          id_number: id_number || null,
-          id_document_url: id_document_url || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .insert(braiderProfileData)
 
       if (braiderError) {
         console.error('Braider profile creation error:', braiderError);
@@ -154,25 +157,26 @@ export async function POST(request: NextRequest) {
       }
 
       // Create braider verification record in braider_verification table
+      const verificationData: any = {
+        user_id: userId,
+        status: 'pending',
+        full_name,
+        location_country: 'NG',
+      };
+
+      if (phone) verificationData.phone = phone;
+      if (state) verificationData.location_state = state;
+      if (city) verificationData.location_city = city;
+      if (years_experience) verificationData.years_experience = years_experience;
+      if (specialization) verificationData.specialization = specialization;
+      if (id_type) verificationData.id_document_type = id_type;
+      if (id_number) verificationData.id_number = id_number;
+      if (id_document_url) verificationData.id_document_url = id_document_url;
+      verificationData.submitted_at = new Date().toISOString();
+
       const { error: verificationError } = await serviceSupabase
         .from('braider_verification')
-        .insert({
-          user_id: userId,
-          status: 'pending',
-          full_name,
-          phone,
-          location_country: 'NG',
-          location_state: state || null,
-          location_city: city || null,
-          years_experience: years_experience || 0,
-          specialization: specialization || '',
-          id_document_type: id_type || null,
-          id_number: id_number || null,
-          id_document_url: id_document_url || null,
-          submitted_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .insert(verificationData)
 
       if (verificationError) {
         console.error('Verification record creation error:', verificationError);
