@@ -74,9 +74,49 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
     );
   }
 
-  if (products.length === 0) {
-    return null;
-  }
+  // Show demo products if no real products exist
+  const displayProducts = products.length > 0 ? products : [
+    {
+      id: 'demo-1',
+      name: 'Premium Hair Extensions',
+      price: 15000,
+      currency: 'NGN',
+      images: ['/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png'],
+      rating_avg: 4.8,
+      rating_count: 124,
+      braider_id: 'demo',
+    },
+    {
+      id: 'demo-2',
+      name: 'Braiding Beads Set',
+      price: 5000,
+      currency: 'NGN',
+      images: ['/images/braiding-styles/gemini-3-pro-image-preview-2k_b_Hero_Background_Imag.png'],
+      rating_avg: 4.9,
+      rating_count: 89,
+      braider_id: 'demo',
+    },
+    {
+      id: 'demo-3',
+      name: 'Wig Installation Kit',
+      price: 25000,
+      currency: 'NGN',
+      images: ['/images/braiding-styles/b_Professional_photo_o.png'],
+      rating_avg: 4.7,
+      rating_count: 156,
+      braider_id: 'demo',
+    },
+    {
+      id: 'demo-4',
+      name: 'Braiding Thread Bundle',
+      price: 8000,
+      currency: 'NGN',
+      images: ['/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png'],
+      rating_avg: 4.6,
+      rating_count: 203,
+      braider_id: 'demo',
+    },
+  ];
 
   return (
     <section className="py-12 px-4 md:px-8 bg-gradient-to-br from-white via-purple-50 to-white">
@@ -104,7 +144,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
             className="flex gap-6 overflow-x-auto scroll-smooth pb-4 snap-x snap-mandatory"
             style={{ scrollBehavior: 'smooth' }}
           >
-            {products.map((product) => (
+            {displayProducts.map((product) => (
               <Link
                 key={product.id}
                 href={`/marketplace/product/${product.id}`}
