@@ -229,37 +229,11 @@ export default function LandingPage(): JSX.Element {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 animate-fade-in">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-gray-900 mb-4">
-              How It Works
-            </h2>
-            <p className="text-lg text-gray-600">Simple, secure, and seamless booking in three steps</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            {[
-              { icon: Search, title: 'Search', desc: 'Find verified braiders near you with ratings and reviews' },
-              { icon: Clock, title: 'Book', desc: 'Choose date, time, and service with instant confirmation' },
-              { icon: Star, title: 'Get Braided', desc: 'Enjoy premium service with full protection' },
-            ].map((step, i) => (
-              <div 
-                key={i} 
-                className="text-center animate-slide-up"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-accent-100 rounded-2xl flex items-center justify-center mx-auto mb-6 hover:shadow-lg transition-smooth">
-                  <step.icon className="w-10 h-10 text-primary-600" />
-                </div>
-                <h3 className="text-2xl font-semibold mb-3 text-gray-900">{step.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Marketplace Carousel - Moved to prominent position */}
+      <MarketplaceCarousel 
+        title="Trending Accessories & Products"
+        subtitle="Premium hair products, braiding supplies, and exclusive items from verified braiders"
+      />
 
       {/* Featured Braiders */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-50 to-white">
@@ -399,11 +373,7 @@ export default function LandingPage(): JSX.Element {
         </div>
       </section>
 
-      {/* Marketplace Carousel */}
-      <MarketplaceCarousel 
-        title="Trending Accessories"
-        subtitle="Premium hair products and braiding supplies"
-      />
+
 
       {/* Braiding Styles Gallery */}
       <BraidingStylesGallery />
