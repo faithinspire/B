@@ -11,51 +11,72 @@ export async function GET(request: NextRequest) {
       { auth: { persistSession: false } }
     );
 
-    // Fetch all braiders with verification status
+    // UNIFIED SOURCE: Query braider_profiles (single source of truth for braiders)
     const { data: braiders, error } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('role', 'braider')
+      .from('braider_profiles')
+      .select(`
+        id,
+        user_id,
+        full_name,
+        email,
+        phone,
+        bio,
+        specialization,
+        verification_status,
+        state,
+        city,
+        address,
+        avatar_url,
+        experience_years,
+        rating_avg,
+        rating_count,
+        created_at,
+        updated_at
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching braiders:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch braiders' },
+        { success: false, error: 'Failed to fetch braiders', details: error.message },
         { status: 500 }
       );
     }
 
-    // Fetch portfolio images for each braider
-    const braiderIds = (braiders || []).map(b => b.id);
-    let portfolioMap: Record<string, string[]> = {};
+    // Get stats
+    const { count: total } = await supabaseAdmin
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true });
 
-    if (braiderIds.length > 0) {
-      const { data: portfolios } = await supabaseAdmin
-        .from('braider_portfolio')
-        .select('braider_id, image_url')
-        .in('braider_id', braiderIds);
+    const { count: pending } = await supabaseAdmin
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('verification_status', 'pending');
 
-      if (portfolios) {
-        portfolioMap = portfolios.reduce((acc, p) => {
-          if (!acc[p.braider_id]) acc[p.braider_id] = [];
-          acc[p.braider_id].push(p.image_url);
-          return acc;
-        }, {} as Record<string, string[]>);
-      }
-    }
+    const { count: approved } = await supabaseAdmin
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('verification_status', 'approved');
 
-    // Enrich braiders with portfolio images
-    const enrichedBraiders = (braiders || []).map(b => ({
-      ...b,
-      portfolio_images: portfolioMap[b.id] || [],
-    }));
+    const { count: rejected } = await supabaseAdmin
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('verification_status', 'rejected');
 
-    return NextResponse.json(enrichedBraiders);
+    return NextResponse.json({
+      success: true,
+      data: braiders || [],
+      stats: {
+        total: total || 0,
+        pending: pending || 0,
+        approved: approved || 0,
+        rejected: rejected || 0,
+      },
+    });
   } catch (err) {
     console.error('Braiders API error:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }

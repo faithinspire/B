@@ -1,9 +1,7 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useEffect, useState } from 'react';
-import { Search, CheckCircle, Clock, X, Loader, MapPin, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 interface Braider {
   id: string;
@@ -11,295 +9,234 @@ interface Braider {
   full_name: string;
   email: string;
   phone: string;
-  location: string;
-  verification_status: 'pending' | 'verified' | 'rejected';
+  specialization: string;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  state: string;
+  city: string;
   bio: string;
-  avatar_url?: string;
+  avatar_url: string;
+  experience_years: number;
+  rating_avg: number;
+  rating_count: number;
   created_at: string;
-  portfolio_images?: string[];
-  years_of_experience?: number;
-  specialties?: string;
-  rating?: number;
-  total_bookings?: number;
+}
+
+interface Stats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
 }
 
 export default function BraidersPage() {
   const [braiders, setBraiders] = useState<Braider[]>([]);
-  const [filteredBraiders, setFilteredBraiders] = useState<Braider[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, approved: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
-  const [selectedBraider, setSelectedBraider] = useState<Braider | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-
-  useEffect(() => {
-    fetchBraiders();
-  }, []);
-
-  useEffect(() => {
-    let filtered = braiders;
-
-    if (searchTerm) {
-      filtered = filtered.filter(b =>
-        b.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(b => b.verification_status === statusFilter);
-    }
-
-    setFilteredBraiders(filtered);
-  }, [braiders, searchTerm, statusFilter]);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
   const fetchBraiders = async () => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/admin/braiders');
-      if (!res.ok) throw new Error('Failed to fetch braiders');
-      const data = await res.json();
-      setBraiders(data);
+      setError(null);
+      const response = await fetch('/api/admin/braiders');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch braiders: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load braiders');
+      }
+      
+      setBraiders(data.data || []);
+      setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 });
     } catch (err) {
-      console.error('Error fetching braiders:', err);
+      const message = err instanceof Error ? err.message : 'Failed to load braiders';
+      setError(message);
+      console.error('Braiders fetch error:', message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerify = async (braider: Braider) => {
-    try {
-      setVerifying(true);
-      const res = await fetch(`/api/admin/braiders/${braider.id}/verify`, {
-        method: 'POST',
-      });
-      if (!res.ok) throw new Error('Verification failed');
-      
-      // Update local state
-      setBraiders(braiders.map(b =>
-        b.id === braider.id ? { ...b, verification_status: 'verified' } : b
-      ));
-      
-      setShowModal(false);
-      // Show toast notification
-      alert('✅ Braider Verified Successfully');
-    } catch (err) {
-      console.error('Error verifying braider:', err);
-      alert('❌ Verification failed');
-    } finally {
-      setVerifying(false);
-    }
-  };
+  useEffect(() => {
+    fetchBraiders();
+    
+    // Set up auto-refresh every 5 seconds to catch new braiders
+    const interval = setInterval(fetchBraiders, 5000);
+    setRefreshInterval(interval);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return 'bg-green-100 text-green-700';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'rejected':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
+  const filteredBraiders = braiders.filter(braider => {
+    const matchesSearch = braider.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         braider.full_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || braider.verification_status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'pending':
-        return <Clock className="w-4 h-4" />;
-      default:
-        return null;
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading braiders...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Braiders Management</h1>
-        <p className="text-gray-600 mt-1">Verify and manage braider profiles</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Braiders Management</h1>
+          <p className="text-gray-600">View and manage all braiders in the system</p>
+        </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-600"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-600 text-sm font-medium">Total Braiders</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-600"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="rejected">Rejected</option>
-          </select>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-600 text-sm font-medium">Pending</p>
+            <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-600 text-sm font-medium">Approved</p>
+            <p className="text-3xl font-bold text-green-600 mt-2">{stats.approved}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-600 text-sm font-medium">Rejected</p>
+            <p className="text-3xl font-bold text-red-600 mt-2">{stats.rejected}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Braiders List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-96">
-          <Loader className="w-12 h-12 text-primary-600 animate-spin" />
-        </div>
-      ) : filteredBraiders.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <p className="text-gray-600">No braiders found</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredBraiders.map((braider) => (
-            <div
-              key={braider.id}
-              className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow"
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-red-800 font-medium">Error</p>
+              <p className="text-red-700 text-sm mt-1">{error}</p>
+            </div>
+            <button
+              onClick={fetchBraiders}
+              className="text-red-600 hover:text-red-700 font-medium text-sm"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{braider.full_name}</h3>
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(braider.verification_status)}`}>
-                      {getStatusIcon(braider.verification_status)}
-                      {braider.verification_status.charAt(0).toUpperCase() + braider.verification_status.slice(1)}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      {braider.email}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {braider.location}
-                    </div>
-                  </div>
+              Retry
+            </button>
+          </div>
+        )}
 
-                  {braider.bio && (
-                    <p className="text-sm text-gray-600 mt-3 line-clamp-2">{braider.bio}</p>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => {
-                    setSelectedBraider(braider);
-                    setShowModal(true);
-                  }}
-                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold text-sm"
-                >
-                  View Details
-                </button>
-              </div>
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by email or name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Detail Modal */}
-      {showModal && selectedBraider && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-primary-600 to-accent-600 text-white p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold">{selectedBraider.full_name}</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Avatar */}
-              {selectedBraider.avatar_url && (
-                <div className="flex justify-center">
-                  <img
-                    src={selectedBraider.avatar_url}
-                    alt={selectedBraider.full_name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-primary-600"
-                  />
-                </div>
-              )}
-
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Email</p>
-                  <p className="text-gray-900">{selectedBraider.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Phone</p>
-                  <p className="text-gray-900">{selectedBraider.phone}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Location</p>
-                  <p className="text-gray-900">{selectedBraider.location}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Status</p>
-                  <p className="text-gray-900 capitalize">{selectedBraider.verification_status}</p>
-                </div>
-              </div>
-
-              {/* Bio */}
-              {selectedBraider.bio && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-2">Bio</p>
-                  <p className="text-gray-900">{selectedBraider.bio}</p>
-                </div>
-              )}
-
-              {/* Portfolio Images */}
-              {selectedBraider.portfolio_images && selectedBraider.portfolio_images.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-3">Portfolio</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedBraider.portfolio_images.map((image, idx) => (
-                      <img
-                        key={idx}
-                        src={image}
-                        alt={`Portfolio ${idx + 1}`}
-                        className="w-full h-24 object-cover rounded-lg border border-gray-200"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              {selectedBraider.verification_status === 'pending' && (
-                <button
-                  onClick={() => handleVerify(selectedBraider)}
-                  disabled={verifying}
-                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold flex items-center justify-center gap-2"
-                >
-                  {verifying && <Loader className="w-4 h-4 animate-spin" />}
-                  {verifying ? 'Verifying...' : 'Verify Braider'}
-                </button>
-              )}
-
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
               <button
-                onClick={() => setShowModal(false)}
-                className="w-full px-6 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 font-semibold"
+                onClick={fetchBraiders}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
               >
-                Close
+                <RefreshCw className="w-4 h-4" />
+                Refresh
               </button>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          {filteredBraiders.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-gray-600">No braiders found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Specialization</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Rating</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Joined</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredBraiders.map((braider) => (
+                    <tr key={braider.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{braider.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{braider.full_name || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{braider.specialization || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {braider.city && braider.state ? `${braider.city}, ${braider.state}` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {braider.verification_status === 'pending' && (
+                            <>
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                              <span className="text-xs font-medium text-yellow-700">Pending</span>
+                            </>
+                          )}
+                          {braider.verification_status === 'approved' && (
+                            <>
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                              <span className="text-xs font-medium text-green-700">Approved</span>
+                            </>
+                          )}
+                          {braider.verification_status === 'rejected' && (
+                            <>
+                              <XCircle className="w-4 h-4 text-red-600" />
+                              <span className="text-xs font-medium text-red-700">Rejected</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {braider.rating_avg ? `${braider.rating_avg.toFixed(1)} ⭐ (${braider.rating_count})` : 'New'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {new Date(braider.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 text-sm text-gray-600">
+          Showing {filteredBraiders.length} of {braiders.length} braiders (Auto-refreshing every 5 seconds)
+        </div>
+      </div>
     </div>
   );
 }
