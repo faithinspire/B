@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     // Get filter from query params
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
+    const page = parseInt(searchParams.get('page') || '0');
+    const limit = 50;
+    const offset = page * limit;
 
     // Query braider_profiles table (source of truth for braider data)
     let query = supabase
@@ -37,15 +40,16 @@ export async function GET(request: NextRequest) {
         verification_status,
         created_at,
         updated_at
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     // Filter by verification status
     if (status !== 'all') {
       query = query.eq('verification_status', status);
     }
 
-    const { data: braiderProfiles, error: profilesError } = await query;
+    const { data: braiderProfiles, error: profilesError, count: totalCount } = await query;
 
     if (profilesError) {
       console.error('Braider profiles query error:', profilesError);
