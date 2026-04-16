@@ -52,28 +52,22 @@ export async function POST(request: NextRequest) {
       throw updateError;
     }
 
-    // Create notification for braider
-    await supabase
-      .from('verification_notifications')
-      .insert({
-        user_id: actualUserId,
-        type: 'approved',
-        title: 'Account Verified',
-        message: 'Your account has been verified! You can now receive bookings.',
-        is_read: false,
-      });
-
-    // Create audit log
-    await supabase
-      .from('verification_audit_log')
-      .insert({
-        user_id: actualUserId,
-        action: 'approved',
-        old_status: 'pending',
-        new_status: 'approved',
-        admin_id: 'system', // Service role operation
-        reason: 'Admin approved verification',
-      });
+    // Create notification for braider using the notifications table
+    try {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: actualUserId,
+          type: 'verification_approved',
+          title: 'Account Verified',
+          message: 'Your account has been verified! You can now receive bookings.',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+    } catch (notifError) {
+      console.warn('Failed to create notification:', notifError);
+      // Continue anyway - notification is not critical
+    }
 
     return NextResponse.json({
       success: true,
