@@ -8,6 +8,7 @@ import { Search, MapPin, Star, Shield, Clock, Users, Zap, CheckCircle } from 'lu
 import { useBraiders } from '@/app/hooks/useBraiders';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 import { PremiumSearchModal } from '@/app/components/PremiumSearchModal';
+import MarketplaceCarousel from '@/app/components/MarketplaceCarousel';
 
 // Lazy load heavy below-fold components
 const BackgroundAnimator = dynamic(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
@@ -96,7 +97,7 @@ export default function LandingPage(): JSX.Element {
     <div className="min-h-screen bg-white">
       <PremiumSearchModal 
         isOpen={showSearchModal}
-        onClose={() => setSearchModal(false)}
+        onClose={() => setShowSearchModal(false)}
         onSearch={handleModalSearch}
       />
       {/* Hero Section */}
@@ -397,6 +398,12 @@ export default function LandingPage(): JSX.Element {
           </div>
         </div>
       </section>
+
+      {/* Marketplace Carousel */}
+      <MarketplaceCarousel 
+        title="Trending Accessories"
+        subtitle="Premium hair products and braiding supplies"
+      />
 
       {/* Braiding Styles Gallery */}
       <BraidingStylesGallery />
