@@ -46,7 +46,7 @@ export async function GET() {
 
       allUsers = allUsers.concat(users);
       
-      if (users.length < pageSize) {
+      if (users.length <= pageSize) {
         hasMore = false;
       } else {
         pageNumber++;

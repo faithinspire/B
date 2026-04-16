@@ -62,37 +62,50 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id
 
     // 2. Create profile record with EXPLICIT role - CRITICAL for auth
+    const profileData: any = {
+      id: userId,
+      email,
+      full_name,
+      role, // EXPLICIT role - MUST be set here, not defaulting to customer
+      phone,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add phone_country if provided (may not exist in schema yet)
+    if (phone_country) {
+      profileData.phone_country = phone_country;
+    }
+
     const { error: profileError } = await serviceSupabase
       .from('profiles')
-      .insert({
-        id: userId,
-        email,
-        full_name,
-        role, // EXPLICIT role - MUST be set here, not defaulting to customer
-        phone,
-        phone_country,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(profileData)
 
     if (profileError && profileError.code !== 'PGRST103') {
       // PGRST103 = duplicate key, which is ok if profile already exists
       console.error('Profile creation error:', profileError);
+      
       // Try upsert to ensure role is set correctly
+      const upsertData: any = {
+        id: userId,
+        email,
+        full_name,
+        role, // EXPLICIT role
+        phone,
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Add phone_country if provided
+      if (phone_country) {
+        upsertData.phone_country = phone_country;
+      }
+
       const { error: upsertError } = await serviceSupabase
         .from('profiles')
-        .upsert({
-          id: userId,
-          email,
-          full_name,
-          role, // EXPLICIT role
-          phone,
-          phone_country,
-          avatar_url: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, {
+        .upsert(upsertData, {
           onConflict: 'id',
         });
       
