@@ -33,15 +33,20 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false }
     });
 
-    // Sign in user
-    const { data: authData, error: authError } = await supabase.auth.admin.signInWithPassword({
+    // Sign in user using regular client (not admin)
+    const userClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '', {
+      auth: { persistSession: false }
+    });
+
+    const { data: authData, error: authError } = await userClient.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError || !authData.user) {
+      console.error('Auth error:', authError);
       return NextResponse.json(
-        { success: false, error: 'Invalid credentials' },
+        { success: false, error: authError?.message || 'Invalid credentials' },
         { status: 401 }
       );
     }
