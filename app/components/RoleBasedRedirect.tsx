@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { useRouteRoleVerification } from '@/app/hooks/useRouteRoleVerification';
 
 /**
  * RoleBasedRedirect Component
@@ -20,114 +19,21 @@ export function RoleBasedRedirect() {
   const pathname = usePathname() || '/';
   const { user, loading } = useSupabaseAuthStore();
   const redirectAttempted = useRef(false);
-
-  // Verify role when route changes
-  useRouteRoleVerification();
+  const verifyInProgress = useRef(false);
 
   useEffect(() => {
     // Don't redirect while loading
     if (loading) {
-      console.log('=== ROLE REDIRECT: Still loading ===');
       return;
     }
 
     // Don't redirect if no user
     if (!user) {
-      console.log('=== ROLE REDIRECT: No user, clearing redirect flag ===');
       redirectAttempted.current = false;
       return;
     }
 
-    console.log('=== ROLE REDIRECT: Checking redirect ===', { role: user.role, pathname, redirectAttempted: redirectAttempted.current });
-
-    // CRITICAL FIX: Verify role on first load for ALL users, not just braiders on braider dashboard
-    // This ensures newly registered braiders get the correct role immediately
-    const verifyKey = `role_verify_${user.id}`;
-    const lastVerify = sessionStorage.getItem(verifyKey);
-    const now = Date.now();
-    
-    // Only verify if we haven't verified in the last 3 seconds
-    if (!lastVerify || now - parseInt(lastVerify) > 3000) {
-      console.log('=== ROLE REDIRECT: Verifying role for user ===', { userId: user.id, currentRole: user.role });
-      sessionStorage.setItem(verifyKey, now.toString());
-      
-      fetch('/api/auth/verify-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          console.log('=== ROLE REDIRECT: Role verification result ===', data);
-          
-          // If role doesn't match, update it
-          if (data.correctRole && data.correctRole !== user.role) {
-            console.log('=== ROLE REDIRECT: Role mismatch detected, updating ===', { 
-              currentRole: user.role, 
-              correctRole: data.correctRole 
-            });
-            useSupabaseAuthStore.setState({
-              user: { ...user, role: data.correctRole as 'customer' | 'braider' | 'admin' }
-            });
-            // Hard reload to ensure correct dashboard is shown
-            setTimeout(() => {
-              window.location.href = '/';
-            }, 100);
-            return;
-          }
-        })
-        .catch(err => {
-          console.error('=== ROLE REDIRECT: Role verification failed ===', err);
-        });
-    }
-
-    // If on braider dashboard but role is not braider, verify the role first
-    if (pathname?.startsWith('/braider/dashboard') && user.role !== 'braider') {
-      console.log('=== ROLE REDIRECT: On braider dashboard but role is not braider, verifying ===', { role: user.role });
-      
-      // Set a flag to prevent multiple verification attempts
-      const braiderVerifyKey = `braider_verify_${user.id}`;
-      const lastBraiderVerify = sessionStorage.getItem(braiderVerifyKey);
-      const braiderNow = Date.now();
-      
-      // Only verify if we haven't verified in the last 2 seconds
-      if (lastBraiderVerify && braiderNow - parseInt(lastBraiderVerify) < 2000) {
-        console.log('=== ROLE REDIRECT: Already verified recently, redirecting to customer dashboard ===');
-        router.push('/dashboard');
-        return;
-      }
-      
-      sessionStorage.setItem(braiderVerifyKey, braiderNow.toString());
-      
-      fetch('/api/auth/refresh-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          console.log('=== ROLE REDIRECT: Role verification result ===', data);
-          if (data.correctRole === 'braider') {
-            // User should be a braider, update store and reload
-            console.log('=== ROLE REDIRECT: Correct role is braider, updating store and reloading ===');
-            useSupabaseAuthStore.setState({
-              user: { ...user, role: 'braider' }
-            });
-            setTimeout(() => {
-              window.location.href = '/braider/dashboard';
-            }, 100);
-          } else {
-            // Not a braider, redirect to customer dashboard
-            console.log('=== ROLE REDIRECT: Correct role is not braider, redirecting to customer dashboard ===');
-            router.push('/dashboard');
-          }
-        })
-        .catch(err => {
-          console.error('=== ROLE REDIRECT: Role verification failed ===', err);
-          router.push('/dashboard');
-        });
-      return;
-    }
+    console.log('=== ROLE REDIRECT: Checking redirect ===', { role: user.role, pathname });
 
     // List of paths where we should NOT redirect (public pages, auth pages, etc.)
     const noRedirectPaths = [
@@ -148,7 +54,6 @@ export function RoleBasedRedirect() {
     
     // If on a public path, don't redirect
     if (isPublicPath) {
-      console.log('=== ROLE REDIRECT: On public path, skipping redirect ===', { pathname });
       return;
     }
 
@@ -157,40 +62,101 @@ export function RoleBasedRedirect() {
       if (!redirectAttempted.current) {
         redirectAttempted.current = true;
         console.log('=== ROLE REDIRECT: On homepage, redirecting based on role ===', { role: user.role });
+        
         if (user.role === 'braider') {
-          console.log('=== ROLE REDIRECT: Redirecting braider to /braider/dashboard ===');
           router.push('/braider/dashboard');
-        } else if (user.role === 'customer') {
-          console.log('=== ROLE REDIRECT: Redirecting customer to /dashboard ===');
-          router.push('/dashboard');
         } else if (user.role === 'admin') {
-          console.log('=== ROLE REDIRECT: Redirecting admin to /admin ===');
           router.push('/admin');
+        } else {
+          router.push('/dashboard');
         }
       }
       return;
     }
 
-    // If user is on a dashboard that doesn't match their role, redirect
-    if (user.role === 'braider' && !pathname?.startsWith('/braider')) {
-      // Braider on non-braider page - redirect to braider dashboard
-      if (!pathname?.startsWith('/search') && !pathname?.startsWith('/premium')) {
-        console.log('=== ROLE REDIRECT: Braider on non-braider page, redirecting ===', { pathname });
-        router.push('/braider/dashboard');
-      }
-    } else if (user.role === 'customer' && pathname?.startsWith('/braider/dashboard')) {
-      // Customer on braider dashboard - redirect to customer dashboard
-      console.log('=== ROLE REDIRECT: Customer on braider dashboard, redirecting ===');
+    // CRITICAL: Verify role is correct for the current route
+    // This prevents braiders from seeing customer dashboard and vice versa
+    const isOnBraiderRoute = pathname?.startsWith('/braider');
+    const isOnCustomerRoute = pathname?.startsWith('/dashboard') || pathname?.startsWith('/booking') || pathname?.startsWith('/favorites') || pathname?.startsWith('/notifications') || pathname?.startsWith('/profile') || pathname?.startsWith('/referrals') || pathname?.startsWith('/messages');
+    const isOnAdminRoute = pathname?.startsWith('/admin');
+
+    // If braider is on customer route, redirect to braider dashboard
+    if (user.role === 'braider' && isOnCustomerRoute) {
+      console.log('=== ROLE REDIRECT: Braider on customer route, redirecting to braider dashboard ===');
+      router.push('/braider/dashboard');
+      return;
+    }
+
+    // If customer is on braider route, redirect to customer dashboard
+    if (user.role === 'customer' && isOnBraiderRoute) {
+      console.log('=== ROLE REDIRECT: Customer on braider route, redirecting to customer dashboard ===');
       router.push('/dashboard');
-    } else if (user.role === 'customer' && pathname?.startsWith('/admin')) {
-      // Customer on admin page - redirect to customer dashboard
-      console.log('=== ROLE REDIRECT: Customer on admin page, redirecting ===');
+      return;
+    }
+
+    // If customer is on admin route, redirect to customer dashboard
+    if (user.role === 'customer' && isOnAdminRoute) {
+      console.log('=== ROLE REDIRECT: Customer on admin route, redirecting to customer dashboard ===');
       router.push('/dashboard');
-    } else if (user.role === 'admin' && !pathname?.startsWith('/admin')) {
-      // Admin on non-admin page - redirect to admin dashboard
-      if (!pathname?.startsWith('/search') && !pathname?.startsWith('/premium')) {
-        console.log('=== ROLE REDIRECT: Admin on non-admin page, redirecting ===', { pathname });
-        router.push('/admin');
+      return;
+    }
+
+    // If admin is on customer route, redirect to admin dashboard
+    if (user.role === 'admin' && isOnCustomerRoute) {
+      console.log('=== ROLE REDIRECT: Admin on customer route, redirecting to admin dashboard ===');
+      router.push('/admin');
+      return;
+    }
+
+    // If admin is on braider route, redirect to admin dashboard
+    if (user.role === 'admin' && isOnBraiderRoute) {
+      console.log('=== ROLE REDIRECT: Admin on braider route, redirecting to admin dashboard ===');
+      router.push('/admin');
+      return;
+    }
+
+    // If braider is on admin route, redirect to braider dashboard
+    if (user.role === 'braider' && isOnAdminRoute) {
+      console.log('=== ROLE REDIRECT: Braider on admin route, redirecting to braider dashboard ===');
+      router.push('/braider/dashboard');
+      return;
+    }
+
+    // Verify role periodically (every 5 minutes) to catch role changes
+    const verifyKey = `role_verify_${user.id}`;
+    const lastVerify = sessionStorage.getItem(verifyKey);
+    const now = Date.now();
+    
+    if (!lastVerify || now - parseInt(lastVerify) > 300000) { // 5 minutes
+      if (!verifyInProgress.current) {
+        verifyInProgress.current = true;
+        sessionStorage.setItem(verifyKey, now.toString());
+        
+        fetch('/api/auth/verify-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            console.log('=== ROLE REDIRECT: Role verification result ===', data);
+            
+            // If role doesn't match, update it
+            if (data.correctRole && data.correctRole !== user.role) {
+              console.log('=== ROLE REDIRECT: Role mismatch detected, reloading ===', { 
+                currentRole: user.role, 
+                correctRole: data.correctRole 
+              });
+              // Hard reload to ensure correct dashboard is shown
+              window.location.href = '/';
+            }
+          })
+          .catch(err => {
+            console.error('=== ROLE REDIRECT: Role verification failed ===', err);
+          })
+          .finally(() => {
+            verifyInProgress.current = false;
+          });
       }
     }
   }, [user, loading, pathname, router]);
