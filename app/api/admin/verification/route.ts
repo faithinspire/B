@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
 
-    // Query braider_profiles with CORRECT schema
+    // Query braider_profiles with COMPLETE schema
     let query = supabase
       .from('braider_profiles')
       .select(`
@@ -39,6 +39,18 @@ export async function GET(request: NextRequest) {
         bio,
         specialization,
         verification_status,
+        state,
+        city,
+        address,
+        id_type,
+        id_number,
+        id_document_url,
+        next_of_kin_name,
+        next_of_kin_phone,
+        next_of_kin_relationship,
+        experience_years,
+        services,
+        avatar_url,
         created_at
       `)
       .order('created_at', { ascending: false });

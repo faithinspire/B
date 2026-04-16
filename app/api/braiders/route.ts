@@ -14,7 +14,7 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -31,19 +31,39 @@ export async function GET() {
       return NextResponse.json([], { status: 200 });
     }
 
+    // Get query parameters for location filtering
+    const { searchParams } = new URL(request.url);
+    const state = searchParams.get('state');
+    const city = searchParams.get('city');
+    const country = searchParams.get('country') || 'NG';
+
     // Use service role client to bypass RLS
     const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
 
     console.log('=== API: Fetching braiders from braider_profiles table ===');
+    console.log('=== API: Filters - state:', state, 'city:', city, 'country:', country);
 
     // Fetch braiders from braider_profiles table - include all statuses except rejected
     // New braiders start as 'pending' or 'unverified', so they need to be visible
-    const { data, error } = await serviceSupabase
+    let query = serviceSupabase
       .from('braider_profiles')
       .select('*')
-      .neq('verification_status', 'rejected') // Exclude only rejected braiders
+      .neq('verification_status', 'rejected'); // Exclude only rejected braiders
+
+    // Apply location filters if provided
+    if (state) {
+      query = query.ilike('state', `%${state}%`);
+    }
+    if (city) {
+      query = query.ilike('city', `%${city}%`);
+    }
+    if (country) {
+      query = query.eq('country', country);
+    }
+
+    const { data, error } = await query
       .order('rating_avg', { ascending: false })
       .order('created_at', { ascending: false });
 
