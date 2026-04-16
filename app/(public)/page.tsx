@@ -10,10 +10,6 @@ import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 import { PremiumSearchModal } from '@/app/components/PremiumSearchModal';
 import MarketplaceCarousel from '@/app/components/MarketplaceCarousel';
 
-// Force dynamic rendering to prevent Vercel caching
-export const revalidate = 0;
-export const dynamic = 'force-dynamic';
-
 // Lazy load heavy below-fold components
 const BackgroundAnimator = dynamicImport(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50" /> });
 const BraidingStylesGallery = dynamicImport(() => import('@/app/components/BraidingStylesGallery').then(m => ({ default: m.BraidingStylesGallery })), { ssr: false, loading: () => null });
