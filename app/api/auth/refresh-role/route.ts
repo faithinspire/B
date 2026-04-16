@@ -47,10 +47,12 @@ export async function POST(request: NextRequest) {
 
     // Determine correct role
     let correctRole = 'customer'
-    if (braiderProfile) {
-      correctRole = 'braider'
-    } else if (profile?.role === 'admin') {
+    if (profile?.role === 'admin') {
       correctRole = 'admin'
+    } else if (profile?.role === 'braider') {
+      correctRole = 'braider'
+    } else if (braiderProfile) {
+      correctRole = 'braider'
     }
 
     console.log(`=== REFRESH ROLE: User ${userId} has role ${profile?.role} in DB, correct role is ${correctRole}`)
