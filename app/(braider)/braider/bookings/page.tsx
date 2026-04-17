@@ -113,7 +113,7 @@ export default function BraiderBookingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
+    <div className="bg-gradient-to-br from-primary-50 via-white to-accent-50">
       {/* Header - Fixed positioning relative to scrollable content */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 w-full">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -122,7 +122,7 @@ export default function BraiderBookingsPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
         {loading ? (
           <div className="text-center py-12">
             <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
