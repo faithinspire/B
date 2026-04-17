@@ -5,11 +5,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase credentials');
+      return NextResponse.json(
+        { success: false, error: 'Server configuration error', data: [] },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
 
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
@@ -17,7 +26,7 @@ export async function GET(request: Request) {
     const country_code = searchParams.get('country_code') || 'NG';
     const state = searchParams.get('state');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = parseInt(searchParams.get('limit') || '12');
     const offset = (page - 1) * limit;
 
     let query = supabase
@@ -28,15 +37,15 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     // Apply filters
-    if (category) {
+    if (category && category !== '') {
       query = query.eq('category', category);
     }
 
-    if (state) {
+    if (state && state !== '') {
       query = query.eq('location_state', state);
     }
 
-    if (search) {
+    if (search && search !== '') {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
@@ -47,7 +56,7 @@ export async function GET(request: Request) {
     if (error) {
       console.error('Products fetch error:', error);
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: error.message, data: [] },
         { status: 500 }
       );
     }
@@ -65,77 +74,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error('Marketplace products API error:', err);
     return NextResponse.json(
-      { success: false, error: 'Server error' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
-    const body = await request.json();
-    const {
-      braider_id,
-      name,
-      description,
-      category,
-      price,
-      currency,
-      country_code,
-      location_state,
-      location_city,
-      stock_quantity,
-      image_url,
-    } = body;
-
-    if (!braider_id || !name || !price) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    const { data: product, error } = await supabase
-      .from('marketplace_products')
-      .insert({
-        braider_id,
-        name,
-        description,
-        category: category || 'General',
-        price,
-        currency: currency || 'NGN',
-        country_code: country_code || 'NG',
-        location_state,
-        location_city,
-        stock_quantity: stock_quantity || 0,
-        image_url,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Product creation error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: product,
-    });
-  } catch (err) {
-    console.error('Create product error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Server error' },
+      { success: false, error: 'Server error', data: [] },
       { status: 500 }
     );
   }

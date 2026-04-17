@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!name || !category || !price || !country_code || !location_state || !location_city) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields: name, category, price, country_code, location_state, location_city' },
         { status: 400 }
       );
     }
@@ -30,24 +30,35 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
+        { success: false, error: 'Not authenticated - missing authorization header' },
         { status: 401 }
       );
     }
 
     // Create Supabase client with service role key
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase credentials');
+      return NextResponse.json(
+        { success: false, error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
 
     // Get user from auth header
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
+      console.error('Auth error:', userError);
       return NextResponse.json(
-        { success: false, error: 'Invalid authentication' },
+        { success: false, error: 'Invalid authentication token' },
         { status: 401 }
       );
     }
@@ -57,18 +68,18 @@ export async function POST(request: NextRequest) {
       .from('marketplace_products')
       .insert({
         braider_id: user.id,
-        name,
-        description: description || '',
-        category,
+        name: name.trim(),
+        description: (description || '').trim(),
+        category: category.trim(),
         price: parseFloat(price),
         currency: currency || 'NGN',
         stock_quantity: parseInt(stock_quantity) || 0,
-        image_url: image_url || '',
+        image_url: image_url || null,
         is_active: true,
         status: 'active',
         country_code,
-        location_state,
-        location_city,
+        location_state: location_state.trim(),
+        location_city: location_city.trim(),
       })
       .select()
       .single();
@@ -76,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Database error:', error);
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: `Database error: ${error.message}` },
         { status: 500 }
       );
     }
@@ -88,7 +99,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error adding product:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to add product' },
+      { success: false, error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
