@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
-    // Get braider_profiles
+    // Get braider_profiles - only select columns that exist
     let query = supabase
       .from('braider_profiles')
-      .select('id, user_id, bio, verification_status, profile_approved, is_active, created_at, rating_avg, rating_count')
+      .select('id, user_id, bio, verification_status, is_active, created_at, rating_avg, rating_count')
       .order('created_at', { ascending: false });
 
     if (status !== 'all') {
@@ -54,22 +54,28 @@ export async function GET(request: NextRequest) {
     // Merge data - map enum values to display-friendly statuses
     const braiders = braiderProfiles.map(bp => {
       const profile = profileMap[bp.user_id] || {};
-      
+
       // Map enum verification_status to display status
       let displayStatus = bp.verification_status || 'unverified';
-      if (bp.verification_status === 'tier1_verified' || 
-          bp.verification_status === 'tier2_verified' || 
-          bp.verification_status === 'safety_badge_pro' ||
-          bp.profile_approved === true) {
+      if (
+        bp.verification_status === 'tier1_verified' ||
+        bp.verification_status === 'tier2_verified' ||
+        bp.verification_status === 'safety_badge_pro' ||
+        bp.verification_status === 'approved'
+      ) {
         displayStatus = 'approved';
-      } else if (bp.verification_status === 'tier1_pending' || 
-                 bp.verification_status === 'tier2_pending') {
+      } else if (
+        bp.verification_status === 'tier1_pending' ||
+        bp.verification_status === 'tier2_pending' ||
+        bp.verification_status === 'pending'
+      ) {
         displayStatus = 'pending';
-      } else if (bp.verification_status === 'unverified') {
+      } else if (bp.verification_status === 'rejected') {
+        displayStatus = 'rejected';
+      } else {
         displayStatus = 'unverified';
       }
-      // If column was altered to text, 'approved'/'rejected' pass through directly
-      
+
       return {
         id: bp.id,
         user_id: bp.user_id,
@@ -80,7 +86,6 @@ export async function GET(request: NextRequest) {
         bio: bp.bio || '',
         verification_status: displayStatus,
         raw_verification_status: bp.verification_status,
-        profile_approved: bp.profile_approved,
         is_active: bp.is_active,
         rating_avg: bp.rating_avg || 0,
         rating_count: bp.rating_count || 0,
@@ -89,11 +94,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Stats - count all regardless of filter
-    // Count approved = tier1_verified OR tier2_verified OR safety_badge_pro OR profile_approved=true OR status='approved'
     const { count: approvedCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .or('verification_status.eq.tier1_verified,verification_status.eq.tier2_verified,verification_status.eq.safety_badge_pro,verification_status.eq.approved,profile_approved.eq.true');
+      .or('verification_status.eq.tier1_verified,verification_status.eq.tier2_verified,verification_status.eq.safety_badge_pro,verification_status.eq.approved');
 
     const { count: pendingCount } = await supabase
       .from('braider_profiles')
@@ -103,7 +107,7 @@ export async function GET(request: NextRequest) {
     const { count: rejectedCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .or('verification_status.eq.rejected');
+      .eq('verification_status', 'rejected');
 
     const { count: unverifiedCount } = await supabase
       .from('braider_profiles')

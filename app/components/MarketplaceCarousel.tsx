@@ -148,7 +148,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
             {displayProducts.map((product) => (
               <Link
                 key={product.id}
-                href={product.id.startsWith('demo') ? '/marketplace' : `/marketplace`}
+                href={product.id.startsWith('demo') ? '/marketplace' : `/marketplace/product/${product.id}`}
                 className="flex-shrink-0 w-72 group/card"
               >
                 {/* Product Card */}
@@ -160,12 +160,15 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
                         src={product.image_url}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl">
-                        🛍️
-                      </div>
-                    )}
+                    ) : null}
+                    <div className={`w-full h-full flex items-center justify-center text-5xl ${product.image_url ? 'hidden' : ''}`}>
+                      🛍️
+                    </div>
                     {/* Badge */}
                     <div className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-lg">
                       Featured
@@ -193,7 +196,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
                     <div className="mt-auto">
                       {product.price ? (
                         <div className="text-2xl font-bold text-purple-600 mb-4">
-                          ₦{product.price.toLocaleString()}
+                          {product.currency === 'USD' ? '$' : '₦'}{product.price.toLocaleString()}
                         </div>
                       ) : (
                         <div className="text-lg text-gray-600 mb-4">Contact for price</div>

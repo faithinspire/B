@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Loader, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, Loader, AlertCircle, CheckCircle, Wand2, Sparkles } from 'lucide-react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
@@ -44,6 +44,8 @@ export default function AddProduct() {
   const { user, accessToken, loading: authLoading } = useSupabaseAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState('');
   const [country, setCountry] = useState<CountryCode>('NG');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -149,6 +151,46 @@ export default function AddProduct() {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!formData.name || !formData.category) {
+      setError('Please fill in product name and category first to generate an image');
+      return;
+    }
+
+    setGeneratingImage(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/marketplace/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: formData.name,
+          category: formData.category,
+          description: formData.description,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.imageUrl) {
+        setFormData(prev => ({ ...prev, image_url: data.data.imageUrl }));
+        setSuccess('AI image generated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+      } else if (data.data?.prompt) {
+        // No actual image generated, but got a prompt
+        setImagePrompt(data.data.prompt);
+        setSuccess('');
+      } else {
+        throw new Error(data.error || 'Failed to generate image');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate image');
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -395,27 +437,53 @@ export default function AddProduct() {
               </div>
             )}
 
-            <label className="flex items-center justify-center gap-3 px-4 py-4 border-2 border-purple-300 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors bg-white">
-              {uploading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin text-purple-600" />
-                  <span className="text-purple-700 font-semibold">Uploading...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5 text-purple-600" />
-                  <span className="text-gray-700">{formData.image_url ? 'Change Image' : 'Upload Image'}</span>
-                </>
+            <div className="space-y-3">
+              {/* AI Generate Button */}
+              <button
+                type="button"
+                onClick={handleGenerateImage}
+                disabled={generatingImage || !formData.name || !formData.category}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 transition-all font-semibold"
+              >
+                {generatingImage ? (
+                  <><Loader className="w-5 h-5 animate-spin" />Generating AI Image...</>
+                ) : (
+                  <><Wand2 className="w-5 h-5" />Generate Image with AI</>
+                )}
+              </button>
+              <p className="text-xs text-center text-gray-500">Fill in product name & category first, then click to auto-generate</p>
+
+              {/* AI Prompt Display */}
+              {imagePrompt && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <p className="text-sm font-semibold text-blue-800">AI Image Prompt Generated</p>
+                  </div>
+                  <p className="text-xs text-blue-700 font-mono bg-white p-2 rounded border border-blue-200 leading-relaxed">
+                    {imagePrompt}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-2">Use this prompt with DALL-E, Midjourney, or any AI image tool, then upload the result below.</p>
+                </div>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={uploading}
-                className="hidden"
-              />
-            </label>
-            <p className="text-xs text-gray-500 mt-2">Max 5MB. JPG, PNG, WebP supported.</p>
+
+              {/* Manual Upload */}
+              <label className="flex items-center justify-center gap-3 px-4 py-4 border-2 border-purple-300 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors bg-white">
+                {uploading ? (
+                  <><Loader className="w-5 h-5 animate-spin text-purple-600" /><span className="text-purple-700 font-semibold">Uploading...</span></>
+                ) : (
+                  <><Upload className="w-5 h-5 text-purple-600" /><span className="text-gray-700">{formData.image_url ? 'Change Image' : 'Upload Image Manually'}</span></>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+              <p className="text-xs text-gray-500 text-center">Max 5MB. JPG, PNG, WebP supported.</p>
+            </div>
           </div>
 
           {/* Submit */}
