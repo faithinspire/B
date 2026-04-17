@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Calendar, MapPin, AlertCircle, Loader, CheckCircle, CreditCard, Lock } from 'lucide-react';
+import { Calendar, MapPin, AlertCircle, Loader, CheckCircle, CreditCard, Lock, MessageCircle } from 'lucide-react';
 import { CustomerLocationMap } from '@/app/components/CustomerLocationMap';
 
 interface PaymentFormProps {
@@ -275,11 +275,24 @@ export default function BookingDetailPage() {
                     <p className="text-sm text-green-700 font-medium">Booking confirmed!</p>
                     <button
                       onClick={() => router.push('/messages/' + booking.id)}
-                      className="mt-2 px-4 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm"
+                      className="mt-2 px-4 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center gap-2"
                     >
+                      <MessageCircle className="w-4 h-4" />
                       Chat with Braider
                     </button>
                   </div>
+                </div>
+              )}
+              {isConfirmed && paymentComplete && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-700 font-medium mb-2">Ready to chat with your braider?</p>
+                  <button
+                    onClick={() => router.push('/messages/' + booking.id)}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Open Chat
+                  </button>
                 </div>
               )}
             </div>
@@ -376,8 +389,9 @@ export default function BookingDetailPage() {
                 <p className="text-green-700 font-bold">Payment Complete</p>
                 <button
                   onClick={() => router.push('/messages/' + booking.id)}
-                  className="mt-3 w-full px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-bold text-sm"
+                  className="mt-3 w-full px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-bold text-sm flex items-center justify-center gap-2"
                 >
+                  <MessageCircle className="w-4 h-4" />
                   Chat with Braider →
                 </button>
               </div>
