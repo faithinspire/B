@@ -53,18 +53,24 @@ export async function POST(request: NextRequest) {
       .from('conversations').select('id').eq('booking_id', bookingId).maybeSingle();
     if (existingConv?.id) {
       existingConvId = existingConv.id;
+      console.log('Found existing conversation with new schema:', existingConvId);
     } else {
       // Try old schema
       const { data: oldConv } = await serviceSupabase
         .from('conversations').select('id')
         .eq('participant1_id', booking.customer_id).eq('participant2_id', braiderId).maybeSingle();
-      if (oldConv?.id) existingConvId = oldConv.id;
+      if (oldConv?.id) {
+        existingConvId = oldConv.id;
+        console.log('Found existing conversation with old schema:', existingConvId);
+      }
     }
 
     let conversationId = existingConvId;
 
     if (!conversationId) {
       const now = new Date().toISOString();
+      console.log('Creating new conversation for booking:', bookingId);
+      
       // Try new schema insert
       const { data: newConv, error: convErr } = await serviceSupabase
         .from('conversations')
@@ -81,13 +87,22 @@ export async function POST(request: NextRequest) {
 
       if (!convErr && newConv?.id) {
         conversationId = newConv.id;
+        console.log('Created conversation with new schema:', conversationId);
       } else {
+        console.log('New schema failed, trying old schema. Error:', convErr?.message);
+        
         // Fallback: old schema
-        const { data: oldNew } = await serviceSupabase
+        const { data: oldNew, error: oldErr } = await serviceSupabase
           .from('conversations')
           .insert({ participant1_id: booking.customer_id, participant2_id: braiderId, created_at: now })
           .select('id').single();
-        conversationId = oldNew?.id || null;
+        
+        if (oldErr) {
+          console.error('Both conversation creation attempts failed:', { newError: convErr?.message, oldError: oldErr.message });
+        } else {
+          conversationId = oldNew?.id || null;
+          console.log('Created conversation with old schema:', conversationId);
+        }
       }
 
       // Send system welcome message
@@ -100,13 +115,16 @@ export async function POST(request: NextRequest) {
             read: false,
           });
           if (msgErr) {
+            console.log('Message insert with read column failed, trying is_read:', msgErr.message);
             await serviceSupabase.from('messages').insert({
               sender_id: braiderId,
               receiver_id: booking.customer_id,
               content: `Booking accepted! Let's discuss the details.`,
             });
           }
-        } catch {}
+        } catch (e) {
+          console.log('Message creation failed:', e);
+        }
       }
     }
 

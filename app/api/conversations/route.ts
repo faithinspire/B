@@ -123,11 +123,15 @@ export async function POST(request: Request) {
       existing = data;
     }
 
-    if (existing) return NextResponse.json(normalize(existing));
+    if (existing) {
+      console.log('Conversation already exists:', existing.id);
+      return NextResponse.json(normalize(existing));
+    }
 
     const now = new Date().toISOString();
 
     // Try new schema insert first
+    console.log('Attempting to create conversation with new schema:', { booking_id, customer_id, braider_id });
     const { data, error } = await db.from('conversations').insert([{
       booking_id: booking_id || null,
       customer_id,
@@ -139,7 +143,12 @@ export async function POST(request: Request) {
       updated_at: now,
     }]).select().single();
 
-    if (!error && data) return NextResponse.json(normalize(data), { status: 201 });
+    if (!error && data) {
+      console.log('Conversation created with new schema:', data.id);
+      return NextResponse.json(normalize(data), { status: 201 });
+    }
+
+    console.log('New schema failed, trying old schema. Error:', error?.message);
 
     // Fallback: old schema
     const { data: data2, error: error2 } = await db.from('conversations').insert([{
@@ -149,13 +158,17 @@ export async function POST(request: Request) {
     }]).select().single();
 
     if (error2) {
-      console.error('Create conversation error:', error2);
-      return NextResponse.json({ error: `Failed to create conversation: ${error2.message}` }, { status: 500 });
+      console.error('Both schema attempts failed:', { newError: error?.message, oldError: error2.message });
+      return NextResponse.json({ 
+        error: `Failed to create conversation: ${error2.message}`,
+        details: { newSchemaError: error?.message, oldSchemaError: error2.message }
+      }, { status: 500 });
     }
 
+    console.log('Conversation created with old schema:', data2.id);
     return NextResponse.json(normalize(data2), { status: 201 });
   } catch (error) {
     console.error('Create conversation error:', error);
-    return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create conversation', details: String(error) }, { status: 500 });
   }
 }
