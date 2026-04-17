@@ -21,47 +21,28 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    let success = false;
-    let lastError = '';
-
-    // Attempt 1: unverified (original enum value)
+    // Try 'unverified' first (original enum), then 'rejected' (after TEXT migration)
     const { error: e1 } = await supabase
       .from('braider_profiles')
-      .update({ verification_status: 'unverified', is_active: false })
+      .update({ verification_status: 'unverified' })
       .eq('id', braider_id);
 
     if (!e1) {
-      success = true;
-    } else {
-      lastError = e1.message;
-
-      // Attempt 2: rejected (after migration to TEXT)
-      const { error: e2 } = await supabase
-        .from('braider_profiles')
-        .update({ verification_status: 'rejected', is_active: false })
-        .eq('id', braider_id);
-
-      if (!e2) {
-        success = true;
-      } else {
-        lastError = e2.message;
-
-        // Attempt 3: just set is_active
-        const { error: e3 } = await supabase
-          .from('braider_profiles')
-          .update({ is_active: false })
-          .eq('id', braider_id);
-
-        if (!e3) success = true;
-        else lastError = e3.message;
-      }
+      return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
     }
 
-    if (!success) {
-      return NextResponse.json({ success: false, error: lastError }, { status: 500 });
+    // Fallback: try 'rejected'
+    const { error: e2 } = await supabase
+      .from('braider_profiles')
+      .update({ verification_status: 'rejected' })
+      .eq('id', braider_id);
+
+    if (!e2) {
+      return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
     }
 
-    return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
+    console.error('Both reject attempts failed:', e1.message, e2.message);
+    return NextResponse.json({ success: false, error: `Could not update status: ${e2.message}` }, { status: 500 });
   } catch (error) {
     console.error('Reject error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });

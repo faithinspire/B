@@ -23,8 +23,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
-    const country_code = searchParams.get('country_code') || 'NG';
+    const country_code = searchParams.get('country_code'); // Optional - if not provided, show ALL
     const state = searchParams.get('state');
+    const braider_id = searchParams.get('braider_id'); // Optional - filter by braider
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '12');
     const offset = (page - 1) * limit;
@@ -33,8 +34,17 @@ export async function GET(request: Request) {
       .from('marketplace_products')
       .select('*', { count: 'exact' })
       .eq('is_active', true)
-      .eq('country_code', country_code)
       .order('created_at', { ascending: false });
+
+    // Only filter by country if explicitly provided
+    if (country_code && country_code !== '') {
+      query = query.eq('country_code', country_code);
+    }
+
+    // Filter by braider if provided
+    if (braider_id && braider_id !== '') {
+      query = query.eq('braider_id', braider_id);
+    }
 
     // Apply filters - category is sent as name string
     if (category && category !== '') {

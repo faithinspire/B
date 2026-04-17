@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'all';
 
-    // Get braider_profiles - only select columns that exist
+    // Get braider_profiles - use minimal safe columns, handle missing is_active gracefully
     let query = supabase
       .from('braider_profiles')
-      .select('id, user_id, bio, verification_status, is_active, created_at, rating_avg, rating_count')
+      .select('id, user_id, bio, verification_status, created_at, rating_avg, rating_count')
       .order('created_at', { ascending: false });
 
     if (status !== 'all') {
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         bio: bp.bio || '',
         verification_status: displayStatus,
         raw_verification_status: bp.verification_status,
-        is_active: bp.is_active,
+        is_active: true, // Default to true since column may not exist
         rating_avg: bp.rating_avg || 0,
         rating_count: bp.rating_count || 0,
         created_at: bp.created_at,

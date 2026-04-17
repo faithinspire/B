@@ -21,53 +21,28 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Try 'tier1_verified' first (original enum value), then 'approved' (after migration)
-    let success = false;
-    let lastError = '';
-
-    // Attempt 1: tier1_verified (works with original enum)
+    // Try tier1_verified first (original enum), then approved (after TEXT migration)
     const { error: e1 } = await supabase
       .from('braider_profiles')
-      .update({ verification_status: 'tier1_verified', is_active: true })
+      .update({ verification_status: 'tier1_verified' })
       .eq('id', braider_id);
 
     if (!e1) {
-      success = true;
-    } else {
-      lastError = e1.message;
-      console.error('tier1_verified failed:', e1.message);
-
-      // Attempt 2: approved (works after migration to TEXT)
-      const { error: e2 } = await supabase
-        .from('braider_profiles')
-        .update({ verification_status: 'approved', is_active: true })
-        .eq('id', braider_id);
-
-      if (!e2) {
-        success = true;
-      } else {
-        lastError = e2.message;
-        console.error('approved failed:', e2.message);
-
-        // Attempt 3: just set is_active (always works)
-        const { error: e3 } = await supabase
-          .from('braider_profiles')
-          .update({ is_active: true })
-          .eq('id', braider_id);
-
-        if (!e3) {
-          success = true;
-        } else {
-          lastError = e3.message;
-        }
-      }
+      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
     }
 
-    if (!success) {
-      return NextResponse.json({ success: false, error: lastError }, { status: 500 });
+    // Fallback: try 'approved' (works if column is TEXT)
+    const { error: e2 } = await supabase
+      .from('braider_profiles')
+      .update({ verification_status: 'approved' })
+      .eq('id', braider_id);
+
+    if (!e2) {
+      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
     }
 
-    return NextResponse.json({ success: true, message: 'Braider approved successfully' });
+    console.error('Both approve attempts failed:', e1.message, e2.message);
+    return NextResponse.json({ success: false, error: `Could not update status: ${e2.message}` }, { status: 500 });
   } catch (error) {
     console.error('Approve error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });

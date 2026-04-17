@@ -3,8 +3,9 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Filter, Star, ShoppingBag, MapPin, X, Loader, AlertCircle } from 'lucide-react';
+import { Search, Filter, Star, ShoppingBag, MapPin, X, Loader, AlertCircle, Crown } from 'lucide-react';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
+import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
 interface Product {
   id: string;
@@ -19,6 +20,7 @@ interface Product {
   country_code: string;
   description: string;
   category: string;
+  braider_id: string;
 }
 
 interface Category {
@@ -50,13 +52,14 @@ const USA_STATES = [
 
 function MarketplaceContent() {
   const searchParams = useSearchParams();
+  const { user } = useSupabaseAuthStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState(searchParams?.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams?.get('category') || '');
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>('NG');
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | ''>(''); // Empty = show all
   const [selectedState, setSelectedState] = useState(searchParams?.get('state') || '');
   const [page, setPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -69,7 +72,7 @@ function MarketplaceContent() {
       .catch(err => console.error('Categories error:', err));
   }, []);
 
-  // Fetch products whenever filters change
+  // Fetch ALL products whenever filters change
   useEffect(() => {
     let cancelled = false;
 
@@ -81,10 +84,11 @@ function MarketplaceContent() {
         const params = new URLSearchParams();
         if (searchTerm) params.set('search', searchTerm);
         if (selectedCategory) params.set('category', selectedCategory);
-        params.set('country_code', selectedCountry);
+        // Only filter by country if explicitly selected
+        if (selectedCountry) params.set('country_code', selectedCountry);
         if (selectedState) params.set('state', selectedState);
         params.set('page', String(page));
-        params.set('limit', '12');
+        params.set('limit', '20'); // Show more products
 
         const res = await fetch(`/api/marketplace/products?${params.toString()}`);
         const json = await res.json();
@@ -111,12 +115,28 @@ function MarketplaceContent() {
     return () => { cancelled = true; };
   }, [searchTerm, selectedCategory, selectedCountry, selectedState, page]);
 
+  const isOwnProduct = (product: Product) => {
+    return user?.role === 'braider' && user?.id === product.braider_id;
+  };
+
   const FilterPanel = () => (
     <div className="space-y-6">
-      {/* Country */}
+      {/* Country Filter */}
       <div>
         <h3 className="text-base font-bold text-gray-900 mb-3">Country</h3>
         <div className="space-y-2">
+          <button
+            onClick={() => { setSelectedCountry(''); setSelectedState(''); setPage(1); setShowMobileFilters(false); }}
+            className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-3 text-sm ${
+              !selectedCountry ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xl">🌍</span>
+            <div>
+              <div className="font-semibold">All Countries</div>
+              <div className="text-xs text-gray-500">Show all products</div>
+            </div>
+          </button>
           {Object.entries(COUNTRIES).map(([code, config]) => (
             <button
               key={code}
@@ -163,19 +183,21 @@ function MarketplaceContent() {
       </div>
 
       {/* Location */}
-      <div>
-        <h3 className="text-base font-bold text-gray-900 mb-3">Location</h3>
-        <select
-          value={selectedState}
-          onChange={e => { setSelectedState(e.target.value); setPage(1); setShowMobileFilters(false); }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-        >
-          <option value="">All Locations</option>
-          {(selectedCountry === 'NG' ? NIGERIAN_STATES : USA_STATES).map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </div>
+      {selectedCountry && (
+        <div>
+          <h3 className="text-base font-bold text-gray-900 mb-3">Location</h3>
+          <select
+            value={selectedState}
+            onChange={e => { setSelectedState(e.target.value); setPage(1); setShowMobileFilters(false); }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+          >
+            <option value="">All Locations</option>
+            {(selectedCountry === 'NG' ? NIGERIAN_STATES : USA_STATES).map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 
@@ -186,7 +208,7 @@ function MarketplaceContent() {
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 sm:mb-4">BraidMee Marketplace</h1>
           <p className="text-sm sm:text-base text-purple-100 mb-6">
-            Discover premium hair accessories, extensions, and braiding materials
+            Discover premium hair accessories, extensions, and braiding materials from Nigeria 🇳🇬 and USA 🇺🇸
           </p>
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -236,6 +258,14 @@ function MarketplaceContent() {
 
           {/* Products */}
           <div className="lg:col-span-3">
+            {/* Braider notice */}
+            {user?.role === 'braider' && (
+              <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
+                <Crown className="w-5 h-5 text-purple-600" />
+                <p className="text-purple-700 text-sm font-semibold">Your products are highlighted with a purple border</p>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -243,10 +273,7 @@ function MarketplaceContent() {
                 <div>
                   <p className="font-semibold text-red-900">Failed to load products</p>
                   <p className="text-red-700 text-sm">{error}</p>
-                  <button
-                    onClick={() => { setError(''); setPage(1); }}
-                    className="mt-2 text-sm text-red-600 underline"
-                  >
+                  <button onClick={() => { setError(''); setPage(1); }} className="mt-2 text-sm text-red-600 underline">
                     Try again
                   </button>
                 </div>
@@ -268,9 +295,9 @@ function MarketplaceContent() {
                 <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600 text-lg font-semibold">No products found</p>
                 <p className="text-gray-500 text-sm mt-1">Try adjusting your filters or search term</p>
-                {(selectedCategory || selectedState || searchTerm) && (
+                {(selectedCategory || selectedState || searchTerm || selectedCountry) && (
                   <button
-                    onClick={() => { setSelectedCategory(''); setSelectedState(''); setSearchTerm(''); setPage(1); }}
+                    onClick={() => { setSelectedCategory(''); setSelectedState(''); setSearchTerm(''); setSelectedCountry(''); setPage(1); }}
                     className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
                   >
                     Clear all filters
@@ -282,57 +309,87 @@ function MarketplaceContent() {
             {/* Products Grid */}
             {!loading && !error && products.length > 0 && (
               <>
+                <p className="text-sm text-gray-500 mb-4">{products.length} product{products.length !== 1 ? 's' : ''} found</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-                  {products.map(product => (
-                    <Link key={product.id} href={`/marketplace/product/${product.id}`} className="group">
-                      <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:-translate-y-1">
-                        {/* Image */}
-                        <div className="relative h-48 sm:h-56 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-5xl">🛍️</div>
-                          )}
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-4 sm:p-5 flex-1 flex flex-col">
-                          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
-                            {product.name}
-                          </h3>
-
-                          <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 mb-3">
-                            <MapPin className="w-3 h-3 flex-shrink-0" />
-                            <span className="truncate">
-                              {product.location_city && product.location_state
-                                ? `${product.location_city}, ${product.location_state}`
-                                : 'Location not specified'}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 mb-4">
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-semibold">{(product.rating_avg || 0).toFixed(1)}</span>
-                            <span className="text-xs text-gray-400">({product.rating_count || 0})</span>
-                          </div>
-
-                          <div className="mt-auto">
-                            <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-3">
-                              {product.currency === 'NGN' ? '₦' : '$'}{(product.price || 0).toLocaleString()}
+                  {products.map(product => {
+                    const isOwn = isOwnProduct(product);
+                    return (
+                      <Link key={product.id} href={`/marketplace/product/${product.id}`} className="group">
+                        <div className={`bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:-translate-y-1 ${
+                          isOwn ? 'ring-2 ring-purple-500 ring-offset-2' : ''
+                        }`}>
+                          {/* Image */}
+                          <div className="relative h-48 sm:h-56 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+                            {product.image_url ? (
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-5xl">🛍️</div>
+                            )}
+                            {/* Country badge */}
+                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-semibold text-gray-700 shadow">
+                              {product.country_code === 'US' ? '🇺🇸' : '🇳🇬'}
                             </div>
-                            <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all text-sm sm:text-base flex items-center justify-center gap-2">
-                              <ShoppingBag className="w-4 h-4" />
-                              Order Now
-                            </button>
+                            {/* Own product badge */}
+                            {isOwn && (
+                              <div className="absolute top-2 left-2 bg-purple-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <Crown className="w-3 h-3" />
+                                Your Product
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="p-4 sm:p-5 flex-1 flex flex-col">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+                              {product.name}
+                            </h3>
+
+                            <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 mb-3">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {product.location_city && product.location_state
+                                  ? `${product.location_city}, ${product.location_state}`
+                                  : 'Location not specified'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-4">
+                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm font-semibold">{(product.rating_avg || 0).toFixed(1)}</span>
+                              <span className="text-xs text-gray-400">({product.rating_count || 0})</span>
+                            </div>
+
+                            <div className="mt-auto">
+                              <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-3">
+                                {product.currency === 'USD' ? '$' : '₦'}{(product.price || 0).toLocaleString()}
+                              </div>
+                              {isOwn ? (
+                                <Link
+                                  href={`/braider/marketplace/edit/${product.id}`}
+                                  onClick={e => e.stopPropagation()}
+                                  className="w-full bg-purple-100 text-purple-700 py-2 sm:py-3 rounded-lg font-semibold hover:bg-purple-200 transition-all text-sm sm:text-base flex items-center justify-center gap-2 border-2 border-purple-300"
+                                >
+                                  ✏️ Edit Your Product
+                                </Link>
+                              ) : (
+                                <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all text-sm sm:text-base flex items-center justify-center gap-2">
+                                  <ShoppingBag className="w-4 h-4" />
+                                  Order Now
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}
@@ -347,7 +404,7 @@ function MarketplaceContent() {
                   <span className="px-4 py-2 text-sm text-gray-600">Page {page}</span>
                   <button
                     onClick={() => setPage(p => p + 1)}
-                    disabled={products.length < 12}
+                    disabled={products.length < 20}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
                   >
                     Next
