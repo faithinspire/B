@@ -47,7 +47,7 @@ export default function AdminBookingsPage() {
       result = result.filter(b =>
         b.customer_name.toLowerCase().includes(q) ||
         b.braider_name.toLowerCase().includes(q) ||
-        b.service_type.toLowerCase().includes(q)
+        (b.service_name || b.service_type || '').toLowerCase().includes(q)
       );
     }
     if (statusFilter !== 'all') {
@@ -107,11 +107,24 @@ export default function AdminBookingsPage() {
 
   const formatDateTime = (date: string, time: string) => {
     try {
-      const dateObj = new Date(date);
-      if (time) {
-        return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+      // Handle DATE type (YYYY-MM-DD format) vs TIMESTAMP
+      if (date && date.length === 10 && date.includes('-')) {
+        // It's a DATE type
+        const [year, month, day] = date.split('-');
+        const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (time) {
+          return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+        } else {
+          return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
       } else {
-        return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        // It's a TIMESTAMP
+        const dateObj = new Date(date);
+        if (time) {
+          return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+        } else {
+          return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
       }
     } catch {
       return time ? `${date} at ${time}` : date;

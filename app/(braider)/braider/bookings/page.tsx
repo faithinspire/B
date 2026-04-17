@@ -123,7 +123,7 @@ export default function BraiderBookingsPage() {
       </div>
 
       {/* Main content area with proper spacing for bottom navbar */}
-      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full pb-20 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">

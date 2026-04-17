@@ -59,8 +59,8 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
     
-    // Poll for updates every 10 seconds for better real-time experience
-    const interval = setInterval(fetchUsers, 10000);
+    // Poll for updates every 3 seconds for better real-time experience
+    const interval = setInterval(fetchUsers, 3000);
     
     // Set up real-time subscription for instant updates
     let subscription: any = null;
