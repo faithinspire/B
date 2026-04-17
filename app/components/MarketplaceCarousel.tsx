@@ -9,7 +9,7 @@ interface Product {
   name: string;
   price: number;
   currency: string;
-  images: string[];
+  image_url: string | null;
   rating_avg: number;
   rating_count: number;
   braider_id: string;
@@ -32,8 +32,9 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
         const url = new URL('/api/marketplace/products', window.location.origin);
         if (category) url.searchParams.append('category', category);
         url.searchParams.append('limit', '12');
+        url.searchParams.append('country_code', 'NG');
 
-        const response = await fetch(url);
+        const response = await fetch(url.toString());
         const data = await response.json();
         setProducts(data.data || []);
       } catch (err) {
@@ -81,7 +82,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
       name: 'Premium Hair Extensions',
       price: 15000,
       currency: 'NGN',
-      images: ['/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png'],
+      image_url: null,
       rating_avg: 4.8,
       rating_count: 124,
       braider_id: 'demo',
@@ -91,7 +92,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
       name: 'Braiding Beads Set',
       price: 5000,
       currency: 'NGN',
-      images: ['/images/braiding-styles/gemini-3-pro-image-preview-2k_b_Hero_Background_Imag.png'],
+      image_url: null,
       rating_avg: 4.9,
       rating_count: 89,
       braider_id: 'demo',
@@ -101,7 +102,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
       name: 'Wig Installation Kit',
       price: 25000,
       currency: 'NGN',
-      images: ['/images/braiding-styles/b_Professional_photo_o.png'],
+      image_url: null,
       rating_avg: 4.7,
       rating_count: 156,
       braider_id: 'demo',
@@ -111,7 +112,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
       name: 'Braiding Thread Bundle',
       price: 8000,
       currency: 'NGN',
-      images: ['/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png'],
+      image_url: null,
       rating_avg: 4.6,
       rating_count: 203,
       braider_id: 'demo',
@@ -147,16 +148,16 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
             {displayProducts.map((product) => (
               <Link
                 key={product.id}
-                href={`/marketplace/product/${product.id}`}
+                href={product.id.startsWith('demo') ? '/marketplace' : `/marketplace`}
                 className="flex-shrink-0 w-72 group/card"
               >
                 {/* Product Card */}
                 <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:scale-105 hover:-translate-y-2">
                   {/* Image Container */}
                   <div className="relative h-64 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
-                    {product.images && product.images.length > 0 ? (
+                    {product.image_url ? (
                       <img
-                        src={product.images[0]}
+                        src={product.image_url}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
                       />
