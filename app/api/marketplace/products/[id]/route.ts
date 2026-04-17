@@ -51,20 +51,32 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      return NextResponse.json({ success: false, error: 'Server not configured' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
     const body = await request.json();
-    const userId = request.headers.get('x-user-id');
+
+    // Accept auth via Authorization header or x-user-id header
+    const authHeader = request.headers.get('authorization');
+    const xUserId = request.headers.get('x-user-id');
+    let userId = xUserId;
+
+    if (authHeader && !userId) {
+      const anonClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await anonClient.auth.getUser(token);
+      userId = user?.id || null;
+    }
 
     if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify ownership
@@ -75,39 +87,24 @@ export async function PUT(
       .single();
 
     if (!product || product.braider_id !== userId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 403 }
-      );
+      return NextResponse.json({ success: false, error: 'Unauthorized - not your product' }, { status: 403 });
     }
 
     const { data: updated, error } = await supabase
       .from('marketplace_products')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ...body, updated_at: new Date().toISOString() })
       .eq('id', params.id)
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: updated,
-    });
+    return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     console.error('Product update error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }
 }
 
