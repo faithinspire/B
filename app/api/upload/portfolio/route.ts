@@ -37,6 +37,12 @@ export async function POST(request: NextRequest) {
     const filePath = `${userId}/${fileName}`
     const buffer = await file.arrayBuffer()
 
+    // Ensure bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.some(b => b.name === 'portfolio')) {
+      await supabase.storage.createBucket('portfolio', { public: true, fileSizeLimit: 10485760 });
+    }
+
     // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from('portfolio')

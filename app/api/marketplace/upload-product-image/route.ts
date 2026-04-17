@@ -1,89 +1,74 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+const BUCKET_NAME = 'braider-uploads';
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      return NextResponse.json(
-        { success: false, error: 'File must be an image' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'File must be an image' }, { status: 400 });
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: 'File must be less than 5MB' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'File must be less than 5MB' }, { status: 400 });
     }
 
-    // Get auth token from request headers
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
-      return NextResponse.json(
-        { success: false, error: 'Not authenticated - missing authorization header' },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Create Supabase client with service role key for uploads
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !serviceRoleKey || !anonKey) {
-      console.error('Missing Supabase credentials');
-      return NextResponse.json(
-        { success: false, error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 });
     }
 
-    // First verify the token with anon key
-    const anonSupabase = createClient(supabaseUrl, anonKey, {
-      auth: { persistSession: false }
-    });
-
+    // Verify token
+    const anonSupabase = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await anonSupabase.auth.getUser(token);
 
     if (userError || !user) {
-      console.error('Auth verification error:', userError);
-      return NextResponse.json(
-        { success: false, error: 'Invalid authentication token' },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: 'Invalid authentication token' }, { status: 401 });
     }
 
-    // Now use service role for upload
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false }
-    });
+    // Use service role for upload
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Convert file to buffer
+    // Ensure bucket exists - create if missing
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
+
+    if (!bucketExists) {
+      const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, {
+        public: true,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        fileSizeLimit: 5242880, // 5MB
+      });
+      if (createError && !createError.message.includes('already exists')) {
+        console.error('Bucket creation error:', createError);
+        return NextResponse.json({ success: false, error: `Storage setup failed: ${createError.message}` }, { status: 500 });
+      }
+    }
+
     const buffer = await file.arrayBuffer();
-
-    // Generate unique filename
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `marketplace/${timestamp}-${random}.${ext}`;
 
-    // Upload file to storage
-    const { data, error: uploadError } = await supabase.storage
-      .from('braider-uploads')
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
       .upload(fileName, buffer, {
         contentType: file.type,
         cacheControl: '3600',
@@ -92,23 +77,14 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError);
-      return NextResponse.json(
-        { success: false, error: `Upload failed: ${uploadError.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: `Upload failed: ${uploadError.message}` }, { status: 500 });
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('braider-uploads')
-      .getPublicUrl(fileName);
+    const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
 
     return NextResponse.json({
       success: true,
-      data: {
-        imageUrl: publicUrl,
-        fileName: fileName,
-      },
+      data: { imageUrl: publicUrl, fileName },
     });
   } catch (error) {
     console.error('Error uploading image:', error);

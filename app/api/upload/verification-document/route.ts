@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+const BUCKET_NAME = 'braider-documents';
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -8,61 +10,75 @@ export async function POST(request: NextRequest) {
     const type = formData.get('type') as string;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File size must be less than 5MB' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
     }
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Only JPG, PNG, and WebP images are allowed' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Only JPG, PNG, WebP, and PDF files are allowed' }, { status: 400 });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    // Verify auth token from header
+    const authHeader = request.headers.get('authorization');
+    let userId: string | null = null;
+
+    if (authHeader) {
+      const anonClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await anonClient.auth.getUser(token);
+      userId = user?.id || null;
+    }
+
+    // Fall back to checking session via anon client
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Generate unique filename
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+    // Ensure bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.some(b => b.name === BUCKET_NAME)) {
+      await supabase.storage.createBucket(BUCKET_NAME, {
+        public: false,
+        fileSizeLimit: 5242880,
+      });
+    }
+
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const filename = `${type}/${session.user.id}/${timestamp}-${random}-${file.name}`;
+    const ext = file.name.split('.').pop() || 'jpg';
+    const docType = type || 'document';
+    const filename = `${docType}/${userId}/${timestamp}-${random}.${ext}`;
 
-    // Upload to Supabase Storage
+    const buffer = await file.arrayBuffer();
+
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('verification-documents')
-      .upload(filename, file, {
+      .from(BUCKET_NAME)
+      .upload(filename, buffer, {
+        contentType: file.type,
         cacheControl: '3600',
         upsert: false,
       });
 
     if (uploadError) {
-      throw uploadError;
+      console.error('Upload error:', uploadError);
+      return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 });
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('verification-documents')
-      .getPublicUrl(filename);
+    const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
 
     return NextResponse.json({
       success: true,
@@ -71,9 +87,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Document upload error:', error);
-    return NextResponse.json(
-      { error: 'Failed to upload document' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 });
   }
 }

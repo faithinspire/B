@@ -80,6 +80,15 @@ export async function POST(request: Request) {
 
     console.log('Uploading file:', filename, 'Size:', file.size, 'Type:', file.type);
 
+    // Ensure bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.some(b => b.name === 'braider-documents')) {
+      await supabase.storage.createBucket('braider-documents', {
+        public: false,
+        fileSizeLimit: 5242880,
+      });
+    }
+
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from('braider-documents')
