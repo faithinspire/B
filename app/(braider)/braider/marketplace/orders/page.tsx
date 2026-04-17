@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, CheckCircle, XCircle, MessageCircle, Loader, AlertCircle, Package, MapPin, Clock } from 'lucide-react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface Order {
   id: string;
@@ -40,9 +40,16 @@ export default function BraiderOrdersPage() {
   useEffect(() => {
     const resolve = async () => {
       if (accessToken) { setResolvedToken(accessToken); return; }
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
+      // Try getting session from supabase client
+      try {
+        const db = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data: { session } } = await db.auth.getSession();
         if (session?.access_token) setResolvedToken(session.access_token);
+      } catch (e) {
+        console.error('Session resolve error:', e);
       }
     };
     resolve();
@@ -345,10 +352,4 @@ export default function BraiderOrdersPage() {
       </div>
     </div>
   );
-}
-
-// Need createClient import
-function createClient(url: string, key: string) {
-  const { createClient: create } = require('@supabase/supabase-js');
-  return create(url, key);
 }

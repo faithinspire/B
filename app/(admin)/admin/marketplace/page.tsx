@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { ShoppingBag, RefreshCw, AlertCircle, CheckCircle, Package, MapPin, Clock, DollarSign, Loader, X } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
 interface Order {
   id: string;
@@ -25,13 +24,6 @@ interface Order {
   quantity?: number;
 }
 
-function getDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
 export default function AdminMarketplacePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,55 +36,10 @@ export default function AdminMarketplacePage() {
     setLoading(true);
     setError('');
     try {
-      const db = getDb();
-
-      const { data: ordersData, error: ordersError } = await db
-        .from('marketplace_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-      if (!ordersData?.length) { setOrders([]); return; }
-
-      // Enrich with profiles
-      const customerIds = [...new Set(ordersData.map(o => o.customer_id))];
-      const braiderIds = [...new Set(ordersData.map(o => o.braider_id))];
-      const allIds = [...new Set([...customerIds, ...braiderIds])];
-
-      const { data: profiles } = await db
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', allIds);
-
-      const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
-
-      // Get order items
-      const orderIds = ordersData.map(o => o.id);
-      const { data: items } = await db
-        .from('marketplace_order_items')
-        .select('order_id, quantity, marketplace_products(name, image_url)')
-        .in('order_id', orderIds);
-
-      const itemMap: Record<string, any> = {};
-      (items || []).forEach((item: any) => { itemMap[item.order_id] = item; });
-
-      const enriched = ordersData.map(order => {
-        const customer = profileMap[order.customer_id] || {};
-        const braider = profileMap[order.braider_id] || {};
-        const item = itemMap[order.id];
-        return {
-          ...order,
-          customer_name: (customer as any).full_name || 'Customer',
-          customer_email: (customer as any).email || '',
-          braider_name: (braider as any).full_name || 'Braider',
-          braider_email: (braider as any).email || '',
-          product_name: item?.marketplace_products?.name || 'Product',
-          product_image: item?.marketplace_products?.image_url || null,
-          quantity: item?.quantity || 1,
-        };
-      });
-
-      setOrders(enriched);
+      const res = await fetch('/api/admin/marketplace/orders');
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to load orders');
+      setOrders(data.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load orders');
     } finally {
@@ -105,13 +52,13 @@ export default function AdminMarketplacePage() {
   const handleReleasePayout = async (orderId: string) => {
     setActionLoading(orderId);
     try {
-      const db = getDb();
-      const { error } = await db
-        .from('marketplace_orders')
-        .update({ status: 'paid_out', updated_at: new Date().toISOString() })
-        .eq('id', orderId);
-
-      if (error) throw error;
+      const res = await fetch('/api/admin/marketplace/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, status: 'paid_out' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to release payment');
       setSuccessMsg('Payment released to braider!');
       setTimeout(() => setSuccessMsg(''), 3000);
       await fetchOrders();
