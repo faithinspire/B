@@ -1,0 +1,21 @@
+Vercel CLI Setup Instructions:
+
+Since the Vercel CLI is asking for setup, here are the answers:
+
+1. Set up and deploy "~\Desktop\BRAID2"? (Y/n) - Answer: Y
+2. Which scope should contain your project? - Select: "Faithtech 's projects"
+3. Link to existing project? (y/N) - Answer: N (create new)
+4. What's your project's name? - Use: "braid-2" or "braidme"
+5. In which directory is your code located? - Use: "./"
+
+However, since you already have a Vercel project linked to GitHub, you might want to:
+1. Cancel the setup (Ctrl+C)
+2. Get your VERCEL_TOKEN from https://vercel.com/account/tokens
+3. Add it to .env.local: VERCEL_TOKEN=your_token_here
+4. Run: vercel --token $VERCEL_TOKEN deploy --prod
+
+Or simpler: Just wait for Vercel auto-deploy since we pushed to master.
+
+The commit "Force Vercel deployment - changes not reflected in app" has been pushed to GitHub. Vercel should automatically detect this and start deploying within 1-2 minutes.
+
+Check deployment status at: https://vercel.com/dashboard

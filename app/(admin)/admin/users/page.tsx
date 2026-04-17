@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, RefreshCw, AlertCircle, Phone, Trash2, X, Loader, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface User {
   id: string;
@@ -58,9 +59,30 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
     
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchUsers, 30000);
-    return () => clearInterval(interval);
+    // Poll for updates every 10 seconds for better real-time experience
+    const interval = setInterval(fetchUsers, 10000);
+    
+    // Set up real-time subscription for instant updates
+    let subscription: any = null;
+    if (supabase) {
+      subscription = supabase
+        .channel('admin-users-changes')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'profiles' },
+          () => {
+            console.log('Profiles table changed, refreshing users...');
+            fetchUsers();
+          }
+        )
+        .subscribe();
+    }
+    
+    return () => {
+      clearInterval(interval);
+      if (subscription) {
+        supabase?.removeChannel(subscription);
+      }
+    };
   }, []);
 
   const handleDelete = async (user: User) => {

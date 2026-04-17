@@ -1,0 +1,31 @@
+Vercel CLI Setup - Answer these prompts:
+
+1. What's your project's name? (braid-2) 
+   Answer: braid-2
+
+2. In which directory is your code located? ./
+   Answer: ./
+
+After setup completes, the CLI will deploy or you can cancel with Ctrl+C.
+
+Alternative: Since we already pushed a commit earlier, Vercel should auto-deploy.
+
+Check deployment status at: https://vercel.com/dashboard
+
+CRITICAL FIXES APPLIED:
+1. Braider orders page layout fixed
+2. Admin users page now polls for updates (30s interval)
+3. Chat page has conversation creation fallback
+4. Documentation created: CRITICAL_FIXES_SUMMARY_NOW.md
+
+Files modified:
+- app/(braider)/braider/bookings/page.tsx
+- app/(braider)/braider/messages/[booking_id]/page.tsx  
+- app/(admin)/admin/users/page.tsx
+- CRITICAL_FIXES_SUMMARY_NOW.md
+
+Next steps:
+1. Complete Vercel setup or cancel
+2. Test fixes locally
+3. Deploy to production
+4. Verify all issues are resolved

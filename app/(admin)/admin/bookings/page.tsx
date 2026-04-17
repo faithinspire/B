@@ -11,12 +11,16 @@ interface Booking {
   braider_id: string;
   customer_name: string;
   braider_name: string;
-  service_type: string;
-  location: string;
+  service_name: string;
+  service_type?: string;
+  location_address: string;
+  location?: string;
   appointment_date: string;
-  appointment_time: string;
-  status: 'pending' | 'ongoing' | 'completed' | 'cancelled';
-  total_amount: number;
+  appointment_time?: string;
+  status: 'pending' | 'confirmed' | 'accepted' | 'escrowed' | 'completed' | 'cancelled' | 'ongoing';
+  service_price: number;
+  total_amount?: number;
+  braider_payout?: number;
   created_at: string;
   updated_at: string;
   notes?: string;
@@ -104,9 +108,13 @@ export default function AdminBookingsPage() {
   const formatDateTime = (date: string, time: string) => {
     try {
       const dateObj = new Date(date);
-      return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+      if (time) {
+        return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+      } else {
+        return `${dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      }
     } catch {
-      return `${date} at ${time}`;
+      return time ? `${date} at ${time}` : date;
     }
   };
 
@@ -176,7 +184,7 @@ export default function AdminBookingsPage() {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{booking.service_type}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{booking.service_name || booking.service_type || 'Service'}</h3>
                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.status)}`}>
                       {getStatusIcon(booking.status)}
                       {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
@@ -192,17 +200,17 @@ export default function AdminBookingsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      {formatDateTime(booking.appointment_date, booking.appointment_time)}
+                      {formatDateTime(booking.appointment_date, booking.appointment_time || '')}
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
-                      {booking.location}
+                      {booking.location_address || booking.location || 'Location not specified'}
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-gray-900">${booking.total_amount.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">${(booking.total_amount || booking.service_price || 0).toFixed(2)}</p>
                   <button
                     onClick={() => {
                       setSelectedBooking(booking);
@@ -259,19 +267,19 @@ export default function AdminBookingsPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Service</p>
-                  <p className="text-gray-900">{selectedBooking.service_type}</p>
+                  <p className="text-gray-900">{selectedBooking.service_name || selectedBooking.service_type || 'Service'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Amount</p>
-                  <p className="text-2xl font-bold text-gray-900">${selectedBooking.total_amount.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">${(selectedBooking.total_amount || selectedBooking.service_price || 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Date & Time</p>
-                  <p className="text-gray-900">{formatDateTime(selectedBooking.appointment_date, selectedBooking.appointment_time)}</p>
+                  <p className="text-gray-900">{formatDateTime(selectedBooking.appointment_date, selectedBooking.appointment_time || '')}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Location</p>
-                  <p className="text-gray-900">{selectedBooking.location}</p>
+                  <p className="text-gray-900">{selectedBooking.location_address || selectedBooking.location || 'Location not specified'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600 mb-1">Created</p>

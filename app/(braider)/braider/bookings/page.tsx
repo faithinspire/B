@@ -113,20 +113,23 @@ export default function BraiderBookingsPage() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-primary-50 via-white to-accent-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex flex-col">
       {/* Header - Fixed positioning relative to scrollable content */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 w-full">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <h1 className="text-3xl font-serif font-bold text-gray-900">My Bookings</h1>
           <p className="text-gray-600 mt-1">Manage your appointments and bookings</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+      {/* Main content area with proper spacing for bottom navbar */}
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {loading ? (
-          <div className="text-center py-12">
-            <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading bookings...</p>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Loading bookings...</p>
+            </div>
           </div>
         ) : localBookings.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
@@ -135,7 +138,7 @@ export default function BraiderBookingsPage() {
             <p className="text-gray-500">Your bookings will appear here once customers book your services</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {localBookings.map((booking) => (
               <div key={booking.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -251,6 +254,9 @@ export default function BraiderBookingsPage() {
           </div>
         )}
       </div>
+
+      {/* Bottom spacing for navbar */}
+      <div className="h-20"></div>
     </div>
   );
 }
