@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wand2, Upload, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { Upload, Loader, AlertCircle, CheckCircle } from 'lucide-react';
+import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { supabase } from '@/lib/supabase';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
 
 const CATEGORIES = [
@@ -24,7 +25,7 @@ const NIGERIAN_STATES = [
   'Delta', 'Rivers', 'Bayelsa', 'Cross River', 'Akwa Ibom', 'Calabar',
   'Abia', 'Imo', 'Ebonyi', 'Anambra', 'Nasarawa', 'Plateau', 'Taraba',
   'Adamawa', 'Yobe', 'Borno', 'Jigawa', 'Kebbi', 'Sokoto', 'Zamfara',
-  'Niger', 'Gombe', 'Bauchi', 'Benue', 'Gusau', 'Zaria', 'Katsina',
+  'Niger', 'Gombe', 'Bauchi', 'Benue', 'Gusau', 'Zaria',
 ];
 
 const USA_STATES = [
@@ -40,13 +41,13 @@ const USA_STATES = [
 
 export default function AddProduct() {
   const router = useRouter();
+  const { user, accessToken, loading: authLoading } = useSupabaseAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [generatingImage, setGeneratingImage] = useState(false);
   const [country, setCountry] = useState<CountryCode>('NG');
-  const [session, setSession] = useState<any>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [resolvedToken, setResolvedToken] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -59,28 +60,36 @@ export default function AddProduct() {
     location_city: '',
   });
 
+  // Resolve the auth token - try store first, then supabase session
   useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+    const resolveToken = async () => {
+      // First try the stored token
+      if (accessToken) {
+        setResolvedToken(accessToken);
+        return;
+      }
+
+      // Fall back to getting session from supabase client
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          setResolvedToken(session.access_token);
+          return;
+        }
+      }
+
+      // No token found - redirect to login
+      if (!authLoading) {
         router.push('/login');
-      } else {
-        setSession(session);
       }
     };
-    checkAuth();
-  }, [router]);
+
+    resolveToken();
+  }, [accessToken, authLoading, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
@@ -99,14 +108,18 @@ export default function AddProduct() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      setError('Please select an image file (JPG, PNG, WebP)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    const token = resolvedToken;
+    if (!token) {
+      setError('Not authenticated. Please log in again.');
       return;
     }
 
@@ -114,34 +127,26 @@ export default function AddProduct() {
     setError('');
 
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('file', file);
+      const fd = new FormData();
+      fd.append('file', file);
 
       const response = await fetch('/api/marketplace/upload-product-image', {
         method: 'POST',
-        body: formDataToSend,
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
       });
 
       const data = await response.json();
 
-      if (!data.success) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || 'Upload failed');
       }
 
-      setFormData(prev => ({
-        ...prev,
-        image_url: data.data.imageUrl,
-      }));
-
-      setSuccess('Image uploaded successfully!');
+      setFormData(prev => ({ ...prev, image_url: data.data.imageUrl }));
+      setSuccess('Image uploaded!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to upload image';
-      setError(errorMsg);
-      console.error('Error uploading image:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
       setUploading(false);
     }
@@ -152,40 +157,26 @@ export default function AddProduct() {
     setError('');
     setSuccess('');
 
-    // Validate form
-    if (!formData.name.trim()) {
-      setError('Product name is required');
-      return;
-    }
-    if (!formData.category) {
-      setError('Category is required');
-      return;
-    }
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      setError('Valid price is required');
-      return;
-    }
-    if (!formData.location_state) {
-      setError('State/Province is required');
-      return;
-    }
-    if (!formData.location_city.trim()) {
-      setError('City is required');
+    if (!formData.name.trim()) { setError('Product name is required'); return; }
+    if (!formData.category) { setError('Category is required'); return; }
+    if (!formData.price || parseFloat(formData.price) <= 0) { setError('Valid price is required'); return; }
+    if (!formData.location_state) { setError('State/Province is required'); return; }
+    if (!formData.location_city.trim()) { setError('City is required'); return; }
+
+    const token = resolvedToken;
+    if (!token) {
+      setError('Not authenticated. Please log in again.');
       return;
     }
 
     setLoading(true);
 
     try {
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
       const response = await fetch('/api/marketplace/add-product', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: formData.name.trim(),
@@ -203,27 +194,26 @@ export default function AddProduct() {
 
       const data = await response.json();
 
-      if (!data.success) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to add product');
       }
 
       setSuccess('Product added successfully! Redirecting...');
-      setTimeout(() => {
-        router.push('/braider/marketplace');
-      }, 2000);
+      setTimeout(() => router.push('/braider/marketplace'), 2000);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to add product';
-      setError(errorMsg);
-      console.error('Error adding product:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add product');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!session) {
+  if (authLoading || (!resolvedToken && !error)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader className="w-8 h-8 animate-spin text-purple-600" />
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+          <p className="text-gray-600 text-sm">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -234,7 +224,7 @@ export default function AddProduct() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Add New Product</h1>
-          <p className="text-gray-600">Create a new product listing for your marketplace</p>
+          <p className="text-gray-600">Create a new product listing for the marketplace</p>
         </div>
 
         {/* Error Alert */}
@@ -242,7 +232,7 @@ export default function AddProduct() {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
+              <p className="font-semibold text-red-900">Error</p>
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           </div>
@@ -252,20 +242,14 @@ export default function AddProduct() {
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-green-900">Success</h3>
-              <p className="text-green-700 text-sm">{success}</p>
-            </div>
+            <p className="text-green-700 text-sm font-semibold">{success}</p>
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-8">
           {/* Country Selection */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-4">
-              Selling Country *
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-4">Selling Country *</label>
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {Object.entries(COUNTRIES).map(([code, config]) => (
                 <button
@@ -288,46 +272,40 @@ export default function AddProduct() {
 
           {/* Product Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Product Name *
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Product Name *</label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
               placeholder="e.g., Premium Hair Extensions"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Description
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Description</label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleInputChange}
               rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all resize-none"
-              placeholder="Describe your product in detail..."
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent resize-none"
+              placeholder="Describe your product..."
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Category *
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Category *</label>
             <select
               name="category"
               value={formData.category}
               onChange={handleInputChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
             >
               <option value="">Select a category</option>
               {CATEGORIES.map(cat => (
@@ -347,26 +325,23 @@ export default function AddProduct() {
                 value={formData.location_state}
                 onChange={handleInputChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
               >
-                <option value="">Select {country === 'NG' ? 'state' : 'state'}</option>
+                <option value="">Select state</option>
                 {(country === 'NG' ? NIGERIAN_STATES : USA_STATES).map(state => (
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                City *
-              </label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">City *</label>
               <input
                 type="text"
                 name="location_city"
                 value={formData.location_city}
                 onChange={handleInputChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                 placeholder={country === 'NG' ? 'e.g., Ikoyi' : 'e.g., New York'}
               />
             </div>
@@ -384,17 +359,14 @@ export default function AddProduct() {
                 value={formData.price}
                 onChange={handleInputChange}
                 required
-                min="0"
+                min="0.01"
                 step="0.01"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                 placeholder="0.00"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Stock Quantity *
-              </label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Stock Quantity *</label>
               <input
                 type="number"
                 name="stock_quantity"
@@ -402,7 +374,7 @@ export default function AddProduct() {
                 onChange={handleInputChange}
                 required
                 min="0"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                 placeholder="0"
               />
             </div>
@@ -419,6 +391,7 @@ export default function AddProduct() {
                   alt="Product preview"
                   className="w-full h-48 sm:h-64 object-cover rounded-lg shadow-md"
                 />
+                <p className="text-sm text-green-600 mt-2 font-semibold">✓ Image uploaded</p>
               </div>
             )}
 
@@ -431,9 +404,7 @@ export default function AddProduct() {
               ) : (
                 <>
                   <Upload className="w-5 h-5 text-purple-600" />
-                  <span className="text-gray-700">
-                    {formData.image_url ? 'Change Image' : 'Upload Image'}
-                  </span>
+                  <span className="text-gray-700">{formData.image_url ? 'Change Image' : 'Upload Image'}</span>
                 </>
               )}
               <input
@@ -444,21 +415,18 @@ export default function AddProduct() {
                 className="hidden"
               />
             </label>
-            <p className="text-xs text-gray-600 mt-2">Max 5MB. Supported: JPG, PNG, WebP</p>
+            <p className="text-xs text-gray-500 mt-2">Max 5MB. JPG, PNG, WebP supported.</p>
           </div>
 
-          {/* Submit Buttons */}
+          {/* Submit */}
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || uploading}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 transition-all font-semibold flex items-center justify-center gap-2"
             >
               {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Adding...
-                </>
+                <><Loader className="w-5 h-5 animate-spin" /> Adding...</>
               ) : (
                 'Add Product'
               )}

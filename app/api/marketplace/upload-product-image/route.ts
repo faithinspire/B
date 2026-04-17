@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json(
-        { success: false, error: 'Not authenticated' },
+        { success: false, error: 'Not authenticated - missing authorization header' },
         { status: 401 }
       );
     }
@@ -41,8 +41,9 @@ export async function POST(request: NextRequest) {
     // Create Supabase client with service role key for uploads
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       console.error('Missing Supabase credentials');
       return NextResponse.json(
         { success: false, error: 'Server configuration error' },
@@ -50,6 +51,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // First verify the token with anon key
+    const anonSupabase = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await anonSupabase.auth.getUser(token);
+
+    if (userError || !user) {
+      console.error('Auth verification error:', userError);
+      return NextResponse.json(
+        { success: false, error: 'Invalid authentication token' },
+        { status: 401 }
+      );
+    }
+
+    // Now use service role for upload
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
     });

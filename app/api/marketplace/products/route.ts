@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       .eq('country_code', country_code)
       .order('created_at', { ascending: false });
 
-    // Apply filters
+    // Apply filters - category is sent as name string
     if (category && category !== '') {
       query = query.eq('category', category);
     }
