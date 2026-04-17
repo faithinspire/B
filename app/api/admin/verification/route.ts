@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Get braider_profiles
     let query = supabase
       .from('braider_profiles')
-      .select('id, user_id, bio, verification_status, is_active, created_at, rating_avg, rating_count')
+      .select('id, user_id, bio, verification_status, profile_approved, is_active, created_at, rating_avg, rating_count')
       .order('created_at', { ascending: false });
 
     if (status !== 'all') {
@@ -51,9 +51,25 @@ export async function GET(request: NextRequest) {
 
     const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
 
-    // Merge data
+    // Merge data - map enum values to display-friendly statuses
     const braiders = braiderProfiles.map(bp => {
       const profile = profileMap[bp.user_id] || {};
+      
+      // Map enum verification_status to display status
+      let displayStatus = bp.verification_status || 'unverified';
+      if (bp.verification_status === 'tier1_verified' || 
+          bp.verification_status === 'tier2_verified' || 
+          bp.verification_status === 'safety_badge_pro' ||
+          bp.profile_approved === true) {
+        displayStatus = 'approved';
+      } else if (bp.verification_status === 'tier1_pending' || 
+                 bp.verification_status === 'tier2_pending') {
+        displayStatus = 'pending';
+      } else if (bp.verification_status === 'unverified') {
+        displayStatus = 'unverified';
+      }
+      // If column was altered to text, 'approved'/'rejected' pass through directly
+      
       return {
         id: bp.id,
         user_id: bp.user_id,
@@ -62,7 +78,9 @@ export async function GET(request: NextRequest) {
         phone: (profile as any).phone || '',
         avatar_url: (profile as any).avatar_url || null,
         bio: bp.bio || '',
-        verification_status: bp.verification_status || 'pending',
+        verification_status: displayStatus,
+        raw_verification_status: bp.verification_status,
+        profile_approved: bp.profile_approved,
         is_active: bp.is_active,
         rating_avg: bp.rating_avg || 0,
         rating_count: bp.rating_count || 0,
@@ -71,35 +89,40 @@ export async function GET(request: NextRequest) {
     });
 
     // Stats - count all regardless of filter
-    const { count: pending } = await supabase
+    // Count approved = tier1_verified OR tier2_verified OR safety_badge_pro OR profile_approved=true OR status='approved'
+    const { count: approvedCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('verification_status', 'pending');
+      .or('verification_status.eq.tier1_verified,verification_status.eq.tier2_verified,verification_status.eq.safety_badge_pro,verification_status.eq.approved,profile_approved.eq.true');
 
-    const { count: approved } = await supabase
+    const { count: pendingCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('verification_status', 'approved');
+      .or('verification_status.eq.tier1_pending,verification_status.eq.tier2_pending,verification_status.eq.pending');
 
-    const { count: rejected } = await supabase
+    const { count: rejectedCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('verification_status', 'rejected');
+      .or('verification_status.eq.rejected');
 
-    const { count: unverified } = await supabase
+    const { count: unverifiedCount } = await supabase
       .from('braider_profiles')
       .select('*', { count: 'exact', head: true })
       .eq('verification_status', 'unverified');
+
+    const { count: totalCount } = await supabase
+      .from('braider_profiles')
+      .select('*', { count: 'exact', head: true });
 
     return NextResponse.json({
       success: true,
       data: braiders,
       stats: {
-        pending: pending || 0,
-        approved: approved || 0,
-        rejected: rejected || 0,
-        unverified: unverified || 0,
-        total: (pending || 0) + (approved || 0) + (rejected || 0) + (unverified || 0),
+        pending: pendingCount || 0,
+        approved: approvedCount || 0,
+        rejected: rejectedCount || 0,
+        unverified: unverifiedCount || 0,
+        total: totalCount || 0,
       },
     });
   } catch (error) {
