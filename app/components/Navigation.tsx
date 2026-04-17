@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
-import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle } from 'lucide-react';
+import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle, ShoppingBag } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -43,8 +43,8 @@ export function Navigation() {
       return [
         { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/booking', icon: Zap, label: 'Book' },
+        { href: '/marketplace', icon: ShoppingBag, label: 'Shop' },
         { href: '/messages', icon: MessageSquare, label: 'Messages' },
-        { href: '/favorites', icon: Heart, label: 'Favorites' },
         { href: '/profile', icon: User, label: 'Profile' },
       ];
     }
@@ -94,6 +94,9 @@ export function Navigation() {
                   </Link>
                   <Link href="/search" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
                     Browse
+                  </Link>
+                  <Link href="/marketplace" className="px-4 py-2 text-purple-600 hover:text-purple-700 transition-colors font-medium flex items-center gap-1">
+                    <ShoppingBag className="w-4 h-4" /> Shop
                   </Link>
                   <Link href="/premium" className="px-4 py-2 text-yellow-600 hover:text-yellow-700 transition-colors font-medium flex items-center gap-1">
                     <span>👑</span> Premium

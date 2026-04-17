@@ -6,6 +6,7 @@ import { Upload, Loader, AlertCircle, CheckCircle, Wand2, Sparkles } from 'lucid
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
+import { getCitiesForState } from '@/lib/cities';
 
 const CATEGORIES = [
   'Hair Extensions',
@@ -377,15 +378,41 @@ export default function AddProduct() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-2">City *</label>
-              <input
-                type="text"
-                name="location_city"
-                value={formData.location_city}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                placeholder={country === 'NG' ? 'e.g., Ikoyi' : 'e.g., New York'}
-              />
+              {formData.location_state ? (
+                <select
+                  name="location_city"
+                  value={formData.location_city}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                >
+                  <option value="">Select city</option>
+                  {getCitiesForState(formData.location_state, country).map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                  <option value="__other__">Other (type below)</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="location_city"
+                  value={formData.location_city}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  placeholder="Select a state first"
+                  disabled
+                />
+              )}
+              {formData.location_city === '__other__' && (
+                <input
+                  type="text"
+                  name="location_city"
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent mt-2"
+                  placeholder={country === 'NG' ? 'e.g., Ikoyi' : 'e.g., New York'}
+                />
+              )}
             </div>
           </div>
 

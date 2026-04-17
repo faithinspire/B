@@ -13,6 +13,7 @@ interface Product {
   rating_avg: number;
   rating_count: number;
   braider_id: string;
+  country_code: string;
 }
 
 interface MarketplaceCarouselProps {
@@ -20,6 +21,76 @@ interface MarketplaceCarouselProps {
   subtitle?: string;
   category?: string;
 }
+
+// Demo products with real-looking images from Unsplash (free to use)
+const DEMO_PRODUCTS: Product[] = [
+  {
+    id: 'demo-1',
+    name: 'Premium Hair Extensions',
+    price: 15000,
+    currency: 'NGN',
+    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop',
+    rating_avg: 4.8,
+    rating_count: 124,
+    braider_id: 'demo',
+    country_code: 'NG',
+  },
+  {
+    id: 'demo-2',
+    name: 'Braiding Beads Set',
+    price: 5000,
+    currency: 'NGN',
+    image_url: 'https://images.unsplash.com/photo-1560869713-7d0a29430803?w=400&h=300&fit=crop',
+    rating_avg: 4.9,
+    rating_count: 89,
+    braider_id: 'demo',
+    country_code: 'NG',
+  },
+  {
+    id: 'demo-3',
+    name: 'Wig Installation Kit',
+    price: 25000,
+    currency: 'NGN',
+    image_url: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400&h=300&fit=crop',
+    rating_avg: 4.7,
+    rating_count: 156,
+    braider_id: 'demo',
+    country_code: 'NG',
+  },
+  {
+    id: 'demo-4',
+    name: 'Braiding Thread Bundle',
+    price: 8000,
+    currency: 'NGN',
+    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop&q=80',
+    rating_avg: 4.6,
+    rating_count: 203,
+    braider_id: 'demo',
+    country_code: 'NG',
+  },
+  {
+    id: 'demo-5',
+    name: 'Hair Care Oil Set',
+    price: 45,
+    currency: 'USD',
+    image_url: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&h=300&fit=crop',
+    rating_avg: 4.9,
+    rating_count: 67,
+    braider_id: 'demo',
+    country_code: 'US',
+  },
+  {
+    id: 'demo-6',
+    name: 'Knotless Braid Kit',
+    price: 35,
+    currency: 'USD',
+    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop&q=60',
+    rating_avg: 4.7,
+    rating_count: 91,
+    braider_id: 'demo',
+    country_code: 'US',
+  },
+];
 
 export default function MarketplaceCarousel({ title, subtitle, category }: MarketplaceCarouselProps) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,16 +100,24 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const url = new URL('/api/marketplace/products', window.location.origin);
-        if (category) url.searchParams.append('category', category);
-        url.searchParams.append('limit', '12');
-        url.searchParams.append('country_code', 'NG');
+        // Fetch from both countries to show all products
+        const [ngRes, usRes] = await Promise.allSettled([
+          fetch(`/api/marketplace/products?limit=6&country_code=NG${category ? `&category=${encodeURIComponent(category)}` : ''}`),
+          fetch(`/api/marketplace/products?limit=6&country_code=US${category ? `&category=${encodeURIComponent(category)}` : ''}`),
+        ]);
 
-        const response = await fetch(url.toString());
-        const data = await response.json();
-        setProducts(data.data || []);
+        const ngProducts = ngRes.status === 'fulfilled' && ngRes.value.ok
+          ? (await ngRes.value.json()).data || []
+          : [];
+        const usProducts = usRes.status === 'fulfilled' && usRes.value.ok
+          ? (await usRes.value.json()).data || []
+          : [];
+
+        const combined = [...ngProducts, ...usProducts];
+        setProducts(combined);
       } catch (err) {
         console.error('Error fetching products:', err);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -52,7 +131,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
     if (!container) return;
 
     const scrollAmount = 400;
-    const newPosition = direction === 'left' 
+    const newPosition = direction === 'left'
       ? Math.max(0, scrollPosition - scrollAmount)
       : scrollPosition + scrollAmount;
 
@@ -75,49 +154,8 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
     );
   }
 
-  // Show demo products if no real products exist
-  const displayProducts = products.length > 0 ? products : [
-    {
-      id: 'demo-1',
-      name: 'Premium Hair Extensions',
-      price: 15000,
-      currency: 'NGN',
-      image_url: null,
-      rating_avg: 4.8,
-      rating_count: 124,
-      braider_id: 'demo',
-    },
-    {
-      id: 'demo-2',
-      name: 'Braiding Beads Set',
-      price: 5000,
-      currency: 'NGN',
-      image_url: null,
-      rating_avg: 4.9,
-      rating_count: 89,
-      braider_id: 'demo',
-    },
-    {
-      id: 'demo-3',
-      name: 'Wig Installation Kit',
-      price: 25000,
-      currency: 'NGN',
-      image_url: null,
-      rating_avg: 4.7,
-      rating_count: 156,
-      braider_id: 'demo',
-    },
-    {
-      id: 'demo-4',
-      name: 'Braiding Thread Bundle',
-      price: 8000,
-      currency: 'NGN',
-      image_url: null,
-      rating_avg: 4.6,
-      rating_count: 203,
-      braider_id: 'demo',
-    },
-  ];
+  // Use real products if available, otherwise show demo products
+  const displayProducts = products.length > 0 ? products : DEMO_PRODUCTS;
 
   return (
     <section className="py-12 px-4 md:px-8 bg-gradient-to-br from-white via-purple-50 to-white">
@@ -143,41 +181,46 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
           <div
             id={`carousel-${title}`}
             className="flex gap-6 overflow-x-auto scroll-smooth pb-4 snap-x snap-mandatory"
-            style={{ scrollBehavior: 'smooth' }}
+            style={{ scrollBehavior: 'smooth', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {displayProducts.map((product) => (
               <Link
                 key={product.id}
                 href={product.id.startsWith('demo') ? '/marketplace' : `/marketplace/product/${product.id}`}
-                className="flex-shrink-0 w-72 group/card"
+                className="flex-shrink-0 w-64 sm:w-72 group/card snap-start"
               >
                 {/* Product Card */}
                 <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:scale-105 hover:-translate-y-2">
                   {/* Image Container */}
-                  <div className="relative h-64 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+                  <div className="relative h-48 sm:h-64 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
                     {product.image_url ? (
                       <img
                         src={product.image_url}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
                         }}
                       />
                     ) : null}
-                    <div className={`w-full h-full flex items-center justify-center text-5xl ${product.image_url ? 'hidden' : ''}`}>
+                    <div
+                      className="w-full h-full items-center justify-center text-5xl"
+                      style={{ display: product.image_url ? 'none' : 'flex' }}
+                    >
                       🛍️
                     </div>
                     {/* Badge */}
-                    <div className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-lg">
-                      Featured
+                    <div className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-lg">
+                      {product.country_code === 'US' ? '🇺🇸 USA' : '🇳🇬 NG'}
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover/card:text-purple-600 transition-colors">
+                  <div className="p-4 sm:p-5 flex-1 flex flex-col">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover/card:text-purple-600 transition-colors">
                       {product.name}
                     </h3>
 
@@ -186,25 +229,21 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
                       <div className="flex items-center gap-1">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                         <span className="text-sm font-semibold text-gray-900">
-                          {product.rating_avg.toFixed(1)}
+                          {(product.rating_avg || 0).toFixed(1)}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">({product.rating_count})</span>
+                      <span className="text-xs text-gray-500">({product.rating_count || 0})</span>
                     </div>
 
                     {/* Price */}
                     <div className="mt-auto">
-                      {product.price ? (
-                        <div className="text-2xl font-bold text-purple-600 mb-4">
-                          {product.currency === 'USD' ? '$' : '₦'}{product.price.toLocaleString()}
-                        </div>
-                      ) : (
-                        <div className="text-lg text-gray-600 mb-4">Contact for price</div>
-                      )}
+                      <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-3 sm:mb-4">
+                        {product.currency === 'USD' ? '$' : '₦'}{(product.price || 0).toLocaleString()}
+                      </div>
 
                       {/* CTA Button */}
-                      <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 group-hover/card:from-purple-700 group-hover/card:to-pink-700">
-                        <ShoppingBag className="w-5 h-5" />
+                      <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 group-hover/card:from-purple-700 group-hover/card:to-pink-700 text-sm sm:text-base">
+                        <ShoppingBag className="w-4 sm:w-5 h-4 sm:h-5" />
                         Order Now
                       </button>
                     </div>
