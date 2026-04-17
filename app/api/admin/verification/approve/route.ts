@@ -21,49 +21,50 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // First check what the current verification_status column type accepts
-    // Try 'tier1_verified' first (standard enum value), fall back to 'approved'
-    let updateData: Record<string, unknown> = {
-      profile_approved: true,
-      is_active: true,
-    };
+    // Try 'tier1_verified' first (original enum value), then 'approved' (after migration)
+    let success = false;
+    let lastError = '';
 
-    // Try to update with tier1_verified (valid enum value)
-    const { error: updateError } = await supabase
+    // Attempt 1: tier1_verified (works with original enum)
+    const { error: e1 } = await supabase
       .from('braider_profiles')
-      .update({
-        ...updateData,
-        verification_status: 'tier1_verified',
-      })
+      .update({ verification_status: 'tier1_verified', is_active: true })
       .eq('id', braider_id);
 
-    if (updateError) {
-      console.error('Approve with tier1_verified failed:', updateError.message);
-      
-      // Try with 'approved' (if enum was extended or column is text)
-      const { error: updateError2 } = await supabase
+    if (!e1) {
+      success = true;
+    } else {
+      lastError = e1.message;
+      console.error('tier1_verified failed:', e1.message);
+
+      // Attempt 2: approved (works after migration to TEXT)
+      const { error: e2 } = await supabase
         .from('braider_profiles')
-        .update({
-          ...updateData,
-          verification_status: 'approved',
-        })
+        .update({ verification_status: 'approved', is_active: true })
         .eq('id', braider_id);
 
-      if (updateError2) {
-        console.error('Approve with approved failed:', updateError2.message);
-        
-        // Last resort: just update profile_approved without changing status
-        const { error: updateError3 } = await supabase
+      if (!e2) {
+        success = true;
+      } else {
+        lastError = e2.message;
+        console.error('approved failed:', e2.message);
+
+        // Attempt 3: just set is_active (always works)
+        const { error: e3 } = await supabase
           .from('braider_profiles')
-          .update({ profile_approved: true, is_active: true })
+          .update({ is_active: true })
           .eq('id', braider_id);
 
-        if (updateError3) {
-          return NextResponse.json({ success: false, error: updateError3.message }, { status: 500 });
+        if (!e3) {
+          success = true;
+        } else {
+          lastError = e3.message;
         }
-        
-        return NextResponse.json({ success: true, message: 'Braider approved (profile_approved set to true)' });
       }
+    }
+
+    if (!success) {
+      return NextResponse.json({ success: false, error: lastError }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: 'Braider approved successfully' });

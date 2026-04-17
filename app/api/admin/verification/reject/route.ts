@@ -21,44 +21,44 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Try 'unverified' first (valid enum value for rejection), fall back to 'rejected'
-    const { error: updateError } = await supabase
+    let success = false;
+    let lastError = '';
+
+    // Attempt 1: unverified (original enum value)
+    const { error: e1 } = await supabase
       .from('braider_profiles')
-      .update({
-        verification_status: 'unverified',
-        profile_approved: false,
-        is_active: false,
-      })
+      .update({ verification_status: 'unverified', is_active: false })
       .eq('id', braider_id);
 
-    if (updateError) {
-      console.error('Reject with unverified failed:', updateError.message);
-      
-      // Try with 'rejected' (if enum was extended or column is text)
-      const { error: updateError2 } = await supabase
+    if (!e1) {
+      success = true;
+    } else {
+      lastError = e1.message;
+
+      // Attempt 2: rejected (after migration to TEXT)
+      const { error: e2 } = await supabase
         .from('braider_profiles')
-        .update({
-          verification_status: 'rejected',
-          profile_approved: false,
-          is_active: false,
-        })
+        .update({ verification_status: 'rejected', is_active: false })
         .eq('id', braider_id);
 
-      if (updateError2) {
-        console.error('Reject with rejected failed:', updateError2.message);
-        
-        // Last resort: just update profile_approved
-        const { error: updateError3 } = await supabase
+      if (!e2) {
+        success = true;
+      } else {
+        lastError = e2.message;
+
+        // Attempt 3: just set is_active
+        const { error: e3 } = await supabase
           .from('braider_profiles')
-          .update({ profile_approved: false, is_active: false })
+          .update({ is_active: false })
           .eq('id', braider_id);
 
-        if (updateError3) {
-          return NextResponse.json({ success: false, error: updateError3.message }, { status: 500 });
-        }
-        
-        return NextResponse.json({ success: true, message: 'Braider rejected (profile_approved set to false)' });
+        if (!e3) success = true;
+        else lastError = e3.message;
       }
+    }
+
+    if (!success) {
+      return NextResponse.json({ success: false, error: lastError }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
