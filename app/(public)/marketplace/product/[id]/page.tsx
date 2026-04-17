@@ -5,10 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Star, MapPin, ShoppingBag, Package, Loader, AlertCircle,
-  CheckCircle, X, CreditCard, Truck, Shield, ChevronDown, ChevronUp
+  CheckCircle, X, CreditCard, Truck, Shield, ChevronDown, ChevronUp, MessageCircle
 } from 'lucide-react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { supabase } from '@/lib/supabase';
+import { MarketplaceChat } from '@/app/components/MarketplaceChat';
 
 interface Product {
   id: string;
@@ -43,7 +44,9 @@ export default function ProductDetailPage() {
   const [ordering, setOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [orderId, setOrderId] = useState('');
   const [orderError, setOrderError] = useState('');
+  const [showChat, setShowChat] = useState(false);
 
   // Order form state
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -134,6 +137,7 @@ export default function ProductDetailPage() {
 
       // If Stripe - show success (in real app would show Stripe Elements)
       setOrderNumber(data.data.order_number);
+      setOrderId(data.data.order_id);
       setOrderSuccess(true);
       setShowOrderModal(false);
     } catch (err) {
@@ -178,12 +182,32 @@ export default function ProductDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-white via-purple-50 to-white">
       {/* Order Success Banner */}
       {orderSuccess && (
-        <div className="bg-green-600 text-white py-4 px-4 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            <p className="font-semibold">Order placed! Order #{orderNumber} — Payment on delivery.</p>
+        <div className="bg-green-600 text-white py-4 px-4">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              <p className="font-semibold">Order placed! Order #{orderNumber} — Payment on delivery.</p>
+            </div>
+            <button
+              onClick={() => setShowChat(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-green-700 rounded-lg font-semibold text-sm hover:bg-green-50"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Chat with Seller
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Chat Modal */}
+      {showChat && product && orderId && (
+        <MarketplaceChat
+          orderId={orderId}
+          otherUserId={product.braider_id}
+          otherUserName="Seller"
+          onClose={() => setShowChat(false)}
+          isModal={true}
+        />
       )}
 
       {/* Back */}

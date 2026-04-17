@@ -53,8 +53,8 @@ export function Navigation() {
       return [
         { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
+        { href: '/braider/marketplace/orders', icon: ShoppingBag, label: 'Orders' },
         { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
-        { href: '/braider/services', icon: Settings, label: 'Services' },
         { href: '/braider/wallet', icon: Wallet, label: 'Wallet' },
       ];
     }

@@ -33,7 +33,7 @@ export default function VerificationPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null); // format: "braider_id:action"
   const [selectedBraider, setSelectedBraider] = useState<Braider | null>(null);
   const [actionMessage, setActionMessage] = useState('');
 
@@ -65,8 +65,9 @@ export default function VerificationPage() {
   }, []);
 
   const handleAction = async (braider_id: string, action: 'approve' | 'reject') => {
+    const loadingKey = `${braider_id}:${action}`;
     try {
-      setActionLoading(braider_id);
+      setActionLoading(loadingKey);
       setActionMessage('');
 
       const endpoint = action === 'approve'
@@ -84,7 +85,7 @@ export default function VerificationPage() {
         throw new Error(data.error || `Failed to ${action}`);
       }
 
-      setActionMessage(`Braider ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      setActionMessage(`Braider ${action === 'approve' ? 'approved ✅' : 'rejected ❌'} successfully!`);
       setSelectedBraider(null);
       await fetchBraiders();
       setTimeout(() => setActionMessage(''), 3000);
@@ -277,18 +278,18 @@ export default function VerificationPage() {
                             <>
                               <button
                                 onClick={() => handleAction(braider.id, 'approve')}
-                                disabled={actionLoading === braider.id}
+                                disabled={actionLoading === `${braider.id}:approve`}
                                 className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
                               >
-                                {actionLoading === braider.id ? <Loader className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                                {actionLoading === `${braider.id}:approve` ? <Loader className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
                                 Approve
                               </button>
                               <button
                                 onClick={() => handleAction(braider.id, 'reject')}
-                                disabled={actionLoading === braider.id}
+                                disabled={actionLoading === `${braider.id}:reject`}
                                 className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
                               >
-                                {actionLoading === braider.id ? <Loader className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                                {actionLoading === `${braider.id}:reject` ? <Loader className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
                                 Reject
                               </button>
                             </>
@@ -296,7 +297,7 @@ export default function VerificationPage() {
                           {braider.verification_status === 'approved' && (
                             <button
                               onClick={() => handleAction(braider.id, 'reject')}
-                              disabled={actionLoading === braider.id}
+                              disabled={actionLoading === `${braider.id}:reject`}
                               className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50"
                             >
                               Revoke
@@ -305,7 +306,7 @@ export default function VerificationPage() {
                           {braider.verification_status === 'rejected' && (
                             <button
                               onClick={() => handleAction(braider.id, 'approve')}
-                              disabled={actionLoading === braider.id}
+                              disabled={actionLoading === `${braider.id}:approve`}
                               className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 disabled:opacity-50"
                             >
                               Re-approve
@@ -391,18 +392,18 @@ export default function VerificationPage() {
               <div className="border-t p-5 flex gap-3">
                 <button
                   onClick={() => handleAction(selectedBraider.id, 'reject')}
-                  disabled={actionLoading === selectedBraider.id}
+                  disabled={actionLoading === `${selectedBraider.id}:reject`}
                   className="flex-1 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-semibold text-sm flex items-center justify-center gap-2"
                 >
-                  {actionLoading === selectedBraider.id ? <Loader className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  {actionLoading === `${selectedBraider.id}:reject` ? <Loader className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                   Reject
                 </button>
                 <button
                   onClick={() => handleAction(selectedBraider.id, 'approve')}
-                  disabled={actionLoading === selectedBraider.id}
+                  disabled={actionLoading === `${selectedBraider.id}:approve`}
                   className="flex-1 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold text-sm flex items-center justify-center gap-2"
                 >
-                  {actionLoading === selectedBraider.id ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {actionLoading === `${selectedBraider.id}:approve` ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                   Approve
                 </button>
               </div>
