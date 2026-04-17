@@ -123,7 +123,7 @@ export default function BraiderBookingsPage() {
       </div>
 
       {/* Main content area with proper spacing for bottom navbar */}
-      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full pb-20 overflow-y-auto">
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full pb-28 md:pb-8 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -255,8 +255,8 @@ export default function BraiderBookingsPage() {
         )}
       </div>
 
-      {/* Bottom spacing for navbar */}
-      <div className="h-20"></div>
+      {/* Bottom spacing for navbar - mobile only */}
+      <div className="h-24 md:hidden"></div>
     </div>
   );
 }

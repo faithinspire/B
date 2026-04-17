@@ -37,7 +37,6 @@ export async function GET(request: Request) {
 
     // Try new schema first (customer_id / braider_id columns)
     let conversations: any[] = [];
-    let usedOldSchema = false;
 
     const newQuery = db.from('conversations').select('*');
     if (role === 'customer') {
@@ -65,7 +64,6 @@ export async function GET(request: Request) {
 
       if (!oldError && oldData) {
         conversations = oldData.map(normalize);
-        usedOldSchema = true;
       }
     }
 
@@ -107,17 +105,22 @@ export async function POST(request: Request) {
 
     // Check if conversation already exists for this booking or these participants
     let existing: any = null;
+    
+    // Try by booking_id first
     if (booking_id) {
       const { data } = await db.from('conversations').select('*').eq('booking_id', booking_id).maybeSingle();
       existing = data;
     }
+    
+    // Try by new schema columns
     if (!existing) {
       const { data } = await db.from('conversations').select('*')
         .eq('customer_id', customer_id).eq('braider_id', braider_id).maybeSingle();
       existing = data;
     }
+    
+    // Try by old schema columns
     if (!existing) {
-      // Try old schema
       const { data } = await db.from('conversations').select('*')
         .eq('participant1_id', customer_id).eq('participant2_id', braider_id).maybeSingle();
       existing = data;
@@ -154,6 +157,7 @@ export async function POST(request: Request) {
     const { data: data2, error: error2 } = await db.from('conversations').insert([{
       participant1_id: customer_id,
       participant2_id: braider_id,
+      booking_id: booking_id || null,
       created_at: now,
     }]).select().single();
 
