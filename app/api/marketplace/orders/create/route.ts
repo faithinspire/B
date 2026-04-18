@@ -78,14 +78,18 @@ export async function POST(request: NextRequest) {
       .from('marketplace_orders')
       .insert({
         order_number,
+        product_id,
+        quantity,
         customer_id: user.id,
         braider_id: product.braider_id,
         total_amount,
+        platform_fee,
+        seller_payout,
         currency,
         status: 'pending',
+        payment_status: 'pending',
         payment_method: payment_method || (country_code === 'NG' ? 'paystack' : 'stripe'),
         shipping_address,
-        notes: `Platform fee: ${currency} ${platform_fee.toFixed(2)} (1%). Seller payout: ${currency} ${seller_payout.toFixed(2)}`,
       })
       .select()
       .single();
@@ -95,14 +99,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: orderError.message }, { status: 500 });
     }
 
-    // Create order item
-    await supabase.from('marketplace_order_items').insert({
-      order_id: order.id,
-      product_id,
-      quantity,
-      unit_price,
-      subtotal,
-    });
+    // Try to create order item (non-critical - table may not exist)
+    try {
+      await supabase.from('marketplace_order_items').insert({
+        order_id: order.id,
+        product_id,
+        quantity,
+        unit_price,
+        subtotal,
+      });
+    } catch (itemErr) {
+      console.log('Note: Could not create order item (table may not exist):', itemErr);
+    }
 
     // Reduce stock
     await supabase

@@ -408,10 +408,14 @@ function MarketplaceContent() {
                                         });
                                         const data = await res.json();
                                         if (data.success && data.conversation) {
-                                          router.push(`/messages?conversation=${data.conversation.id}`);
+                                          // Navigate to messages list — conversation will appear there
+                                          router.push('/messages');
+                                        } else {
+                                          router.push('/messages');
                                         }
                                       } catch (err) {
                                         console.error('Chat error:', err);
+                                        router.push('/messages');
                                       }
                                     }}
                                     className="w-full border-2 border-purple-300 text-purple-600 py-2 sm:py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all text-sm sm:text-base flex items-center justify-center gap-2"

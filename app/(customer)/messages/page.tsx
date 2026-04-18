@@ -87,7 +87,15 @@ export default function CustomerMessagesPage() {
   if (!user || user.role !== 'customer') return null;
 
   const filtered = convs.filter(c => c.other_name.toLowerCase().includes(search.toLowerCase()));
-  const navTo = (c: Conv) => router.push('/messages/' + (c.booking_id || c.id));
+  const navTo = (c: Conv) => {
+    // For booking-based conversations, use booking_id
+    // For marketplace/general conversations, use conversation id directly
+    if (c.booking_id) {
+      router.push('/messages/' + c.booking_id);
+    } else {
+      router.push('/messages/conv/' + c.id);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const state = searchParams.get('state');
     const city = searchParams.get('city');
-    const country = searchParams.get('country') || 'NG';
+    const country = searchParams.get('country'); // Don't default to 'NG' - show all braiders
 
     // Use service role client to bypass RLS
     const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -46,13 +46,12 @@ export async function GET(request: NextRequest) {
     console.log('=== API: Filters - state:', state, 'city:', city, 'country:', country);
 
     // Fetch braiders from braider_profiles table - include all statuses except rejected
-    // New braiders start as 'pending' or 'unverified', so they need to be visible
     let query = serviceSupabase
       .from('braider_profiles')
       .select('*')
       .neq('verification_status', 'rejected'); // Exclude only rejected braiders
 
-    // Apply location filters if provided
+    // Apply location filters only if explicitly provided
     if (state) {
       query = query.ilike('state', `%${state}%`);
     }
@@ -60,6 +59,7 @@ export async function GET(request: NextRequest) {
       query = query.ilike('city', `%${city}%`);
     }
     if (country) {
+      // Only filter by country if explicitly requested
       query = query.eq('country', country);
     }
 

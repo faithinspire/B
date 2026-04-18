@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, CheckCircle, XCircle, MessageCircle, Loader, AlertCircle, Package, MapPin, Clock } from 'lucide-react';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { createClient } from '@supabase/supabase-js';
 
 interface Order {
   id: string;
@@ -38,25 +37,7 @@ export default function BraiderOrdersPage() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
-  const [resolvedToken, setResolvedToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
-
-  useEffect(() => {
-    const resolve = async () => {
-      if (accessToken) { setResolvedToken(accessToken); return; }
-      try {
-        const db = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const { data: { session } } = await db.auth.getSession();
-        if (session?.access_token) setResolvedToken(session.access_token);
-      } catch (e) {
-        console.error('Session resolve error:', e);
-      }
-    };
-    resolve();
-  }, [accessToken]);
 
   useEffect(() => {
     if (!user) return;
@@ -69,58 +50,16 @@ export default function BraiderOrdersPage() {
     setError('');
 
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !anonKey) throw new Error('Config error');
-
-      const client = createClient(supabaseUrl, anonKey);
-
-      // Get orders for this braider
-      const { data: ordersData, error: ordersError } = await client
-        .from('marketplace_orders')
-        .select('*')
-        .eq('braider_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-
-      if (!ordersData || ordersData.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
+      // Use admin orders API which uses service role key (bypasses RLS)
+      const res = await fetch(`/api/admin/orders?braider_id=${user.id}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to load orders');
       }
-
-      // Get customer profiles
-      const customerIds = [...new Set(ordersData.map(o => o.customer_id))];
-      const { data: profiles } = await client
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', customerIds);
-
-      const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
-
-      // Get product info
-      const productIds = [...new Set(ordersData.map(o => o.product_id))];
-      const { data: products } = await client
-        .from('marketplace_products')
-        .select('id, name, image_url')
-        .in('id', productIds);
-
-      const productMap = Object.fromEntries((products || []).map(p => [p.id, p]));
-
-      const enriched = ordersData.map(order => {
-        const profile = profileMap[order.customer_id] || {};
-        const product = productMap[order.product_id] || {};
-        return {
-          ...order,
-          customer_name: profile.full_name || 'Customer',
-          customer_email: profile.email || '',
-          product_name: product.name || 'Product',
-          product_image: product.image_url || null,
-        };
-      });
-
-      setOrders(enriched);
+      const data = await res.json();
+      // Filter to only this braider's orders
+      const allOrders = (data.orders || []).filter((o: Order) => o.braider_id === user.id);
+      setOrders(allOrders);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load orders');
     } finally {
@@ -129,29 +68,22 @@ export default function BraiderOrdersPage() {
   };
 
   const handleAction = async (orderId: string, action: 'accept' | 'reject' | 'deliver') => {
-    if (!resolvedToken) {
-      setError('Not authenticated');
-      return;
-    }
-
     setActionLoading(orderId);
     setError('');
 
     try {
       const newStatus = action === 'accept' ? 'confirmed' : action === 'reject' ? 'cancelled' : 'delivered';
       
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !anonKey) throw new Error('Config error');
+      const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
-      const client = createClient(supabaseUrl, anonKey);
-
-      const { error: updateError } = await client
-        .from('marketplace_orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderId);
-
-      if (updateError) throw updateError;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to ${action} order`);
+      }
 
       setSuccessMsg(`Order ${action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'marked as delivered'} successfully!`);
       setTimeout(() => setSuccessMsg(''), 3000);

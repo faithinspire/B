@@ -15,11 +15,20 @@ export async function GET(request: NextRequest) {
       { auth: { persistSession: false } }
     );
 
-    // Fetch all orders
-    const { data: orders, error: ordersError } = await supabase
+    const { searchParams } = new URL(request.url);
+    const braider_id = searchParams.get('braider_id');
+
+    // Fetch all orders (or filtered by braider)
+    let query = supabase
       .from('marketplace_orders')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (braider_id) {
+      query = query.eq('braider_id', braider_id);
+    }
+
+    const { data: orders, error: ordersError } = await query;
 
     if (ordersError) {
       console.error('Orders fetch error:', ordersError);

@@ -21,46 +21,59 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    console.log('Approving braider:', braider_id);
+    console.log('Approving braider with id:', braider_id);
 
-    // Update the braider profile verification status
-    const { error: updateError } = await supabase
+    // First try: update by braider_profiles.id (the profile row id)
+    const { data: byId, error: err1 } = await supabase
       .from('braider_profiles')
       .update({ verification_status: 'approved' })
-      .eq('id', braider_id);
+      .eq('id', braider_id)
+      .select('id, user_id')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('Error updating braider profile:', updateError);
-      
-      // Try with user_id instead of id
-      const { error: updateError2 } = await supabase
+    let userId: string | null = null;
+
+    if (byId) {
+      userId = byId.user_id;
+      console.log('Updated by profile id, user_id:', userId);
+    } else {
+      // Second try: update by user_id
+      const { data: byUserId, error: err2 } = await supabase
         .from('braider_profiles')
         .update({ verification_status: 'approved' })
-        .eq('user_id', braider_id);
+        .eq('user_id', braider_id)
+        .select('id, user_id')
+        .maybeSingle();
 
-      if (updateError2) {
-        return NextResponse.json({ 
-          success: false, 
-          error: `Failed to update: ${updateError2.message}` 
-        }, { status: 500 });
+      if (byUserId) {
+        userId = byUserId.user_id;
+        console.log('Updated by user_id:', userId);
+      } else {
+        console.error('Could not find braider profile:', { err1, err2 });
+        return NextResponse.json({
+          success: false,
+          error: `Braider profile not found. Tried id and user_id.`,
+        }, { status: 404 });
       }
     }
 
-    // Also update the profiles table role if needed
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ role: 'braider' })
-      .eq('id', braider_id);
+    // Update the profiles table to ensure role is 'braider'
+    if (userId) {
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ role: 'braider' })
+        .eq('id', userId);
 
-    if (profileError) {
-      console.log('Note: Could not update profile role:', profileError.message);
+      if (profileErr) {
+        console.warn('Could not update profile role:', profileErr.message);
+      }
     }
 
     console.log('Braider approved successfully');
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Braider approved successfully' 
+    return NextResponse.json({
+      success: true,
+      message: 'Braider approved successfully',
     });
   } catch (error) {
     console.error('Approve error:', error);
