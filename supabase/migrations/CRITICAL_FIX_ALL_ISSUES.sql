@@ -239,5 +239,24 @@ FROM auth.users u
 WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = u.id);
 
 -- =====================================================
+-- 9. CREATE RPC FUNCTION FOR VERIFICATION UPDATE
+-- =====================================================
+
+-- Create function to update braider verification status
+CREATE OR REPLACE FUNCTION update_braider_verification(
+  p_braider_id UUID,
+  p_status VARCHAR(50)
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE braider_profiles
+  SET verification_status = p_status
+  WHERE id = p_braider_id;
+  
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
 -- DONE! All critical fixes applied.
 -- =====================================================

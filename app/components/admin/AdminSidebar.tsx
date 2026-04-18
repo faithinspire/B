@@ -24,6 +24,7 @@ const menuItems = [
   { icon: CheckCircle, label: 'Braiders', href: '/admin/braiders' },
   { icon: Users, label: 'Users', href: '/admin/users' },
   { icon: Calendar, label: 'Bookings', href: '/admin/bookings' },
+  { icon: ShoppingBag, label: 'Orders', href: '/admin/orders' },
   { icon: ShoppingBag, label: 'Marketplace', href: '/admin/marketplace' },
   { icon: MessageSquare, label: 'Conversations', href: '/admin/conversations' },
   { icon: CreditCard, label: 'Payments', href: '/admin/payments' },

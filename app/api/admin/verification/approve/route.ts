@@ -21,30 +21,57 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Try 'approved' first (TEXT column), then tier1_verified (enum)
-    const { error: e1 } = await supabase
+    // First, check the current braider profile to understand the schema
+    const { data: currentProfile, error: fetchError } = await supabase
       .from('braider_profiles')
-      .update({ verification_status: 'approved' })
-      .eq('id', braider_id);
+      .select('id, verification_status')
+      .eq('id', braider_id)
+      .single();
 
-    if (!e1) {
-      console.log('Braider approved successfully with "approved" status');
+    if (fetchError) {
+      console.error('Error fetching braider profile:', fetchError);
+      return NextResponse.json({ success: false, error: `Braider not found: ${fetchError.message}` }, { status: 404 });
+    }
+
+    console.log('Current braider profile:', currentProfile);
+
+    // Try different status values based on what might be accepted
+    const statusValues = ['approved', 'tier1_verified', 'verified', 'active'];
+    
+    for (const status of statusValues) {
+      const { error } = await supabase
+        .from('braider_profiles')
+        .update({ verification_status: status })
+        .eq('id', braider_id);
+
+      if (!error) {
+        console.log(`Braider approved successfully with "${status}" status`);
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Braider approved successfully',
+          newStatus: status 
+        });
+      }
+      
+      console.log(`Failed with status "${status}":`, error.message);
+    }
+
+    // If all updates failed, try using raw SQL via RPC
+    const { error: rpcError } = await supabase.rpc('update_braider_verification', {
+      p_braider_id: braider_id,
+      p_status: 'approved'
+    });
+
+    if (!rpcError) {
+      console.log('Braider approved successfully via RPC');
       return NextResponse.json({ success: true, message: 'Braider approved successfully' });
     }
 
-    // Fallback: try 'tier1_verified' (works if column is enum)
-    const { error: e2 } = await supabase
-      .from('braider_profiles')
-      .update({ verification_status: 'tier1_verified' })
-      .eq('id', braider_id);
-
-    if (!e2) {
-      console.log('Braider approved successfully with "tier1_verified" status');
-      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
-    }
-
-    console.error('Both approve attempts failed:', e1.message, e2.message);
-    return NextResponse.json({ success: false, error: `Could not update status: ${e2.message}` }, { status: 500 });
+    console.error('All approve attempts failed');
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Could not update verification status. Please run the SQL migration in Supabase.' 
+    }, { status: 500 });
   } catch (error) {
     console.error('Approve error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
