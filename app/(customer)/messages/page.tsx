@@ -2,15 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { createClient } from '@supabase/supabase-js';
 import { MessageCircle, Search, RefreshCw, Loader, ChevronRight } from 'lucide-react';
-
-function getDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 interface Conv {
   id: string;
@@ -41,28 +33,35 @@ export default function CustomerMessagesPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const db = getDb();
-      // Fetch conversations — try both schemas
-      const { data: rows } = await db.from('conversations').select('*')
-        .or(`customer_id.eq.${user.id},participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
-        .order('updated_at', { ascending: false });
+      // Use the conversations API (service role, bypasses RLS)
+      const res = await fetch(`/api/conversations?user_id=${user.id}&role=customer`);
+      let rows: any[] = [];
 
-      if (!rows?.length) { setConvs([]); return; }
+      if (res.ok) {
+        const data = await res.json();
+        rows = Array.isArray(data) ? data : (data.conversations || []);
+      }
 
+      if (!rows.length) { setConvs([]); return; }
+
+      // Enrich with other user names if not already present
       const enriched: Conv[] = await Promise.all(rows.map(async (row: any) => {
-        const braiderId = row.braider_id || (row.participant1_id === user.id ? row.participant2_id : row.participant1_id);
-        let other_name = 'Braider', other_avatar = null;
-        if (braiderId) {
-          const { data: p } = await db.from('profiles').select('full_name,avatar_url').eq('id', braiderId).single();
-          if (p) { other_name = p.full_name || 'Braider'; other_avatar = p.avatar_url; }
+        let other_name = row.other_user?.full_name || 'Braider';
+        let other_avatar = row.other_user?.avatar_url || null;
+
+        // If no other_user data, fetch profile
+        const braiderId = row.braider_id || row.participant2_id;
+        if (braiderId && !row.other_user) {
+          try {
+            const profileRes = await fetch(`/api/admin/users/${braiderId}`);
+            if (profileRes.ok) {
+              const profile = await profileRes.json();
+              other_name = profile.full_name || 'Braider';
+              other_avatar = profile.avatar_url || null;
+            }
+          } catch {}
         }
-        // Last message
-        const { data: msgs } = await db.from('messages').select('content,created_at,read,sender_id')
-          .eq('conversation_id', row.id).order('created_at', { ascending: false }).limit(1);
-        const last = msgs?.[0];
-        // Unread count
-        const { count } = await db.from('messages').select('*', { count: 'exact', head: true })
-          .eq('conversation_id', row.id).eq('sender_id', braiderId || '').eq('read', false);
+
         return {
           id: row.id,
           booking_id: row.booking_id,
@@ -70,13 +69,19 @@ export default function CustomerMessagesPage() {
           customer_id: row.customer_id || row.participant1_id,
           other_name,
           other_avatar,
-          last_message: last?.content || 'Tap to chat',
-          last_time: last?.created_at || null,
-          unread: count || 0,
+          last_message: row.last_message?.content || 'Tap to chat',
+          last_time: row.last_message?.created_at || row.updated_at || null,
+          unread: row.unread_count || 0,
         };
       }));
+
       setConvs(enriched);
-    } finally { setLoading(false); }
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+      setConvs([]);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {

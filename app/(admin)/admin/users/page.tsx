@@ -59,10 +59,7 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
     
-    // Poll for updates every 3 seconds for better real-time experience
-    const interval = setInterval(fetchUsers, 3000);
-    
-    // Set up real-time subscription for instant updates
+    // Set up real-time subscription for instant updates (no polling)
     let subscription: any = null;
     if (supabase) {
       subscription = supabase
@@ -70,7 +67,6 @@ export default function UsersPage() {
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'profiles' },
           () => {
-            console.log('Profiles table changed, refreshing users...');
             fetchUsers();
           }
         )
@@ -78,7 +74,6 @@ export default function UsersPage() {
     }
     
     return () => {
-      clearInterval(interval);
       if (subscription) {
         supabase?.removeChannel(subscription);
       }

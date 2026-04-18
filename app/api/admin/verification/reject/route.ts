@@ -21,57 +21,58 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // First, check the current braider profile to understand the schema
-    const { data: currentProfile, error: fetchError } = await supabase
+    // Find the braider profile — try by id first, then user_id
+    const { data: profileById } = await supabase
       .from('braider_profiles')
-      .select('id, verification_status')
+      .select('id, user_id, verification_status')
       .eq('id', braider_id)
-      .single();
+      .maybeSingle();
 
-    if (fetchError) {
-      console.error('Error fetching braider profile:', fetchError);
-      return NextResponse.json({ success: false, error: `Braider not found: ${fetchError.message}` }, { status: 404 });
+    const { data: profileByUserId } = !profileById
+      ? await supabase
+          .from('braider_profiles')
+          .select('id, user_id, verification_status')
+          .eq('user_id', braider_id)
+          .maybeSingle()
+      : { data: null };
+
+    const profile = profileById || profileByUserId;
+
+    if (!profile) {
+      return NextResponse.json({
+        success: false,
+        error: 'Braider profile not found',
+      }, { status: 404 });
     }
 
-    console.log('Current braider profile:', currentProfile);
+    // Try updating with 'rejected' — if ENUM error, try 'unverified'
+    const statusesToTry = ['rejected', 'unverified', 'denied'];
+    let updated = false;
+    let lastError = '';
 
-    // Try different status values based on what might be accepted
-    const statusValues = ['rejected', 'unverified', 'denied'];
-    
-    for (const status of statusValues) {
+    for (const status of statusesToTry) {
       const { error } = await supabase
         .from('braider_profiles')
         .update({ verification_status: status })
-        .eq('id', braider_id);
+        .eq('id', profile.id);
 
       if (!error) {
-        console.log(`Braider rejected successfully with "${status}" status`);
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Braider rejected successfully',
-          newStatus: status 
-        });
+        updated = true;
+        console.log(`Braider rejected with status: ${status}`);
+        break;
       }
-      
-      console.log(`Failed with status "${status}":`, error.message);
+      lastError = error.message;
+      console.log(`Status "${status}" failed: ${error.message}`);
     }
 
-    // If all updates failed, try using raw SQL via RPC
-    const { error: rpcError } = await supabase.rpc('update_braider_verification', {
-      p_braider_id: braider_id,
-      p_status: 'rejected'
-    });
-
-    if (!rpcError) {
-      console.log('Braider rejected successfully via RPC');
-      return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
+    if (!updated) {
+      return NextResponse.json({
+        success: false,
+        error: `Could not update verification status. Run the SQL migration. Last error: ${lastError}`,
+      }, { status: 500 });
     }
 
-    console.error('All reject attempts failed');
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Could not update verification status. Please run the SQL migration in Supabase.' 
-    }, { status: 500 });
+    return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
   } catch (error) {
     console.error('Reject error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
