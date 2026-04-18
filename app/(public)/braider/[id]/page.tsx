@@ -228,7 +228,7 @@ export default function BraiderProfilePage() {
                       </p>
                     </div>
                   </div>
-                  <Link href="/booking" className="block w-full mt-4 px-4 py-2 sm:py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-center text-sm sm:text-base">
+                  <Link href={`/booking?braider_id=${braider.user_id}`} className="block w-full mt-4 px-4 py-2 sm:py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-center text-sm sm:text-base">
                     Book Service
                   </Link>
                 </div>

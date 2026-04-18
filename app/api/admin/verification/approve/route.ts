@@ -21,57 +21,47 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // First, check the current braider profile to understand the schema
-    const { data: currentProfile, error: fetchError } = await supabase
+    console.log('Approving braider:', braider_id);
+
+    // Update the braider profile verification status
+    const { error: updateError } = await supabase
       .from('braider_profiles')
-      .select('id, verification_status')
-      .eq('id', braider_id)
-      .single();
+      .update({ verification_status: 'approved' })
+      .eq('id', braider_id);
 
-    if (fetchError) {
-      console.error('Error fetching braider profile:', fetchError);
-      return NextResponse.json({ success: false, error: `Braider not found: ${fetchError.message}` }, { status: 404 });
-    }
-
-    console.log('Current braider profile:', currentProfile);
-
-    // Try different status values based on what might be accepted
-    const statusValues = ['approved', 'tier1_verified', 'verified', 'active'];
-    
-    for (const status of statusValues) {
-      const { error } = await supabase
-        .from('braider_profiles')
-        .update({ verification_status: status })
-        .eq('id', braider_id);
-
-      if (!error) {
-        console.log(`Braider approved successfully with "${status}" status`);
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Braider approved successfully',
-          newStatus: status 
-        });
-      }
+    if (updateError) {
+      console.error('Error updating braider profile:', updateError);
       
-      console.log(`Failed with status "${status}":`, error.message);
+      // Try with user_id instead of id
+      const { error: updateError2 } = await supabase
+        .from('braider_profiles')
+        .update({ verification_status: 'approved' })
+        .eq('user_id', braider_id);
+
+      if (updateError2) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `Failed to update: ${updateError2.message}` 
+        }, { status: 500 });
+      }
     }
 
-    // If all updates failed, try using raw SQL via RPC
-    const { error: rpcError } = await supabase.rpc('update_braider_verification', {
-      p_braider_id: braider_id,
-      p_status: 'approved'
-    });
+    // Also update the profiles table role if needed
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ role: 'braider' })
+      .eq('id', braider_id);
 
-    if (!rpcError) {
-      console.log('Braider approved successfully via RPC');
-      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
+    if (profileError) {
+      console.log('Note: Could not update profile role:', profileError.message);
     }
 
-    console.error('All approve attempts failed');
+    console.log('Braider approved successfully');
+
     return NextResponse.json({ 
-      success: false, 
-      error: 'Could not update verification status. Please run the SQL migration in Supabase.' 
-    }, { status: 500 });
+      success: true, 
+      message: 'Braider approved successfully' 
+    });
   } catch (error) {
     console.error('Approve error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });

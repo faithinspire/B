@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { Clock, ArrowLeft, AlertCircle, CheckCircle, Loader, MapPin, Star } from 'lucide-react';
 
@@ -28,6 +28,8 @@ interface Braider {
 
 export default function BookingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedBraiderId = searchParams?.get('braider_id');
   const { user, loading: authLoading } = useSupabaseAuthStore();
   
   const [step, setStep] = useState(1);
@@ -49,6 +51,16 @@ export default function BookingPage() {
   useEffect(() => {
     loadBraiders();
   }, []);
+
+  // Preselect braider from URL param
+  useEffect(() => {
+    if (preselectedBraiderId && braiders.length > 0 && !formData.braider_id) {
+      const braiderExists = braiders.find(b => b.user_id === preselectedBraiderId);
+      if (braiderExists) {
+        setFormData(prev => ({ ...prev, braider_id: preselectedBraiderId }));
+      }
+    }
+  }, [preselectedBraiderId, braiders]);
 
   // Check auth
   useEffect(() => {

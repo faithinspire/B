@@ -11,9 +11,14 @@ interface Order {
   id: string;
   order_number: string;
   customer_id: string;
+  product_id: string;
+  braider_id: string;
+  quantity: number;
   total_amount: number;
-  currency: string;
+  platform_fee: number;
+  seller_payout: number;
   status: string;
+  payment_status: string;
   shipping_address: string;
   notes: string;
   created_at: string;
@@ -23,7 +28,6 @@ interface Order {
   customer_email?: string;
   product_name?: string;
   product_image?: string;
-  quantity?: number;
 }
 
 export default function BraiderOrdersPage() {
@@ -40,7 +44,6 @@ export default function BraiderOrdersPage() {
   useEffect(() => {
     const resolve = async () => {
       if (accessToken) { setResolvedToken(accessToken); return; }
-      // Try getting session from supabase client
       try {
         const db = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -96,28 +99,24 @@ export default function BraiderOrdersPage() {
 
       const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
 
-      // Get order items with product info
-      const orderIds = ordersData.map(o => o.id);
-      const { data: items } = await client
-        .from('marketplace_order_items')
-        .select('order_id, quantity, marketplace_products(name, image_url)')
-        .in('order_id', orderIds);
+      // Get product info
+      const productIds = [...new Set(ordersData.map(o => o.product_id))];
+      const { data: products } = await client
+        .from('marketplace_products')
+        .select('id, name, image_url')
+        .in('id', productIds);
 
-      const itemMap: Record<string, any> = {};
-      (items || []).forEach((item: any) => {
-        itemMap[item.order_id] = item;
-      });
+      const productMap = Object.fromEntries((products || []).map(p => [p.id, p]));
 
       const enriched = ordersData.map(order => {
         const profile = profileMap[order.customer_id] || {};
-        const item = itemMap[order.id];
+        const product = productMap[order.product_id] || {};
         return {
           ...order,
-          customer_name: (profile as any).full_name || 'Customer',
-          customer_email: (profile as any).email || '',
-          product_name: item?.marketplace_products?.name || 'Product',
-          product_image: item?.marketplace_products?.image_url || null,
-          quantity: item?.quantity || 1,
+          customer_name: profile.full_name || 'Customer',
+          customer_email: profile.email || '',
+          product_name: product.name || 'Product',
+          product_image: product.image_url || null,
         };
       });
 
@@ -129,7 +128,7 @@ export default function BraiderOrdersPage() {
     }
   };
 
-  const handleAction = async (orderId: string, action: 'accept' | 'reject') => {
+  const handleAction = async (orderId: string, action: 'accept' | 'reject' | 'deliver') => {
     if (!resolvedToken) {
       setError('Not authenticated');
       return;
@@ -139,19 +138,22 @@ export default function BraiderOrdersPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/marketplace/orders/accept', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${resolvedToken}`,
-        },
-        body: JSON.stringify({ order_id: orderId, action }),
-      });
+      const newStatus = action === 'accept' ? 'confirmed' : action === 'reject' ? 'cancelled' : 'delivered';
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) throw new Error('Config error');
 
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || `Failed to ${action} order`);
+      const client = createClient(supabaseUrl, anonKey);
 
-      setSuccessMsg(`Order ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`);
+      const { error: updateError } = await client
+        .from('marketplace_orders')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+
+      setSuccessMsg(`Order ${action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'marked as delivered'} successfully!`);
       setTimeout(() => setSuccessMsg(''), 3000);
       await fetchOrders();
     } catch (err) {
@@ -165,8 +167,10 @@ export default function BraiderOrdersPage() {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'shipped': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -210,7 +214,7 @@ export default function BraiderOrdersPage() {
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {['all', 'pending', 'confirmed', 'cancelled', 'delivered'].map(f => (
+          {['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -261,7 +265,7 @@ export default function BraiderOrdersPage() {
                       <div className="flex items-start justify-between gap-2 flex-wrap">
                         <div>
                           <p className="font-bold text-gray-900">{order.product_name}</p>
-                          <p className="text-sm text-gray-500">Order #{order.order_number}</p>
+                          <p className="text-sm text-gray-500">Order #{order.order_number || order.id.slice(0, 8)}</p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
                           {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
@@ -271,21 +275,23 @@ export default function BraiderOrdersPage() {
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-purple-500" />
-                          <span>Qty: {order.quantity} • {order.currency === 'USD' ? '$' : '₦'}{order.total_amount.toLocaleString()}</span>
+                          <span>Qty: {order.quantity} • ${order.total_amount?.toLocaleString() || '0'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-purple-500" />
                           <span>{new Date(order.created_at).toLocaleDateString()}</span>
                         </div>
-                        <div className="flex items-center gap-2 sm:col-span-2">
-                          <MapPin className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                          <span className="truncate">{order.shipping_address}</span>
-                        </div>
+                        {order.shipping_address && (
+                          <div className="flex items-center gap-2 sm:col-span-2">
+                            <MapPin className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                            <span className="truncate">{order.shipping_address}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="mt-2 p-2 bg-gray-50 rounded-lg text-sm">
                         <span className="font-semibold text-gray-700">Customer: </span>
-                        <span className="text-gray-600">{order.customer_name} ({order.customer_email})</span>
+                        <span className="text-gray-600">{order.customer_name} {order.customer_email && `(${order.customer_email})`}</span>
                       </div>
                     </div>
                   </div>
@@ -313,35 +319,23 @@ export default function BraiderOrdersPage() {
                       </>
                     )}
                     {order.status === 'confirmed' && (
-                      <Link
-                        href={`/braider/marketplace/orders/${order.id}/chat`}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        Chat with Buyer
-                      </Link>
-                    )}
-                    {order.status === 'confirmed' && (
-                      <button
-                        onClick={async () => {
-                          if (!resolvedToken) return;
-                          setActionLoading(order.id);
-                          try {
-                            const res = await fetch('/api/marketplace/orders/accept', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resolvedToken}` },
-                              body: JSON.stringify({ order_id: order.id, action: 'deliver' }),
-                            });
-                            const data = await res.json();
-                            if (data.success) { setSuccessMsg('Order marked as delivered!'); await fetchOrders(); }
-                          } finally { setActionLoading(null); }
-                        }}
-                        disabled={actionLoading === order.id}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-semibold"
-                      >
-                        <Package className="w-4 h-4" />
-                        Mark Delivered
-                      </button>
+                      <>
+                        <Link
+                          href={`/braider/marketplace/orders/${order.id}/chat`}
+                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Chat with Buyer
+                        </Link>
+                        <button
+                          onClick={() => handleAction(order.id, 'deliver')}
+                          disabled={actionLoading === order.id}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-semibold"
+                        >
+                          <Package className="w-4 h-4" />
+                          Mark Delivered
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

@@ -61,15 +61,6 @@ BEGIN
   END IF;
 END $$;
 
--- Migrate old schema to new schema
-UPDATE conversations 
-SET customer_id = participant1_id 
-WHERE customer_id IS NULL AND participant1_id IS NOT NULL;
-
-UPDATE conversations 
-SET braider_id = participant2_id 
-WHERE braider_id IS NULL AND participant2_id IS NOT NULL;
-
 -- =====================================================
 -- 3. FIX MESSAGES TABLE
 -- =====================================================
@@ -121,7 +112,7 @@ CREATE TABLE IF NOT EXISTS marketplace_orders (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add missing columns
+-- Add missing columns to marketplace_orders if they don't exist
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_orders' AND column_name = 'order_number') THEN
@@ -176,7 +167,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Function to get or create conversation
 CREATE OR REPLACE FUNCTION get_or_create_conversation(
   p_customer_id UUID,
-  p_bider_id UUID
+  p_braider_id UUID
 )
 RETURNS UUID AS $$
 DECLARE
@@ -203,6 +194,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Create sequence for order numbers if it doesn't exist
+CREATE SEQUENCE IF NOT EXISTS order_seq START 1;
+
 -- Function to generate order number
 CREATE OR REPLACE FUNCTION generate_order_number()
 RETURNS VARCHAR(50) AS $$
@@ -213,9 +207,6 @@ BEGIN
   RETURN v_order_number;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create sequence for order numbers
-CREATE SEQUENCE IF NOT EXISTS order_seq START 1;
 
 -- =====================================================
 -- 7. GRANT PERMISSIONS

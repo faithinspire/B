@@ -373,7 +373,7 @@ export default function CustomerDashboard() {
                           View Profile
                         </Link>
                         <Link
-                          href={`/braider/${braider.user_id || braider.id}`}
+                          href={`/booking?braider_id=${braider.user_id || braider.id}`}
                           className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-xs sm:text-sm"
                         >
                           Book

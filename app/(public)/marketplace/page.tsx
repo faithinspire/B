@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Filter, Star, ShoppingBag, MapPin, X, Loader, AlertCircle, Crown, MessageCircle } from 'lucide-react';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
@@ -52,6 +52,7 @@ const USA_STATES = [
 
 function MarketplaceContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useSupabaseAuthStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -387,13 +388,37 @@ function MarketplaceContent() {
                                     <ShoppingBag className="w-4 h-4" />
                                     Order Now
                                   </Link>
-                                  <Link
-                                    href={`/marketplace/product/${product.id}?action=chat`}
+                                  <button
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (!user) {
+                                        router.push('/login');
+                                        return;
+                                      }
+                                      try {
+                                        const res = await fetch('/api/chat/create-conversation', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            customer_id: user.id,
+                                            braider_id: product.braider_id,
+                                            initial_message: `Hi! I'm interested in your product: ${product.name}`,
+                                          }),
+                                        });
+                                        const data = await res.json();
+                                        if (data.success && data.conversation) {
+                                          router.push(`/messages?conversation=${data.conversation.id}`);
+                                        }
+                                      } catch (err) {
+                                        console.error('Chat error:', err);
+                                      }
+                                    }}
                                     className="w-full border-2 border-purple-300 text-purple-600 py-2 sm:py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all text-sm sm:text-base flex items-center justify-center gap-2"
                                   >
                                     <MessageCircle className="w-4 h-4" />
                                     Chat with Seller
-                                  </Link>
+                                  </button>
                                 </div>
                               )}
                             </div>
