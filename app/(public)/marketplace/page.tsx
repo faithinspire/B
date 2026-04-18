@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Filter, Star, ShoppingBag, MapPin, X, Loader, AlertCircle, Crown } from 'lucide-react';
+import { Search, Filter, Star, ShoppingBag, MapPin, X, Loader, AlertCircle, Crown, MessageCircle } from 'lucide-react';
 import { COUNTRIES, type CountryCode } from '@/lib/countries';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
@@ -379,10 +379,22 @@ function MarketplaceContent() {
                                   ✏️ Edit Your Product
                                 </Link>
                               ) : (
-                                <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all text-sm sm:text-base flex items-center justify-center gap-2">
-                                  <ShoppingBag className="w-4 h-4" />
-                                  Order Now
-                                </button>
+                                <div className="space-y-2">
+                                  <Link
+                                    href={`/marketplace/product/${product.id}`}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all text-sm sm:text-base flex items-center justify-center gap-2"
+                                  >
+                                    <ShoppingBag className="w-4 h-4" />
+                                    Order Now
+                                  </Link>
+                                  <Link
+                                    href={`/marketplace/product/${product.id}?action=chat`}
+                                    className="w-full border-2 border-purple-300 text-purple-600 py-2 sm:py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all text-sm sm:text-base flex items-center justify-center gap-2"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Chat with Seller
+                                  </Link>
+                                </div>
                               )}
                             </div>
                           </div>

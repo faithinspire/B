@@ -21,23 +21,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Try 'unverified' first (original enum), then 'rejected' (after TEXT migration)
+    // Try 'rejected' first (TEXT column), then 'unverified' (enum)
     const { error: e1 } = await supabase
-      .from('braider_profiles')
-      .update({ verification_status: 'unverified' })
-      .eq('id', braider_id);
-
-    if (!e1) {
-      return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
-    }
-
-    // Fallback: try 'rejected'
-    const { error: e2 } = await supabase
       .from('braider_profiles')
       .update({ verification_status: 'rejected' })
       .eq('id', braider_id);
 
+    if (!e1) {
+      console.log('Braider rejected successfully with "rejected" status');
+      return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
+    }
+
+    // Fallback: try 'unverified' (works if column is enum)
+    const { error: e2 } = await supabase
+      .from('braider_profiles')
+      .update({ verification_status: 'unverified' })
+      .eq('id', braider_id);
+
     if (!e2) {
+      console.log('Braider rejected successfully with "unverified" status');
       return NextResponse.json({ success: true, message: 'Braider rejected successfully' });
     }
 

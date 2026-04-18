@@ -21,23 +21,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Try tier1_verified first (original enum), then approved (after TEXT migration)
+    // Try 'approved' first (TEXT column), then tier1_verified (enum)
     const { error: e1 } = await supabase
-      .from('braider_profiles')
-      .update({ verification_status: 'tier1_verified' })
-      .eq('id', braider_id);
-
-    if (!e1) {
-      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
-    }
-
-    // Fallback: try 'approved' (works if column is TEXT)
-    const { error: e2 } = await supabase
       .from('braider_profiles')
       .update({ verification_status: 'approved' })
       .eq('id', braider_id);
 
+    if (!e1) {
+      console.log('Braider approved successfully with "approved" status');
+      return NextResponse.json({ success: true, message: 'Braider approved successfully' });
+    }
+
+    // Fallback: try 'tier1_verified' (works if column is enum)
+    const { error: e2 } = await supabase
+      .from('braider_profiles')
+      .update({ verification_status: 'tier1_verified' })
+      .eq('id', braider_id);
+
     if (!e2) {
+      console.log('Braider approved successfully with "tier1_verified" status');
       return NextResponse.json({ success: true, message: 'Braider approved successfully' });
     }
 
