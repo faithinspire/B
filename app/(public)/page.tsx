@@ -300,13 +300,44 @@ export default function LandingPage(): JSX.Element {
                                 Verified
                               </div>
                             )}
-                            <div className="mt-auto">
+                            <div className="mt-auto space-y-2">
                               <Link
                                 href={`/braider/${braider.user_id || braider.id}`}
                                 className="block w-full text-center px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-xs sm:text-sm"
                               >
                                 View Profile
                               </Link>
+                              <button
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  try {
+                                    const res = await fetch('/api/chat/create-conversation', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        customer_id: localStorage.getItem('userId') || '',
+                                        braider_id: braider.user_id || braider.id,
+                                        initial_message: 'Hi! I found you on BraidMe and would like to chat.',
+                                      }),
+                                    });
+                                    const data = await res.json();
+                                    if (data.success && data.conversation) {
+                                      router.push(`/messages?conversation=${data.conversation.id}`);
+                                    } else {
+                                      router.push('/login?redirect=/messages');
+                                    }
+                                  } catch {
+                                    router.push('/login?redirect=/messages');
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-xs sm:text-sm"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                Chat
+                              </button>
                             </div>
                           </div>
                         </div>
