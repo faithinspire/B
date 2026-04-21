@@ -53,7 +53,7 @@ function StyleCard({ name, emoji, color, onClick }: { name: string; emoji: strin
 }
 
 // ─── ProfessionalCard component ────────────────────────────────────────────
-function ProfessionalCard({ braider, idx, router }: { braider: any; idx: number; router: any }) {
+function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
   const img = braider.avatar_url || BRAIDER_FEATURED_IMAGES[idx % BRAIDER_FEATURED_IMAGES.length]?.src;
   return (
     <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group" style={{ width: 220 }}>
@@ -102,7 +102,6 @@ export default function LandingPage(): JSX.Element {
   const [location, setLocation] = useState('');
   const [style, setStyle] = useState('');
   const [featuredBraiders, setFeaturedBraiders] = useState<any[]>([]);
-  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const braidingScrollRef = useRef<HTMLDivElement>(null);
   const barbingScrollRef = useRef<HTMLDivElement>(null);
@@ -118,17 +117,10 @@ export default function LandingPage(): JSX.Element {
     setFeaturedBraiders(featured);
   }, [braiders]);
 
-  // Auto-rotate carousel
+  // Auto-rotate carousel (kept for future use)
   useEffect(() => {
     if (featuredBraiders.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentCarouselIndex((prev) => (prev + 1) % Math.ceil(featuredBraiders.length / 4));
-    }, 5000);
-    return () => clearInterval(interval);
   }, [featuredBraiders.length]);
-
-  const handlePrevCarousel = () => setCurrentCarouselIndex((prev) => prev === 0 ? Math.ceil(featuredBraiders.length / 4) - 1 : prev - 1);
-  const handleNextCarousel = () => setCurrentCarouselIndex((prev) => (prev + 1) % Math.ceil(featuredBraiders.length / 4));
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -312,7 +304,7 @@ export default function LandingPage(): JSX.Element {
             </div>
           ) : (
             <div ref={profScrollRef} className="flex gap-5 overflow-x-auto pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {featuredBraiders.map((braider, idx) => <ProfessionalCard key={braider.user_id || braider.id} braider={braider} idx={idx} router={router} />)}
+              {featuredBraiders.map((braider, idx) => <ProfessionalCard key={braider.user_id || braider.id} braider={braider} idx={idx} />)}
             </div>
           )}
         </div>
@@ -326,27 +318,7 @@ export default function LandingPage(): JSX.Element {
 
       {/* BRAIDING STYLES GALLERY */}
       <BraidingStylesGallery />
-                                <CheckCircle className="w-3 h-3" />
-                                Verified
-                              </div>
-                            )}
-                            <div className="mt-auto space-y-2">
-                              <Link
-                                href={`/braider/${braider.user_id || braider.id}`}
-                                className="block w-full text-center px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth font-semibold text-xs sm:text-sm"
-                              >
-                                View Profile
-                              </Link>
-                              <button
-                                onClick={async (e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  try {
-                                    const res = await fetch('/api/chat/create-conversation', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        customer_id: localStorage.getItem('userId') || '',
+
       {/* TRUST SECTION */}
       <section className="py-20 bg-gradient-to-br from-purple-900 via-pink-900 to-blue-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
