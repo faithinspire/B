@@ -108,6 +108,8 @@ export async function POST(request: NextRequest) {
         next_of_kin_name,
         next_of_kin_phone,
         next_of_kin_relationship,
+        profession_type,
+        country: profileCountry,
       } = body
 
       // Create braider profile - CRITICAL: This MUST succeed for braider to be visible
@@ -128,6 +130,8 @@ export async function POST(request: NextRequest) {
         specialties: specialization ? [specialization] : [],
         total_earnings: 0,
         available_balance: 0,
+        profession_type: profession_type || 'braider',
+        country: profileCountry || 'NG',
       };
 
       // Add optional columns if they exist in the schema

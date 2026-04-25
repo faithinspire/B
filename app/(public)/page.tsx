@@ -197,7 +197,7 @@ export default function LandingPage(): JSX.Element {
             <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 shadow-2xl">
               <div className="flex gap-2 mb-4">
                 {[{ flag: '🇳🇬', label: 'Nigeria', val: 'NG' }, { flag: '🇺🇸', label: 'USA', val: 'US' }].map(c => (
-                  <button key={c.val} className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white text-sm font-semibold transition-all" onClick={() => handleModalSearch(c.val, location)}>
+                  <button key={c.val} className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white text-sm font-semibold transition-all" onClick={() => router.push(`/search?country=${c.val}`)}>
                     <span>{c.flag}</span> {c.label}
                   </button>
                 ))}
@@ -239,7 +239,7 @@ export default function LandingPage(): JSX.Element {
             </div>
             <div className="flex flex-col sm:flex-row gap-3 mt-6 justify-center">
               <Link href="/signup/customer" className="px-8 py-3.5 bg-white text-purple-700 rounded-2xl font-bold hover:shadow-xl transition-all text-center">Book a Professional</Link>
-              <Link href="/signup/braider" className="px-8 py-3.5 bg-transparent border-2 border-white text-white rounded-2xl font-bold hover:bg-white/10 transition-all text-center">Join as Professional</Link>
+              <Link href="/signup" className="px-8 py-3.5 bg-transparent border-2 border-white text-white rounded-2xl font-bold hover:bg-white/10 transition-all text-center">Join as Braider or Barber</Link>
             </div>
           </div>
         </div>
@@ -389,7 +389,7 @@ export default function LandingPage(): JSX.Element {
               Join thousands of verified braiders, barbers &amp; stylists earning $50–$200+ per appointment with secure payments and flexible scheduling.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup/braider" className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold hover:shadow-xl transition-all text-lg">Start Earning Today</Link>
+              <Link href="/signup" className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold hover:shadow-xl transition-all text-lg">Start Earning Today</Link>
               <Link href="/search" className="px-10 py-4 border-2 border-purple-600 text-purple-600 rounded-2xl font-bold hover:bg-purple-50 transition-all text-lg">Browse Professionals</Link>
             </div>
           </div>
@@ -433,8 +433,8 @@ export default function LandingPage(): JSX.Element {
             <div>
               <h4 className="font-semibold mb-4 text-gray-200">Countries</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><button onClick={() => handleModalSearch('NG', '')} className="hover:text-white transition-colors flex items-center gap-2">🇳🇬 Nigeria</button></li>
-                <li><button onClick={() => handleModalSearch('US', '')} className="hover:text-white transition-colors flex items-center gap-2">🇺🇸 United States</button></li>
+                <li><button onClick={() => router.push('/search?country=NG')} className="hover:text-white transition-colors flex items-center gap-2">🇳🇬 Nigeria</button></li>
+                <li><button onClick={() => router.push('/search?country=US')} className="hover:text-white transition-colors flex items-center gap-2">🇺🇸 United States</button></li>
               </ul>
             </div>
           </div>
