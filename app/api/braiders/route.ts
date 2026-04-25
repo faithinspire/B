@@ -80,36 +80,50 @@ export async function GET(request: NextRequest) {
     }
 
     // Map data to include all fields
-    const braiders = (data || []).map((b: any) => ({
-      id: b.id || b.user_id,
-      user_id: b.user_id,
-      full_name: b.full_name || '',
-      email: b.email || '',
-      avatar_url: b.avatar_url || null,
-      bio: b.bio || '',
-      experience_years: b.experience_years || 0,
-      rating_avg: b.rating_avg || null,
-      rating_count: b.rating_count || 0,
-      verification_status: b.verification_status || 'unverified',
-      travel_radius_miles: b.travel_radius_miles || 10,
-      is_mobile: b.is_mobile || false,
-      salon_address: b.salon_address || '',
-      specialties: b.specialties || [],
-      specialization: b.specialization || '',
-      state: b.state || '',
-      city: b.city || '',
-      country: b.country || 'NG',
-      latitude: b.latitude || null,
-      longitude: b.longitude || null,
-      is_premium: b.is_premium || false,
-      featured_order: b.featured_order || 0,
-      services: [],
-      portfolio: [],
-      total_earnings: b.total_earnings || 0,
-      available_balance: b.available_balance || 0,
-      created_at: b.created_at,
-      updated_at: b.updated_at,
-    }));
+    const braiders = (data || []).map((b: any) => {
+      // Detect barber from specialization prefix if profession_type column doesn't exist yet
+      let professionType = b.profession_type || 'braider';
+      let specialization = b.specialization || '';
+      if (specialization.startsWith('barber:')) {
+        professionType = 'barber';
+        specialization = specialization.substring(7);
+      }
+      return {
+        id: b.id || b.user_id,
+        user_id: b.user_id,
+        full_name: b.full_name || '',
+        email: b.email || '',
+        avatar_url: b.avatar_url || null,
+        bio: b.bio || '',
+        experience_years: b.experience_years || 0,
+        rating_avg: b.rating_avg || null,
+        rating_count: b.rating_count || 0,
+        verification_status: b.verification_status || 'unverified',
+        travel_radius_miles: b.travel_radius_miles || 10,
+        is_mobile: b.is_mobile || false,
+        salon_address: b.salon_address || '',
+        specialties: b.specialties || [],
+        specialization,
+        profession_type: professionType,
+        state: b.state || '',
+        city: b.city || '',
+        country: b.country || 'NG',
+        latitude: b.latitude || null,
+        longitude: b.longitude || null,
+        is_premium: b.is_premium || false,
+        featured_order: b.featured_order || 0,
+        services: [],
+        portfolio: [],
+        total_earnings: b.total_earnings || 0,
+        available_balance: b.available_balance || 0,
+        total_bookings: b.total_bookings || 0,
+        instagram_url: b.instagram_url || null,
+        tiktok_url: b.tiktok_url || null,
+        portfolio_media: b.portfolio_media || [],
+        created_at: b.created_at,
+        updated_at: b.updated_at,
+      };
+    });
 
     console.log(`=== API: Returning ${braiders.length} braiders ===`);
     return NextResponse.json(braiders, {

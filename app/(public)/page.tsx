@@ -61,15 +61,20 @@ function StyleCard({ name, image, onClick }: { name: string; image: string; onCl
 // ─── ProfessionalCard component ────────────────────────────────────────────
 function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
   const img = braider.avatar_url || BRAIDER_FEATURED_IMAGES[idx % BRAIDER_FEATURED_IMAGES.length]?.src;
+  const isBarber = braider.profession_type === 'barber';
   return (
     <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group" style={{ width: 220 }}>
       <div className="relative h-48 bg-gradient-to-br from-purple-200 to-pink-200 overflow-hidden">
         {img ? (
           <img src={img} alt={braider.full_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl">💇</div>
+          <div className="w-full h-full flex items-center justify-center text-5xl">{isBarber ? '💈' : '💇'}</div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        {/* Profession badge */}
+        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
+          {isBarber ? '💈 Barber' : '✂️ Braider'}
+        </div>
         <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
           <div className="flex items-center gap-1 bg-white/90 rounded-full px-2 py-0.5">
             <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -82,17 +87,17 @@ function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
       </div>
       <div className="p-4">
         <h3 className="font-bold text-gray-900 text-sm mb-0.5 truncate">{braider.full_name}</h3>
-        <p className="text-xs text-gray-500 mb-3 line-clamp-1">{braider.bio || 'Professional braider'}</p>
+        <p className="text-xs text-gray-500 mb-3 line-clamp-1">{braider.bio || `Professional ${isBarber ? 'barber' : 'braider'}`}</p>
         <div className="flex gap-2">
           <Link
             href={`/braider/${braider.user_id || braider.id}`}
-            className="flex-1 text-center py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors"
+            className={`flex-1 text-center py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
           >
             View
           </Link>
           <Link
             href={`/booking?braider_id=${braider.user_id || braider.id}`}
-            className="flex-1 text-center py-1.5 border-2 border-purple-600 text-purple-600 rounded-lg text-xs font-semibold hover:bg-purple-50 transition-colors"
+            className={`flex-1 text-center py-1.5 border-2 rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'border-blue-600 text-blue-600 hover:bg-blue-50' : 'border-purple-600 text-purple-600 hover:bg-purple-50'}`}
           >
             Book
           </Link>

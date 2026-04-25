@@ -54,8 +54,28 @@ export async function GET(
       .eq('braider_id', braider.user_id)
       .limit(10);
 
+    // Count total bookings
+    const { count: bookingCount } = await serviceSupabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('braider_id', braider.user_id);
+
+    // Detect barber from specialization prefix if profession_type column doesn't exist
+    let professionType = braider.profession_type || 'braider';
+    let specialization = braider.specialization || '';
+    if (specialization.startsWith('barber:')) {
+      professionType = 'barber';
+      specialization = specialization.substring(7);
+    }
+
     return NextResponse.json({
       ...braider,
+      specialization,
+      profession_type: professionType,
+      total_bookings: bookingCount || braider.total_bookings || 0,
+      instagram_url: braider.instagram_url || null,
+      tiktok_url: braider.tiktok_url || null,
+      portfolio_media: braider.portfolio_media || [],
       services: services || [],
       reviews: reviews || [],
     });
