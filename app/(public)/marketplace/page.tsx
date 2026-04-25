@@ -117,6 +117,12 @@ function MarketplaceContent() {
     return user?.role === 'braider' && user?.id === product.braider_id;
   };
 
+  const getCurrencySymbol = (product: Product) => {
+    if (product.country_code === 'NG' || product.currency === 'NGN') return '₦';
+    if (product.country_code === 'US' || product.currency === 'USD') return '$';
+    return '₦'; // Default to Naira
+  };
+
   const FilterPanel = () => (
     <div className="space-y-6">
       <div>
@@ -363,7 +369,7 @@ function MarketplaceContent() {
 
                             <div className="mt-auto">
                               <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-3">
-                                {product.currency === 'NGN' || product.country_code === 'NG' ? '₦' : '$'}{(product.price || 0).toLocaleString()}
+                                {getCurrencySymbol(product)}{(product.price || 0).toLocaleString()}
                               </div>
                               {isOwn ? (
                                 <Link

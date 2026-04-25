@@ -18,10 +18,19 @@ export interface Braider {
   is_mobile: boolean;
   salon_address?: string;
   specialties?: string[];
+  specialization?: string;
+  profession_type?: string;
+  state?: string;
+  city?: string;
+  country?: string;
   services?: any[];
   portfolio?: any[];
   total_earnings?: number;
   available_balance?: number;
+  total_bookings?: number;
+  instagram_url?: string;
+  tiktok_url?: string;
+  portfolio_media?: any[];
   created_at?: string;
   updated_at?: string;
 }

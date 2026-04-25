@@ -16,17 +16,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Paystack not configured' }, { status: 503 });
     }
 
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { 'Authorization': `Bearer ${paystackKey}` },
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${paystackKey}` },
     });
 
     const data = await response.json();
+
     if (!data.status || data.data?.status !== 'success') {
-      return NextResponse.json({ error: 'Payment not verified', status: data.data?.status }, { status: 400 });
+      return NextResponse.json({
+        error: 'Payment not verified',
+        paystackStatus: data.data?.status,
+      }, { status: 400 });
     }
 
-    // Update booking status
-    if (bookingId) {
+    // Extract bookingId from metadata if not provided
+    const resolvedBookingId = bookingId || data.data?.metadata?.bookingId;
+
+    if (resolvedBookingId) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.SUPABASE_SERVICE_ROLE_KEY || '',
@@ -34,12 +40,17 @@ export async function GET(request: NextRequest) {
       );
       await supabase
         .from('bookings')
-        .update({ status: 'confirmed', paystack_reference: reference })
-        .eq('id', bookingId);
+        .update({
+          status: 'confirmed',
+          paystack_reference: reference,
+          payment_verified_at: new Date().toISOString(),
+        })
+        .eq('id', resolvedBookingId);
     }
 
-    return NextResponse.json({ success: true, verified: true });
+    return NextResponse.json({ success: true, verified: true, amount: data.data?.amount });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Paystack verify error:', error);
+    return NextResponse.json({ error: error.message || 'Verification failed' }, { status: 500 });
   }
 }
