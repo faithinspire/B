@@ -139,7 +139,7 @@ export function Navigation() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 top-16 z-50 overflow-hidden">
+          <div className="md:hidden fixed inset-0 top-16 z-50 overflow-y-auto">
             {/* Animated Background */}
             <div className="absolute inset-0">
               {BACKGROUND_IMAGES.map((img, idx) => (
@@ -158,8 +158,8 @@ export function Navigation() {
             </div>
 
             {/* Menu Content */}
-            <div className="relative h-full overflow-y-auto">
-              <div className="p-4 space-y-2">
+            <div className="relative min-h-full">
+              <div className="p-4 space-y-2 pb-32">
                 {!user ? (
                   <>
                     <Link

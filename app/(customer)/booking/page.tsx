@@ -67,14 +67,18 @@ export default function BookingPage() {
     if (authLoading) return;
 
     if (!user) {
+      console.log('No user found, redirecting to login');
       router.push('/login');
       return;
     }
 
     if (user.role !== 'customer') {
+      console.log('User is not a customer, redirecting home');
       router.push('/');
       return;
     }
+    
+    console.log('Auth check passed for customer:', user.id);
   }, [user, authLoading, router]);
 
   const loadBraiders = async () => {

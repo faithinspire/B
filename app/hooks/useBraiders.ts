@@ -84,14 +84,25 @@ export function useBraiders() {
         console.warn('=== HOOK: WARNING - No braiders returned from API ===');
       }
 
-      const normalized = braidersList.map((b: any) => ({
-        ...b,
-        services: b.services || [],
-        portfolio: b.portfolio || [],
-        specialties: b.specialties || [],
-        total_earnings: b.total_earnings || 0,
-        available_balance: b.available_balance || 0,
-      }));
+      const normalized = braidersList.map((b: any) => {
+        // Ensure profession_type is set correctly
+        let professionType = b.profession_type || 'braider';
+        
+        // If profession_type is missing, check specialization for barber prefix
+        if (!b.profession_type && b.specialization?.startsWith('barber:')) {
+          professionType = 'barber';
+        }
+        
+        return {
+          ...b,
+          profession_type: professionType,
+          services: b.services || [],
+          portfolio: b.portfolio || [],
+          specialties: b.specialties || [],
+          total_earnings: b.total_earnings || 0,
+          available_balance: b.available_balance || 0,
+        };
+      });
 
       console.log(`=== HOOK: Setting ${normalized.length} braiders ===`);
       setBraiders(normalized);
