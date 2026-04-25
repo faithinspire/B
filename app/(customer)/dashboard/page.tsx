@@ -11,6 +11,116 @@ import { Heart, Star, MapPin, Search, Loader, Calendar, Clock, AlertCircle } fro
 import { ReviewSubmissionModal } from '@/app/components/ReviewSubmissionModal';
 import { createClient } from '@supabase/supabase-js';
 
+interface ProfessionalCardProps {
+  braider: any;
+  idx: number;
+  favorites: string[];
+  toggleFavorite: (id: string) => void;
+}
+
+function ProfessionalCard({ braider, idx, favorites, toggleFavorite }: ProfessionalCardProps) {
+  const isBarber = braider.profession_type === 'barber';
+  console.log('Professional card:', braider.full_name, 'user_id:', braider.user_id, 'id:', braider.id);
+  return (
+    <div
+      className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg overflow-hidden hover:shadow-xl transition-smooth animate-slide-up"
+      style={{ animationDelay: `${idx * 50}ms` }}
+    >
+      {/* Image */}
+      <div className="relative h-32 sm:h-40 md:h-48 bg-gradient-to-br from-primary-200 to-accent-200">
+        {braider.avatar_url && (
+          <img
+            src={braider.avatar_url}
+            alt={braider.full_name}
+            className="w-full h-full object-cover"
+          />
+        )}
+        {/* Profession badge */}
+        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+          isBarber ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+        }`}>
+          {isBarber ? '💈 Barber' : '✂️ Braider'}
+        </div>
+        <button
+          onClick={() => toggleFavorite(braider.id)}
+          className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-smooth"
+        >
+          <Heart
+            className={`w-4 sm:w-5 h-4 sm:h-5 ${
+              favorites.includes(braider.id)
+                ? 'fill-red-500 text-red-500'
+                : 'text-gray-400'
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-3 sm:p-4 md:p-6">
+        <div className="flex items-start justify-between mb-1.5 sm:mb-2">
+          <div>
+            <h3 className="text-sm sm:text-base md:text-xl font-semibold text-gray-900">{braider.full_name}</h3>
+            <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
+              <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
+              <span className="text-xs sm:text-sm font-medium">
+                {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}
+              </span>
+              <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
+            </div>
+          </div>
+          {braider.verification_status === 'verified' && (
+            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full whitespace-nowrap">
+              ✓ Verified
+            </span>
+          )}
+        </div>
+
+        <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{braider.bio}</p>
+
+        <div className="space-y-1 sm:space-y-1.5 mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <MapPin className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
+            <span>{braider.travel_radius_miles} miles radius</span>
+          </div>
+          {braider.specialties && braider.specialties.length > 0 && (
+            <div className="flex flex-wrap gap-0.5 sm:gap-1">
+              {braider.specialties.slice(0, 2).map((specialty: string) => (
+                <span key={specialty} className="px-1.5 sm:px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
+                  {specialty}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {braider.services && braider.services.length > 0 && (
+          <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-t border-gray-200">
+            <p className="text-xs font-semibold text-gray-700 mb-1">Services from:</p>
+            <p className="text-base sm:text-lg font-bold text-primary-600">
+              ${Math.min(...braider.services.map((service: any) => service.price)).toFixed(2)}
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-1.5 sm:gap-2">
+          <Link
+            href={`/braider/${braider.user_id || braider.id}`}
+            className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-xs sm:text-sm"
+          >
+            View Profile
+          </Link>
+          <Link
+            href={`/booking?braider_id=${braider.user_id || braider.id}`}
+            className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-xs sm:text-sm"
+          >
+            Book
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDashboard() {
   const router = useRouter();
   
@@ -176,7 +286,7 @@ export default function CustomerDashboard() {
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            Browse Braiders
+            Browse Braiders &amp; Barbers
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
@@ -258,7 +368,7 @@ export default function CustomerDashboard() {
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-xs sm:text-sm text-gray-600">
-                  {loading ? 'Filtering...' : `Found ${filteredBraiders.length} braiders`}
+                  {loading ? 'Filtering...' : `Found ${filteredBraiders.length} professionals`}
                 </p>
                 <button
                   onClick={() => {
@@ -282,107 +392,59 @@ export default function CustomerDashboard() {
             ) : filteredBraiders.length === 0 ? (
               <div className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg p-6 sm:p-8 md:p-12 text-center">
                 <AlertCircle className="w-10 sm:w-12 h-10 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
-                <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-3 sm:mb-4">No braiders found matching your criteria</p>
+                <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-3 sm:mb-4">No professionals found matching your criteria</p>
                 <Link href="/search" className="text-primary-600 font-semibold hover:text-primary-700 text-xs sm:text-sm md:text-base">
-                  Browse all braiders →
+                  Browse all professionals →
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
-                {filteredBraiders.map((braider, idx) => (
-                  <div
-                    key={braider.id}
-                    className="bg-white rounded-lg sm:rounded-2xl md:rounded-3xl shadow-lg overflow-hidden hover:shadow-xl transition-smooth animate-slide-up"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    {/* Image */}
-                    <div className="relative h-32 sm:h-40 md:h-48 bg-gradient-to-br from-primary-200 to-accent-200">
-                      {braider.avatar_url && (
-                        <img
-                          src={braider.avatar_url}
-                          alt={braider.full_name}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                      <button
-                        onClick={() => toggleFavorite(braider.id)}
-                        className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-smooth"
-                      >
-                        <Heart
-                          className={`w-4 sm:w-5 h-4 sm:h-5 ${
-                            favorites.includes(braider.id)
-                              ? 'fill-red-500 text-red-500'
-                              : 'text-gray-400'
-                          }`}
-                        />
-                      </button>
+              <>
+                {/* ✂️ Braiders Section */}
+                {filteredBraiders.filter(b => b.profession_type !== 'barber').length > 0 && (
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg sm:text-xl font-bold text-gray-900">✂️ Braiders</h2>
+                      <Link href="/search?profession=braider" className="text-primary-600 hover:text-primary-700 text-sm font-semibold">
+                        View all →
+                      </Link>
                     </div>
-
-                    {/* Content */}
-                    <div className="p-3 sm:p-4 md:p-6">
-                      <div className="flex items-start justify-between mb-1.5 sm:mb-2">
-                        <div>
-                          <h3 className="text-sm sm:text-base md:text-xl font-semibold text-gray-900">{braider.full_name}</h3>
-                          <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1">
-                            <Star className="w-3 sm:w-4 h-3 sm:h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-xs sm:text-sm font-medium">
-                              {braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}
-                            </span>
-                            <span className="text-xs text-gray-500">({braider.rating_count || 0})</span>
-                          </div>
-                        </div>
-                        {braider.verification_status === 'verified' && (
-                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full whitespace-nowrap">
-                            ✓ Verified
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{braider.bio}</p>
-
-                      <div className="space-y-1 sm:space-y-1.5 mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <MapPin className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
-                          <span>{braider.travel_radius_miles} miles radius</span>
-                        </div>
-                        {braider.specialties.length > 0 && (
-                          <div className="flex flex-wrap gap-0.5 sm:gap-1">
-                            {braider.specialties.slice(0, 2).map((specialty: string) => (
-                              <span key={specialty} className="px-1.5 sm:px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
-                                {specialty}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {braider.services.length > 0 && (
-                        <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-t border-gray-200">
-                          <p className="text-xs font-semibold text-gray-700 mb-1">Services from:</p>
-                          <p className="text-base sm:text-lg font-bold text-primary-600">
-                            ${Math.min(...braider.services.map((service: any) => service.price)).toFixed(2)}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-1.5 sm:gap-2">
-                        <Link
-                          href={`/braider/${braider.user_id || braider.id}`}
-                          className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-smooth text-center font-semibold text-xs sm:text-sm"
-                        >
-                          View Profile
-                        </Link>
-                        <Link
-                          href={`/booking?braider_id=${braider.user_id || braider.id}`}
-                          className="px-2 sm:px-4 py-1.5 sm:py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-smooth font-semibold text-xs sm:text-sm"
-                        >
-                          Book
-                        </Link>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                      {filteredBraiders.filter(b => b.profession_type !== 'barber').map((braider, idx) => (
+                        <ProfessionalCard
+                          key={braider.id}
+                          braider={braider}
+                          idx={idx}
+                          favorites={favorites}
+                          toggleFavorite={toggleFavorite}
+                        />
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+
+                {/* 💈 Barbers Section */}
+                {filteredBraiders.filter(b => b.profession_type === 'barber').length > 0 && (
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg sm:text-xl font-bold text-gray-900">💈 Barbers</h2>
+                      <Link href="/search?profession=barber" className="text-primary-600 hover:text-primary-700 text-sm font-semibold">
+                        View all →
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                      {filteredBraiders.filter(b => b.profession_type === 'barber').map((braider, idx) => (
+                        <ProfessionalCard
+                          key={braider.id}
+                          braider={braider}
+                          idx={idx}
+                          favorites={favorites}
+                          toggleFavorite={toggleFavorite}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

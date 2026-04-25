@@ -60,12 +60,11 @@ function MarketplaceContent() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState(searchParams?.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams?.get('category') || '');
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode | ''>(''); // Empty = show all
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | ''>('');
   const [selectedState, setSelectedState] = useState(searchParams?.get('state') || '');
   const [page, setPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Fetch categories once
   useEffect(() => {
     fetch('/api/marketplace/categories')
       .then(r => r.json())
@@ -73,7 +72,6 @@ function MarketplaceContent() {
       .catch(err => console.error('Categories error:', err));
   }, []);
 
-  // Fetch ALL products whenever filters change
   useEffect(() => {
     let cancelled = false;
 
@@ -85,11 +83,10 @@ function MarketplaceContent() {
         const params = new URLSearchParams();
         if (searchTerm) params.set('search', searchTerm);
         if (selectedCategory) params.set('category', selectedCategory);
-        // Only filter by country if explicitly selected
         if (selectedCountry) params.set('country_code', selectedCountry);
         if (selectedState) params.set('state', selectedState);
         params.set('page', String(page));
-        params.set('limit', '20'); // Show more products
+        params.set('limit', '20');
 
         const res = await fetch(`/api/marketplace/products?${params.toString()}`);
         const json = await res.json();
@@ -122,7 +119,6 @@ function MarketplaceContent() {
 
   const FilterPanel = () => (
     <div className="space-y-6">
-      {/* Country Filter */}
       <div>
         <h3 className="text-base font-bold text-gray-900 mb-3">Country</h3>
         <div className="space-y-2">
@@ -156,7 +152,6 @@ function MarketplaceContent() {
         </div>
       </div>
 
-      {/* Categories */}
       <div>
         <h3 className="text-base font-bold text-gray-900 mb-3">Categories</h3>
         <div className="space-y-1">
@@ -183,7 +178,6 @@ function MarketplaceContent() {
         </div>
       </div>
 
-      {/* Location */}
       {selectedCountry && (
         <div>
           <h3 className="text-base font-bold text-gray-900 mb-3">Location</h3>
@@ -259,11 +253,11 @@ function MarketplaceContent() {
 
           {/* Products */}
           <div className="lg:col-span-3">
-            {/* Braider notice */}
+            {/* Braider/Barber notice */}
             {user?.role === 'braider' && (
               <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
                 <Crown className="w-5 h-5 text-purple-600" />
-                <p className="text-purple-700 text-sm font-semibold">Your products are highlighted with a purple border</p>
+                <p className="text-purple-700 text-sm font-semibold">Braider/Barber: Your products are highlighted with a purple border</p>
               </div>
             )}
 
@@ -369,7 +363,7 @@ function MarketplaceContent() {
 
                             <div className="mt-auto">
                               <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-3">
-                                {product.currency === 'USD' ? '$' : '₦'}{(product.price || 0).toLocaleString()}
+                                {product.currency === 'NGN' || product.country_code === 'NG' ? '₦' : '$'}{(product.price || 0).toLocaleString()}
                               </div>
                               {isOwn ? (
                                 <Link
@@ -408,7 +402,6 @@ function MarketplaceContent() {
                                         });
                                         const data = await res.json();
                                         if (data.success && data.conversation) {
-                                          // Navigate to messages list — conversation will appear there
                                           router.push('/messages');
                                         } else {
                                           router.push('/messages');

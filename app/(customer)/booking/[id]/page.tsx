@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, MapPin, AlertCircle, Loader, CheckCircle, CreditCard, Lock, MessageCircle } from 'lucide-react';
 import { CustomerLocationMap } from '@/app/components/CustomerLocationMap';
 
@@ -27,7 +27,7 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
     async function initStripe() {
       try {
         const key = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
-        if (!key || !key.startsWith('pk_live_') && !key.startsWith('pk_test_')) {
+        if (!key || (!key.startsWith('pk_live_') && !key.startsWith('pk_test_'))) {
           setError('Payment system not configured. Please contact support.');
           return;
         }
@@ -59,7 +59,6 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
           else setError('');
         });
 
-        // Wait for DOM
         const tryMount = () => {
           const el = document.getElementById('stripe-card-element');
           if (el && !elementsMountedRef.current) {
@@ -74,7 +73,7 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
         setTimeout(tryMount, 200);
       } catch (err) {
         console.error('Stripe init error:', err);
-        if (!cancelled) setStripeReady(true); // fallback to bypass
+        if (!cancelled) setStripeReady(true);
       }
     }
 
@@ -96,7 +95,6 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
     setError('');
 
     try {
-      // Must have real Stripe loaded
       if (!stripeRef.current || !cardRef.current) {
         throw new Error('Payment form not ready. Please refresh and try again.');
       }
@@ -118,17 +116,14 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
         throw new Error('No payment session received. Please try again.');
       }
 
-      // Confirm real Stripe payment — card must be valid
       const { error: stripeError, paymentIntent } = await stripeRef.current.confirmCardPayment(
         clientSecret,
         { payment_method: { card: cardRef.current } }
       );
 
       if (stripeError) {
-        // Stripe returns the real decline reason here
         setError(stripeError.message || 'Payment failed. Please check your card details.');
       } else if (paymentIntent?.status === 'succeeded') {
-        // Confirm booking in DB
         await fetch(`/api/bookings/${bookingId}/confirm`, { method: 'POST' }).catch(() => {});
         onSuccess();
       } else {
@@ -145,7 +140,6 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
 
   return (
     <form onSubmit={handlePay} className="space-y-4">
-      {/* Card input */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-purple-600" />
@@ -194,9 +188,83 @@ function PaymentForm({ bookingId, amount, onSuccess }: PaymentFormProps) {
   );
 }
 
+interface PaystackPaymentFormProps {
+  bookingId: string;
+  amount: number;
+  email: string;
+  onSuccess: () => void;
+}
+
+function PaystackPaymentForm({ bookingId, amount, email, onSuccess: _onSuccess }: PaystackPaymentFormProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handlePaystack = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId,
+          amount,
+          email,
+          currency: 'NGN',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.authorizationUrl) {
+        throw new Error(data.error || 'Failed to initialize payment');
+      }
+
+      // Redirect to Paystack payment page
+      window.location.href = data.authorizationUrl;
+    } catch (err: any) {
+      setError(err.message || 'Payment initialization failed');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+        <p className="text-sm text-green-800 font-semibold mb-1">🇳🇬 Pay with Paystack</p>
+        <p className="text-xs text-green-700">Secure Nigerian payment via Paystack. You will be redirected to complete payment.</p>
+      </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 text-xs text-gray-500">
+        <Lock className="w-3.5 h-3.5 text-green-500" />
+        <span>Secured by Paystack — your payment is protected</span>
+      </div>
+
+      <button
+        onClick={handlePaystack}
+        disabled={loading}
+        className="w-full px-4 py-3.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-base transition-colors flex items-center justify-center gap-2"
+      >
+        {loading ? (
+          <><Loader className="w-5 h-5 animate-spin" /> Redirecting to Paystack...</>
+        ) : (
+          <><Lock className="w-4 h-4" /> Pay ₦{amount.toLocaleString()} via Paystack</>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [paymentComplete, setPaymentComplete] = useState(false);
@@ -204,6 +272,29 @@ export default function BookingDetailPage() {
   useEffect(() => {
     if (params?.id) fetchBooking();
   }, [params?.id]);
+
+  // Handle ?payment=success from Paystack callback
+  useEffect(() => {
+    const paymentParam = searchParams?.get('payment');
+    const reference = searchParams?.get('reference');
+    if (paymentParam === 'success' && params?.id) {
+      setPaymentComplete(true);
+      // Verify with Paystack if reference is present
+      if (reference) {
+        fetch(`/api/paystack/verify?reference=${reference}&bookingId=${params.id}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.verified) {
+              setBooking((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
+            }
+          })
+          .catch(() => {});
+      } else {
+        // Mark as confirmed optimistically
+        setBooking((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
+      }
+    }
+  }, [searchParams, params?.id]);
 
   const fetchBooking = async () => {
     if (!params?.id) return;
@@ -242,6 +333,15 @@ export default function BookingDetailPage() {
   const isPending = booking.status === 'pending' || booking.status === 'pending_payment';
   const isConfirmed = booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'escrowed';
 
+  // Detect Nigerian booking: check braider_country or currency
+  const isNigerianBooking =
+    booking.braider_country === 'NG' ||
+    booking.currency === 'NGN' ||
+    booking.country_code === 'NG';
+
+  // Customer email for Paystack
+  const customerEmail = booking.customer_email || 'customer@braidmee.com';
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="max-w-4xl mx-auto px-4 py-6">
@@ -268,7 +368,7 @@ export default function BookingDetailPage() {
                   <p className="text-sm text-yellow-700">Complete payment to confirm your booking.</p>
                 </div>
               )}
-              {isConfirmed && !paymentComplete && (
+              {(isConfirmed || paymentComplete) && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -281,18 +381,6 @@ export default function BookingDetailPage() {
                       Chat with Braider
                     </button>
                   </div>
-                </div>
-              )}
-              {isConfirmed && paymentComplete && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-700 font-medium mb-2">Ready to chat with your braider?</p>
-                  <button
-                    onClick={() => router.push('/messages/' + booking.id)}
-                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm flex items-center justify-center gap-2"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Open Chat
-                  </button>
                 </div>
               )}
             </div>
@@ -309,6 +397,12 @@ export default function BookingDetailPage() {
                   <span className="text-gray-500">Braider</span>
                   <span className="font-medium">{booking.braider_name || '—'}</span>
                 </div>
+                {isNigerianBooking && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Payment</span>
+                    <span className="font-medium text-green-700">🇳🇬 Paystack (NGN)</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -319,7 +413,7 @@ export default function BookingDetailPage() {
                 <div className="flex items-start gap-3">
                   <Calendar className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-gray-500">Date & Time</p>
+                    <p className="text-gray-500">Date &amp; Time</p>
                     <p className="font-medium">{booking.appointment_date ? new Date(booking.appointment_date).toLocaleString() : 'TBD'}</p>
                   </div>
                 </div>
@@ -360,27 +454,45 @@ export default function BookingDetailPage() {
             <div className="space-y-2 text-sm mb-5">
               <div className="flex justify-between">
                 <span className="text-gray-500">Service</span>
-                <span className="font-medium">${(booking.service_price || 0).toFixed(2)}</span>
+                <span className="font-medium">
+                  {isNigerianBooking ? '₦' : '$'}{(booking.service_price || 0).toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Platform Fee</span>
-                <span className="font-medium">${(booking.platform_fee || 0).toFixed(2)}</span>
+                <span className="font-medium">
+                  {isNigerianBooking ? '₦' : '$'}{(booking.platform_fee || 0).toLocaleString()}
+                </span>
               </div>
               <div className="border-t border-gray-200 pt-2 flex justify-between">
                 <span className="font-bold text-gray-900">Total</span>
-                <span className="text-xl font-bold text-purple-600">${(booking.total_amount || 0).toFixed(2)}</span>
+                <span className="text-xl font-bold text-purple-600">
+                  {isNigerianBooking ? '₦' : '$'}{(booking.total_amount || 0).toLocaleString()}
+                </span>
               </div>
             </div>
 
             {isPending && !paymentComplete && (
-              <PaymentForm
-                bookingId={booking.id}
-                amount={booking.total_amount || 0}
-                onSuccess={() => {
-                  setPaymentComplete(true);
-                  setBooking({ ...booking, status: 'confirmed' });
-                }}
-              />
+              isNigerianBooking ? (
+                <PaystackPaymentForm
+                  bookingId={booking.id}
+                  amount={booking.total_amount || 0}
+                  email={customerEmail}
+                  onSuccess={() => {
+                    setPaymentComplete(true);
+                    setBooking({ ...booking, status: 'confirmed' });
+                  }}
+                />
+              ) : (
+                <PaymentForm
+                  bookingId={booking.id}
+                  amount={booking.total_amount || 0}
+                  onSuccess={() => {
+                    setPaymentComplete(true);
+                    setBooking({ ...booking, status: 'confirmed' });
+                  }}
+                />
+              )
             )}
 
             {(paymentComplete || isConfirmed) && (
