@@ -16,37 +16,43 @@ const BraidingStylesGallery = dynamicImport(() => import('@/app/components/Braid
 
 // ─── Braiding style data ───────────────────────────────────────────────────
 const BRAIDING_STYLES = [
-  { name: 'Knotless Braids', emoji: '✨', color: 'from-purple-500 to-pink-500', query: 'knotless' },
-  { name: 'Box Braids', emoji: '💜', color: 'from-indigo-500 to-purple-500', query: 'box_braids' },
-  { name: 'Cornrows', emoji: '🌟', color: 'from-pink-500 to-rose-500', query: 'cornrows' },
-  { name: 'Locs', emoji: '🔥', color: 'from-amber-500 to-orange-500', query: 'locs' },
-  { name: 'Twists', emoji: '💫', color: 'from-teal-500 to-cyan-500', query: 'twists' },
-  { name: 'Kids Braids', emoji: '🌈', color: 'from-green-500 to-emerald-500', query: 'kids' },
-  { name: 'Faux Locs', emoji: '🎀', color: 'from-rose-500 to-pink-500', query: 'faux_locs' },
-  { name: 'Goddess Braids', emoji: '👑', color: 'from-yellow-500 to-amber-500', query: 'goddess' },
+  { name: 'Knotless Braids', image: '/images/braiding-styles/b_Long_knotless_braids.png', query: 'knotless' },
+  { name: 'Box Braids', image: '/images/braiding-styles/b_Long_jumbo_box_braid.png', query: 'box_braids' },
+  { name: 'Cornrows', image: '/images/braiding-styles/BRAIDER AND BARBER/CONCROW.jpeg', query: 'cornrows' },
+  { name: 'Locs', image: '/images/braiding-styles/BRAIDER AND BARBER/DREADLOCK.png', query: 'locs' },
+  { name: 'Twists', image: '/images/braiding-styles/BRAIDER AND BARBER/TWISTS.png', query: 'twists' },
+  { name: 'Kids Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/YOUNG GIRL BRAIDED HAIRSTYLE.jpeg', query: 'kids' },
+  { name: 'Goddess Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/GODESS BRAIDS.jpeg', query: 'goddess' },
+  { name: 'Medium Knotless', image: '/images/braiding-styles/b_Medium_knotless_brai.png', query: 'knotless' },
 ];
 
 const BARBING_STYLES = [
-  { name: 'Skin Fade', emoji: '✂️', color: 'from-slate-600 to-gray-700', query: 'skin_fade' },
-  { name: 'Low Cut', emoji: '💈', color: 'from-blue-600 to-indigo-600', query: 'low_cut' },
-  { name: 'Afro Taper', emoji: '🎯', color: 'from-purple-600 to-violet-600', query: 'afro_taper' },
-  { name: 'Waves', emoji: '🌊', color: 'from-cyan-600 to-blue-600', query: 'waves' },
-  { name: 'Dreadlocks', emoji: '🦁', color: 'from-amber-600 to-yellow-600', query: 'dreadlocks' },
-  { name: 'Line Up', emoji: '📐', color: 'from-green-600 to-teal-600', query: 'lineup' },
+  { name: 'Skin Fade', image: '/images/braiding-styles/BRAIDER AND BARBER/SKIN FADE.jpeg', query: 'skin_fade' },
+  { name: 'Low Cut', image: '/images/braiding-styles/BRAIDER AND BARBER/LOW CUT.jpeg', query: 'low_cut' },
+  { name: 'Afro Taper', image: '/images/braiding-styles/BRAIDER AND BARBER/AFRO TAPER.jpeg', query: 'afro_taper' },
+  { name: 'Waves', image: '/images/braiding-styles/BRAIDER AND BARBER/WAVES.jpeg', query: 'waves' },
+  { name: 'Dreadlocks', image: '/images/braiding-styles/BRAIDER AND BARBER/DREAD.jpeg', query: 'dreadlocks' },
+  { name: 'Line Up', image: '/images/braiding-styles/BRAIDER AND BARBER/LINE UP.jpeg', query: 'lineup' },
 ];
 
 // ─── StyleCard component ───────────────────────────────────────────────────
-function StyleCard({ name, emoji, color, onClick }: { name: string; emoji: string; color: string; onClick: () => void }) {
+function StyleCard({ name, image, onClick }: { name: string; image: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="flex-shrink-0 group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-      style={{ width: 140, height: 100 }}
+      style={{ width: 140, height: 160 }}
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-90 group-hover:opacity-100 transition-opacity`} />
-      <div className="relative flex flex-col items-center justify-center h-full gap-1 px-2">
-        <span className="text-3xl">{emoji}</span>
-        <span className="text-white font-semibold text-xs text-center leading-tight">{name}</span>
+      <img
+        src={image}
+        alt={name}
+        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        loading="lazy"
+      />
+      {/* Dark gradient overlay at bottom for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-2">
+        <span className="text-white font-semibold text-xs text-center leading-tight block drop-shadow">{name}</span>
       </div>
     </button>
   );
@@ -253,7 +259,7 @@ export default function LandingPage(): JSX.Element {
             </div>
           </div>
           <div ref={braidingScrollRef} className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {BRAIDING_STYLES.map(s => <StyleCard key={s.query} {...s} onClick={() => router.push(`/search?style=${s.query}`)} />)}
+            {BRAIDING_STYLES.map(s => <StyleCard key={s.query} name={s.name} image={s.image} onClick={() => router.push(`/search?style=${s.query}`)} />)}
           </div>
         </div>
       </section>
@@ -272,7 +278,7 @@ export default function LandingPage(): JSX.Element {
             </div>
           </div>
           <div ref={barbingScrollRef} className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {BARBING_STYLES.map(s => <StyleCard key={s.query} {...s} onClick={() => router.push(`/search?style=${s.query}`)} />)}
+            {BARBING_STYLES.map(s => <StyleCard key={s.query} name={s.name} image={s.image} onClick={() => router.push(`/search?style=${s.query}`)} />)}
           </div>
         </div>
       </section>
