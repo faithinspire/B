@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import dynamicImport from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Star, Shield, Users, Zap, CheckCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Search, MapPin, Star, Shield, Users, Zap, CheckCircle, ChevronLeft, ChevronRight, Calendar, Heart, Play } from 'lucide-react';
 import { useBraiders } from '@/app/hooks/useBraiders';
+import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BRAIDER_FEATURED_IMAGES } from '@/lib/imageAssets';
 import { PremiumSearchModal } from '@/app/components/PremiumSearchModal';
 import MarketplaceCarousel from '@/app/components/MarketplaceCarousel';
@@ -59,9 +60,41 @@ function StyleCard({ name, image, onClick }: { name: string; image: string; onCl
 }
 
 // ─── ProfessionalCard component ────────────────────────────────────────────
-function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
+function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: number; currentUserId?: string }) {
   const img = braider.avatar_url || BRAIDER_FEATURED_IMAGES[idx % BRAIDER_FEATURED_IMAGES.length]?.src;
   const isBarber = braider.profession_type === 'barber';
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    fetch(`/api/followers?follower_id=${currentUserId}&following_id=${braider.user_id || braider.id}`)
+      .then(r => r.json())
+      .then(d => setIsFollowing((d.data?.length || 0) > 0))
+      .catch(() => {});
+  }, [currentUserId, braider.user_id, braider.id]);
+
+  const toggleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentUserId) { window.location.href = '/login'; return; }
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await fetch(`/api/followers?follower_id=${currentUserId}&following_id=${braider.user_id || braider.id}`, { method: 'DELETE' });
+        setIsFollowing(false);
+      } else {
+        await fetch('/api/followers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ follower_id: currentUserId, following_id: braider.user_id || braider.id }),
+        });
+        setIsFollowing(true);
+      }
+    } catch {}
+    setFollowLoading(false);
+  };
+
   return (
     <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group" style={{ width: 220 }}>
       <div className="relative h-48 bg-gradient-to-br from-purple-200 to-pink-200 overflow-hidden">
@@ -75,6 +108,15 @@ function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
         <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
           {isBarber ? '💈 Barber' : '✂️ Braider'}
         </div>
+        {/* Follow button */}
+        <button
+          onClick={toggleFollow}
+          disabled={followLoading}
+          className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${isFollowing ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'}`}
+          title={isFollowing ? 'Unfollow' : 'Follow'}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isFollowing ? 'fill-current' : ''}`} />
+        </button>
         <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
           <div className="flex items-center gap-1 bg-white/90 rounded-full px-2 py-0.5">
             <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -107,9 +149,156 @@ function ProfessionalCard({ braider, idx }: { braider: any; idx: number }) {
   );
 }
 
+// ─── StatusSection component ────────────────────────────────────────────────
+function StatusSection({ braiders }: { braiders: any[] }) {
+  const [statuses, setStatuses] = useState<any[]>([]);
+  const [viewingStatus, setViewingStatus] = useState<any | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (braiders.length === 0) return;
+    // Fetch statuses for all featured braiders
+    const fetchStatuses = async () => {
+      try {
+        const res = await fetch('/api/braider/status');
+        if (res.ok) {
+          const data = await res.json();
+          setStatuses(data.data || []);
+        }
+      } catch {}
+    };
+    fetchStatuses();
+  }, [braiders.length]);
+
+  // Group statuses by braider
+  const braiderStatusMap = statuses.reduce((acc: any, s: any) => {
+    if (!acc[s.braider_id]) acc[s.braider_id] = [];
+    acc[s.braider_id].push(s);
+    return acc;
+  }, {});
+
+  const braidersWithStatus = braiders.filter(b => braiderStatusMap[b.user_id || b.id]?.length > 0);
+
+  if (braidersWithStatus.length === 0) return null;
+
+  return (
+    <section className="py-8 bg-white border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block"></span>
+          Live Status
+        </h2>
+        <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {braidersWithStatus.map(braider => {
+            const bStatuses = braiderStatusMap[braider.user_id || braider.id] || [];
+            const latest = bStatuses[0];
+            return (
+              <button
+                key={braider.user_id || braider.id}
+                onClick={() => setViewingStatus({ braider, statuses: bStatuses, current: 0 })}
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
+              >
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-400">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
+                      {braider.avatar_url ? (
+                        <img src={braider.avatar_url} alt={braider.full_name} className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-200 to-pink-200 flex items-center justify-center text-xl">
+                          {braider.profession_type === 'barber' ? '💈' : '✂️'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {latest?.media_type === 'video' && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Play className="w-2.5 h-2.5 text-white fill-white" />
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-gray-700 font-medium max-w-[64px] truncate">{braider.full_name?.split(' ')[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Status Viewer Modal */}
+      {viewingStatus && (
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setViewingStatus(null)}>
+          <div className="relative w-full max-w-sm h-full max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Progress bars */}
+            <div className="absolute top-4 left-4 right-4 z-10 flex gap-1">
+              {viewingStatus.statuses.map((_: any, i: number) => (
+                <div key={i} className={`h-0.5 flex-1 rounded-full ${i <= viewingStatus.current ? 'bg-white' : 'bg-white/40'}`} />
+              ))}
+            </div>
+            {/* Header */}
+            <div className="absolute top-8 left-4 right-4 z-10 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20">
+                {viewingStatus.braider.avatar_url
+                  ? <img src={viewingStatus.braider.avatar_url} className="w-full h-full object-cover" alt="" />
+                  : <div className="w-full h-full flex items-center justify-center text-sm">{viewingStatus.braider.profession_type === 'barber' ? '💈' : '✂️'}</div>}
+              </div>
+              <div>
+                <p className="text-white text-sm font-semibold">{viewingStatus.braider.full_name}</p>
+                <p className="text-white/60 text-xs">{new Date(viewingStatus.statuses[viewingStatus.current]?.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</p>
+              </div>
+              <button onClick={() => setViewingStatus(null)} className="ml-auto text-white/80 hover:text-white text-2xl font-light">✕</button>
+            </div>
+            {/* Media */}
+            <div className="w-full h-full rounded-2xl overflow-hidden bg-gray-900">
+              {viewingStatus.statuses[viewingStatus.current]?.media_type === 'video' ? (
+                <video
+                  src={viewingStatus.statuses[viewingStatus.current]?.media_url}
+                  autoPlay
+                  className="w-full h-full object-cover"
+                  onEnded={() => {
+                    if (viewingStatus.current < viewingStatus.statuses.length - 1) {
+                      setViewingStatus((v: any) => ({ ...v, current: v.current + 1 }));
+                    } else {
+                      setViewingStatus(null);
+                    }
+                  }}
+                />
+              ) : (
+                <img
+                  src={viewingStatus.statuses[viewingStatus.current]?.media_url}
+                  alt="Status"
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
+            {/* Caption */}
+            {viewingStatus.statuses[viewingStatus.current]?.caption && (
+              <div className="absolute bottom-8 left-4 right-4 bg-black/50 rounded-xl p-3">
+                <p className="text-white text-sm">{viewingStatus.statuses[viewingStatus.current].caption}</p>
+              </div>
+            )}
+            {/* Navigation */}
+            <div className="absolute inset-0 flex">
+              <div className="flex-1" onClick={() => {
+                if (viewingStatus.current > 0) setViewingStatus((v: any) => ({ ...v, current: v.current - 1 }));
+              }} />
+              <div className="flex-1" onClick={() => {
+                if (viewingStatus.current < viewingStatus.statuses.length - 1) {
+                  setViewingStatus((v: any) => ({ ...v, current: v.current + 1 }));
+                } else {
+                  setViewingStatus(null);
+                }
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function LandingPage(): JSX.Element {
   const router = useRouter();
   const { braiders, loading } = useBraiders();
+  const { user } = useSupabaseAuthStore();
   const [location, setLocation] = useState('');
   const [style, setStyle] = useState('');
   const [featuredBraiders, setFeaturedBraiders] = useState<any[]>([]);
@@ -288,6 +477,9 @@ export default function LandingPage(): JSX.Element {
         </div>
       </section>
 
+      {/* BRAIDER/BARBER STATUS — WhatsApp-style stories */}
+      <StatusSection braiders={featuredBraiders} />
+
       {/* FEATURED PROFESSIONALS */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -315,7 +507,7 @@ export default function LandingPage(): JSX.Element {
             </div>
           ) : (
             <div ref={profScrollRef} className="flex gap-5 overflow-x-auto pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {featuredBraiders.map((braider, idx) => <ProfessionalCard key={braider.user_id || braider.id} braider={braider} idx={idx} />)}
+              {featuredBraiders.map((braider, idx) => <ProfessionalCard key={braider.user_id || braider.id} braider={braider} idx={idx} currentUserId={user?.id} />)}
             </div>
           )}
         </div>

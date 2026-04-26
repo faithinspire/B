@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
-import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle, ShoppingBag } from 'lucide-react';
+import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle, ShoppingBag, Radio } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -53,7 +53,7 @@ export function Navigation() {
       return [
         { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
-        { href: '/braider/marketplace/orders', icon: ShoppingBag, label: 'Orders' },
+        { href: '/braider/status', icon: Radio, label: 'Status' },
         { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
         { href: '/braider/wallet', icon: Wallet, label: 'Wallet' },
       ];
