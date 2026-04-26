@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       buyer_email,
       buyer_name,
       seller_id,
+      braider_id,
       product_name,
       product_image,
       quantity,
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
       currency,
       delivery_address,
       notes,
+      seller_country,
+      payment_method,
     } = body;
 
     if (!product_id || !buyer_id || !seller_id || !total_amount) {
@@ -79,6 +82,19 @@ export async function POST(request: Request) {
       { auth: { persistSession: false } }
     );
 
+    // Use braider_id if provided, otherwise use seller_id
+    const finalBraiderId = braider_id || seller_id;
+    
+    // Determine payment method based on seller country
+    let finalPaymentMethod = payment_method || 'stripe';
+    let finalSellerCountry = seller_country || 'NG';
+    
+    if (finalSellerCountry === 'NG') {
+      finalPaymentMethod = 'paystack';
+    } else if (finalSellerCountry === 'US') {
+      finalPaymentMethod = 'stripe';
+    }
+
     const { data: order, error } = await db
       .from('marketplace_orders')
       .insert({
@@ -87,6 +103,7 @@ export async function POST(request: Request) {
         buyer_email,
         buyer_name,
         seller_id,
+        braider_id: finalBraiderId,
         product_name,
         product_image,
         quantity: quantity || 1,
@@ -97,11 +114,14 @@ export async function POST(request: Request) {
         notes,
         status: 'pending',
         payment_status: 'unpaid',
+        payment_method: finalPaymentMethod,
+        seller_country: finalSellerCountry,
       })
       .select()
       .single();
 
     if (error) {
+      console.error('Marketplace order insert error:', error);
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
