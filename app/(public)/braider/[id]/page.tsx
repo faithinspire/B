@@ -3,8 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { useParams } from 'next/navigation';
 import {
   Star, MapPin, Clock, Shield, ChevronRight, AlertCircle, Crown,
   Instagram, Calendar, Bookmark, Play, Image as ImageIcon,
@@ -68,8 +67,6 @@ const TikTokIcon = () => (
 
 export default function BraiderProfilePage() {
   const params = useParams();
-  const router = useRouter();
-  const { user, loading: authLoading } = useSupabaseAuthStore();
   const [pro, setPro] = useState<BraiderProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,24 +74,12 @@ export default function BraiderProfilePage() {
   const [lightboxMedia, setLightboxMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
-    // Wait for auth to resolve
-    if (authLoading) return;
-
-    // Redirect to login if not authenticated
-    if (!user) {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-      }
-      router.push('/login');
-      return;
-    }
-
-    // Fetch profile once authenticated
+    // Fetch profile - public page, no auth required
     if (params?.id) {
       fetchProfile(params.id as string);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params?.id, authLoading, user?.id]);
+  }, [params?.id]);
 
   const fetchProfile = async (id: string) => {
     try {
@@ -155,7 +140,7 @@ export default function BraiderProfilePage() {
   const countryFlag = pro?.country === 'NG' ? '🇳🇬' : pro?.country === 'US' ? '🇺🇸' : '';
   const locationStr = [pro?.city, pro?.state, countryFlag].filter(Boolean).join(', ');
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center">
         <div className="text-center">

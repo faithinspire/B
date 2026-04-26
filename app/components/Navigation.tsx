@@ -34,7 +34,7 @@ export function Navigation() {
     router.push('/');
   };
 
-  const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
+  const isActive = (path: string) => pathname === path || (pathname?.startsWith(path + '/') ?? false);
 
   const getBottomNavItems = () => {
     if (!user) return [];
@@ -139,7 +139,7 @@ export function Navigation() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 top-16 z-50 overflow-y-auto">
+          <div className="md:hidden fixed inset-0 top-16 z-50 overflow-y-auto overscroll-contain">
             {/* Animated Background */}
             <div className="absolute inset-0">
               {BACKGROUND_IMAGES.map((img, idx) => (

@@ -95,64 +95,70 @@ export async function POST(request: Request) {
       finalPaymentMethod = 'stripe';
     }
 
-    // First check which columns exist to handle missing migration gracefully
-    const { data: columnCheck } = await db
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_name', 'marketplace_orders')
-      .in('column_name', ['braider_id', 'payment_method', 'seller_country']);
-
-    const existingCols = new Set((columnCheck || []).map((c: any) => c.column_name));
-
-    // Build insert object based on what columns exist
-    const insertData: any = {
+    // Build the minimal insert that always works (only core columns)
+    const coreInsert: any = {
       product_id,
       buyer_id,
-      buyer_email,
-      buyer_name,
+      buyer_email: buyer_email || '',
+      buyer_name: buyer_name || '',
       seller_id,
-      product_name,
-      product_image,
+      product_name: product_name || '',
+      product_image: product_image || null,
       quantity: quantity || 1,
       unit_price: unit_price || 0,
       total_amount,
       currency: currency || 'NGN',
-      delivery_address,
-      notes,
+      delivery_address: delivery_address || '',
+      notes: notes || null,
       status: 'pending',
       payment_status: 'unpaid',
     };
 
-    // Only add columns that exist in the database
-    if (existingCols.has('braider_id')) insertData.braider_id = finalBraiderId;
-    if (existingCols.has('payment_method')) insertData.payment_method = finalPaymentMethod;
-    if (existingCols.has('seller_country')) insertData.seller_country = finalSellerCountry;
+    // Try with all new columns first
+    const fullInsert = {
+      ...coreInsert,
+      braider_id: finalBraiderId,
+      payment_method: finalPaymentMethod,
+      seller_country: finalSellerCountry,
+    };
 
-    const { data: order, error } = await db
-      .from('marketplace_orders')
-      .insert(insertData)
-      .select()
-      .single();
+    let order: any = null;
+    let insertError: any = null;
 
-    if (error) {
-      console.error('Marketplace order insert error:', error);
-      // If still failing due to braider_id, try without it
-      if (error.message?.includes('braider_id') || error.message?.includes('schema cache')) {
-        delete insertData.braider_id;
-        delete insertData.payment_method;
-        delete insertData.seller_country;
-        const { data: order2, error: error2 } = await db
-          .from('marketplace_orders')
-          .insert(insertData)
-          .select()
-          .single();
-        if (error2) {
-          return NextResponse.json({ error: error2.message }, { status: 400 });
+    // Attempt 1: Full insert with new columns
+    const result1 = await db.from('marketplace_orders').insert(fullInsert).select().single();
+    if (!result1.error) {
+      order = result1.data;
+    } else {
+      insertError = result1.error;
+      console.error('Full insert failed:', result1.error.message);
+
+      // Attempt 2: Try without braider_id/payment_method/seller_country
+      const result2 = await db.from('marketplace_orders').insert(coreInsert).select().single();
+      if (!result2.error) {
+        order = result2.data;
+        insertError = null;
+      } else {
+        insertError = result2.error;
+        console.error('Core insert also failed:', result2.error.message);
+
+        // Attempt 3: Try with buyer_id as customer_id alias (some schemas use customer_id)
+        const altInsert = { ...coreInsert, customer_id: buyer_id };
+        delete altInsert.buyer_id;
+        const result3 = await db.from('marketplace_orders').insert(altInsert).select().single();
+        if (!result3.error) {
+          order = result3.data;
+          insertError = null;
+        } else {
+          insertError = result3.error;
         }
-        return NextResponse.json({ data: order2 }, { status: 201 });
       }
+    }
+
+    if (insertError || !order) {
+      console.error('All insert attempts failed:', insertError?.message);
       return NextResponse.json(
-        { error: error.message },
+        { error: insertError?.message || 'Failed to create order' },
         { status: 400 }
       );
     }

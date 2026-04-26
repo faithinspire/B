@@ -129,7 +129,7 @@ export default function CustomerDashboard() {
             <div className="absolute bottom-2 right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">✓</div>
           )}
         </div>
-        <div className="p-4 flex-1 flex flex-col">
+        <div className="p-3 flex-1 flex flex-col">
           <h3 className="font-bold text-gray-900 text-sm mb-0.5 truncate">{pro.full_name}</h3>
           <div className="flex items-center gap-1 mb-1">
             <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -143,14 +143,22 @@ export default function CustomerDashboard() {
             </div>
           )}
           <p className="text-xs text-gray-500 line-clamp-2 mb-3 flex-1">{pro.bio || `Professional ${isBarber ? 'barber' : 'braider'}`}</p>
-          <div className="flex gap-2 mt-auto">
-            {/* Use <a> tag to force full navigation — avoids Next.js router refresh issue */}
+          <div className="flex gap-1.5 mt-auto">
+            {/* View Profile - full page navigation to avoid auth glitch */}
             <a
               href={`/braider/${profileId}`}
               className={`flex-1 text-center py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
             >
-              View Profile
+              Profile
             </a>
+            {/* Chat button - starts direct conversation */}
+            <a
+              href={`/messages?braider_id=${profileId}&name=${encodeURIComponent(pro.full_name)}`}
+              className="flex-1 text-center py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors"
+            >
+              💬 Chat
+            </a>
+            {/* Book button */}
             <a
               href={`/booking?braider_id=${profileId}`}
               className={`flex-1 text-center py-1.5 border-2 rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'border-blue-600 text-blue-600 hover:bg-blue-50' : 'border-purple-600 text-purple-600 hover:bg-purple-50'}`}

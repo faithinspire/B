@@ -397,25 +397,27 @@ function MarketplaceContent() {
                                         return;
                                       }
                                       try {
-                                        const res = await fetch('/api/chat/create-conversation', {
+                                        // Create or find conversation with seller
+                                        const res = await fetch('/api/conversations', {
                                           method: 'POST',
                                           headers: { 'Content-Type': 'application/json' },
                                           body: JSON.stringify({
                                             customer_id: user.id,
                                             braider_id: product.braider_id,
-                                            initial_message: `Hi! I'm interested in your product: ${product.name}`,
+                                            booking_id: null,
                                           }),
                                         });
-                                        const data = await res.json();
-                                        if (data.success && data.conversation) {
-                                          router.push('/messages');
-                                        } else {
-                                          router.push('/messages');
+                                        if (res.ok) {
+                                          const conv = await res.json();
+                                          if (conv.id) {
+                                            router.push(`/messages/conv/${conv.id}`);
+                                            return;
+                                          }
                                         }
                                       } catch (err) {
                                         console.error('Chat error:', err);
-                                        router.push('/messages');
                                       }
+                                      router.push(`/messages?braider_id=${product.braider_id}`);
                                     }}
                                     className="w-full border-2 border-purple-300 text-purple-600 py-2 sm:py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all text-sm sm:text-base flex items-center justify-center gap-2"
                                   >
