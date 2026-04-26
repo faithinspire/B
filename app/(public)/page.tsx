@@ -160,40 +160,39 @@ function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: 
   );
 }
 
-// ─── All Services data (braider services only) ────────────────────────────
+// ─── All Services data (braider services only) — using real images ─────────
 const ALL_SERVICES = [
   // Hair Braiding
-  { name: 'Knotless Braids', emoji: '✂️', query: 'knotless', category: 'Braiding' },
-  { name: 'Box Braids', emoji: '✂️', query: 'box_braids', category: 'Braiding' },
-  { name: 'Cornrows', emoji: '✂️', query: 'cornrows', category: 'Braiding' },
-  { name: 'Goddess Braids', emoji: '✂️', query: 'goddess', category: 'Braiding' },
-  { name: 'Fulani Braids', emoji: '✂️', query: 'fulani', category: 'Braiding' },
-  { name: 'Micro Braids', emoji: '✂️', query: 'micro_braids', category: 'Braiding' },
-  { name: 'Senegalese Twists', emoji: '✂️', query: 'senegalese', category: 'Braiding' },
-  { name: 'Passion Twists', emoji: '✂️', query: 'passion_twists', category: 'Braiding' },
-  { name: 'Locs / Dreadlocks', emoji: '✂️', query: 'locs', category: 'Braiding' },
-  { name: 'Kids Braids', emoji: '✂️', query: 'kids', category: 'Braiding' },
+  { name: 'Knotless Braids', image: '/images/braiding-styles/b_Long_knotless_braids.png', query: 'knotless', category: 'Braiding' },
+  { name: 'Box Braids', image: '/images/braiding-styles/b_Long_jumbo_box_braid.png', query: 'box_braids', category: 'Braiding' },
+  { name: 'Cornrows', image: '/images/braiding-styles/BRAIDER AND BARBER/CONCROW.jpeg', query: 'cornrows', category: 'Braiding' },
+  { name: 'Goddess Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/GODESS BRAIDS.jpeg', query: 'goddess', category: 'Braiding' },
+  { name: 'Fulani Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/FULANI BRAID.jpeg', query: 'fulani', category: 'Braiding' },
+  { name: 'Micro Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/MICRO BRAIDS.jpeg', query: 'micro_braids', category: 'Braiding' },
+  { name: 'Senegalese Twists', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/SENEGALISE TWISTS.jpeg', query: 'senegalese', category: 'Braiding' },
+  { name: 'Passion Twists', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/PASSION TWISTS.png', query: 'passion_twists', category: 'Braiding' },
+  { name: 'Locs / Dreadlocks', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/DREADLOCKS.png', query: 'locs', category: 'Braiding' },
+  { name: 'Kids Braids', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/KIDS BRAID.jpeg', query: 'kids', category: 'Braiding' },
   // Hair Extensions & Weaves
-  { name: 'Weaves / Sew-In', emoji: '💇', query: 'weave', category: 'Extensions' },
-  { name: 'Quick Weave', emoji: '💇', query: 'quick_weave', category: 'Extensions' },
-  { name: 'Frontal Install', emoji: '💇', query: 'frontal', category: 'Extensions' },
-  { name: 'Closure Install', emoji: '💇', query: 'closure', category: 'Extensions' },
-  { name: 'Wig Install', emoji: '💇', query: 'wig', category: 'Extensions' },
-  { name: 'Tape-In Extensions', emoji: '💇', query: 'tape_in', category: 'Extensions' },
+  { name: 'Weaves / Sew-In', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/WEAVES.jpeg', query: 'weave', category: 'Extensions' },
+  { name: 'Quick Weave', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/QUICK WEAVE.jpeg', query: 'quick_weave', category: 'Extensions' },
+  { name: 'Frontal Install', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/FRONTAL INSTALL.jpeg', query: 'frontal', category: 'Extensions' },
+  { name: 'Closure Install', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/CLOSURE INSTALL.png', query: 'closure', category: 'Extensions' },
+  { name: 'Wig Install', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/WIG INSTALL.png', query: 'wig', category: 'Extensions' },
+  { name: 'Tape-In Extensions', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/TAPE IN EXTENSIONS.png', query: 'tape_in', category: 'Extensions' },
   // Natural Hair
-  { name: 'Natural Hair Styling', emoji: '🌿', query: 'natural', category: 'Natural Hair' },
-  { name: 'Slick Press', emoji: '🌿', query: 'slick_press', category: 'Natural Hair' },
-  { name: 'Silk Press', emoji: '🌿', query: 'silk_press', category: 'Natural Hair' },
-  { name: 'Blow Out', emoji: '🌿', query: 'blowout', category: 'Natural Hair' },
-  { name: 'Wash & Go', emoji: '🌿', query: 'wash_go', category: 'Natural Hair' },
-  { name: 'Protective Styles', emoji: '🌿', query: 'protective', category: 'Natural Hair' },
+  { name: 'Natural Hair', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/NATURAL HAIR.png', query: 'natural', category: 'Natural Hair' },
+  { name: 'Slick Press', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/SLICK PRESSED HAIR.png', query: 'slick_press', category: 'Natural Hair' },
+  { name: 'Blow Out', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/BLOW OUT.png', query: 'blowout', category: 'Natural Hair' },
+  { name: 'Wash & Go', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/WASH AND GO.png', query: 'wash_go', category: 'Natural Hair' },
+  { name: 'Protective Styles', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/PROTECTIVE HAIRSTYLE.png', query: 'protective', category: 'Natural Hair' },
   // Beauty
-  { name: 'Eyelash Extensions', emoji: '👁️', query: 'eyelashes', category: 'Beauty' },
-  { name: 'Nail Art', emoji: '💅', query: 'nails', category: 'Beauty' },
-  { name: 'Acrylic Nails', emoji: '💅', query: 'acrylic_nails', category: 'Beauty' },
-  { name: 'Gel Nails', emoji: '💅', query: 'gel_nails', category: 'Beauty' },
-  { name: 'Makeup', emoji: '💄', query: 'makeup', category: 'Beauty' },
-  { name: 'Bridal Styling', emoji: '👰', query: 'bridal', category: 'Beauty' },
+  { name: 'Eyelash Extensions', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/EYE LASH.png', query: 'eyelashes', category: 'Beauty' },
+  { name: 'Nail Art', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/NAIL ART.png', query: 'nails', category: 'Beauty' },
+  { name: 'Acrylic Nails', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/ARCYLIC NAILS.png', query: 'acrylic_nails', category: 'Beauty' },
+  { name: 'Gel Nails', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/gel nails.jpeg', query: 'gel_nails', category: 'Beauty' },
+  { name: 'Makeup', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/make up.jpeg', query: 'makeup', category: 'Beauty' },
+  { name: 'Bridal Styling', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/bridal makeup.jpeg', query: 'bridal', category: 'Beauty' },
 ];
 
 // ─── ServicesSection component ─────────────────────────────────────────────
@@ -232,16 +231,33 @@ function ServicesSection({ onServiceClick }: { onServiceClick: (query: string) =
           ))}
         </div>
 
-        {/* Services grid */}
-        <div ref={scrollRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+        {/* Services grid — image cards */}
+        <div ref={scrollRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
           {filtered.map(service => (
             <button
               key={service.query}
               onClick={() => onServiceClick(service.query)}
-              className="flex flex-col items-center gap-1.5 p-3 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-2xl transition-all group hover:shadow-sm"
+              className="flex flex-col items-center group overflow-hidden rounded-2xl border border-gray-100 hover:border-purple-300 hover:shadow-md transition-all bg-white"
             >
-              <span className="text-2xl group-hover:scale-110 transition-transform">{service.emoji}</span>
-              <span className="text-xs font-medium text-gray-700 text-center leading-tight">{service.name}</span>
+              {/* Image */}
+              <div className="w-full aspect-square overflow-hidden rounded-t-2xl bg-gradient-to-br from-purple-100 to-pink-100">
+                <img
+                  src={service.image}
+                  alt={service.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  onError={(e) => {
+                    const t = e.target as HTMLImageElement;
+                    t.style.display = 'none';
+                    const parent = t.parentElement;
+                    if (parent) parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-3xl">✂️</div>';
+                  }}
+                />
+              </div>
+              {/* Label */}
+              <div className="w-full px-1.5 py-2 text-center">
+                <span className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">{service.name}</span>
+              </div>
             </button>
           ))}
         </div>

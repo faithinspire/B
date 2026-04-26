@@ -22,14 +22,14 @@ interface MarketplaceCarouselProps {
   category?: string;
 }
 
-// Demo products with real-looking images from Unsplash (free to use)
+// Demo products with product-themed placeholders (no braiding style images)
 const DEMO_PRODUCTS: Product[] = [
   {
     id: 'demo-1',
     name: 'Premium Hair Extensions',
     price: 15000,
     currency: 'NGN',
-    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop',
+    image_url: null,
     rating_avg: 4.8,
     rating_count: 124,
     braider_id: 'demo',
@@ -40,7 +40,7 @@ const DEMO_PRODUCTS: Product[] = [
     name: 'Braiding Beads Set',
     price: 5000,
     currency: 'NGN',
-    image_url: 'https://images.unsplash.com/photo-1560869713-7d0a29430803?w=400&h=300&fit=crop',
+    image_url: null,
     rating_avg: 4.9,
     rating_count: 89,
     braider_id: 'demo',
@@ -51,7 +51,7 @@ const DEMO_PRODUCTS: Product[] = [
     name: 'Wig Installation Kit',
     price: 25000,
     currency: 'NGN',
-    image_url: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400&h=300&fit=crop',
+    image_url: null,
     rating_avg: 4.7,
     rating_count: 156,
     braider_id: 'demo',
@@ -62,7 +62,7 @@ const DEMO_PRODUCTS: Product[] = [
     name: 'Braiding Thread Bundle',
     price: 8000,
     currency: 'NGN',
-    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop&q=80',
+    image_url: null,
     rating_avg: 4.6,
     rating_count: 203,
     braider_id: 'demo',
@@ -73,7 +73,7 @@ const DEMO_PRODUCTS: Product[] = [
     name: 'Hair Care Oil Set',
     price: 45,
     currency: 'USD',
-    image_url: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&h=300&fit=crop',
+    image_url: null,
     rating_avg: 4.9,
     rating_count: 67,
     braider_id: 'demo',
@@ -84,7 +84,7 @@ const DEMO_PRODUCTS: Product[] = [
     name: 'Knotless Braid Kit',
     price: 35,
     currency: 'USD',
-    image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop&q=60',
+    image_url: null,
     rating_avg: 4.7,
     rating_count: 91,
     braider_id: 'demo',
@@ -192,7 +192,7 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
                 {/* Product Card */}
                 <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:scale-105 hover:-translate-y-2">
                   {/* Image Container */}
-                  <div className="relative h-48 sm:h-64 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+                  <div className="relative h-48 sm:h-64 overflow-hidden">
                     {product.image_url ? (
                       <img
                         src={product.image_url}
@@ -207,10 +207,11 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
                       />
                     ) : null}
                     <div
-                      className="w-full h-full items-center justify-center text-5xl"
+                      className="w-full h-full items-center justify-center flex-col gap-2 bg-gradient-to-br from-purple-100 via-pink-50 to-purple-200"
                       style={{ display: product.image_url ? 'none' : 'flex' }}
                     >
-                      🛍️
+                      <span className="text-5xl">🛍️</span>
+                      <span className="text-xs font-semibold text-purple-600 text-center px-2">{product.name}</span>
                     </div>
                     {/* Badge */}
                     <div className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-lg">
