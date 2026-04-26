@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import {
   Star, MapPin, Clock, Shield, ChevronRight, AlertCircle, Crown,
@@ -78,14 +77,24 @@ export default function BraiderProfilePage() {
   const [lightboxMedia, setLightboxMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
-    // Redirect non-authenticated users to login
-    if (!authLoading && !user) {
+    // Wait for auth to resolve
+    if (authLoading) return;
+
+    // Redirect to login if not authenticated
+    if (!user) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      }
       router.push('/login');
       return;
     }
-    
-    if (params?.id) fetchProfile(params.id as string);
-  }, [params?.id, user, authLoading, router]);
+
+    // Fetch profile once authenticated
+    if (params?.id) {
+      fetchProfile(params.id as string);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.id, authLoading, user?.id]);
 
   const fetchProfile = async (id: string) => {
     try {
@@ -93,9 +102,7 @@ export default function BraiderProfilePage() {
       setError(null);
       const res = await fetch('/api/braiders/' + id, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -103,25 +110,22 @@ export default function BraiderProfilePage() {
         return;
       }
       const data = await res.json();
-      
-      // Validate required fields
-      if (!data.id || !data.user_id) {
-        setError('Invalid profile data');
+      if (!data || (!data.id && !data.user_id)) {
+        setError('Profile not found');
         return;
       }
-      
       setPro({
-        id: data.id,
-        user_id: data.user_id,
-        bio: data.bio,
-        rating_avg: data.rating_avg || null,
+        id: data.id || data.user_id,
+        user_id: data.user_id || data.id,
+        bio: data.bio || null,
+        rating_avg: data.rating_avg || 0,
         rating_count: data.rating_count || 0,
         verification_status: data.verification_status || 'unverified',
         travel_radius_miles: data.travel_radius_miles || 10,
         is_mobile: data.is_mobile || false,
-        salon_address: data.salon_address,
+        salon_address: data.salon_address || null,
         full_name: data.full_name || 'Professional',
-        avatar_url: data.avatar_url,
+        avatar_url: data.avatar_url || null,
         specialties: data.specialties || [],
         specialization: data.specialization || null,
         profession_type: data.profession_type || 'braider',
@@ -149,10 +153,9 @@ export default function BraiderProfilePage() {
   const professionEmoji = isBarber ? '💈' : '✂️';
   const professionLabel = isBarber ? 'Barber' : 'Braider';
   const countryFlag = pro?.country === 'NG' ? '🇳🇬' : pro?.country === 'US' ? '🇺🇸' : '';
-
   const locationStr = [pro?.city, pro?.state, countryFlag].filter(Boolean).join(', ');
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center">
         <div className="text-center">
@@ -169,9 +172,9 @@ export default function BraiderProfilePage() {
         <div className="text-center max-w-md bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-white text-lg font-semibold mb-2">{error || 'Profile not found'}</p>
-          <Link href="/search" className="inline-block mt-4 px-6 py-3 bg-white text-purple-700 rounded-xl font-bold hover:shadow-xl transition-all">
+          <a href="/search" className="inline-block mt-4 px-6 py-3 bg-white text-purple-700 rounded-xl font-bold hover:shadow-xl transition-all">
             Back to Search
-          </Link>
+          </a>
         </div>
       </div>
     );
@@ -181,23 +184,18 @@ export default function BraiderProfilePage() {
     <div className="min-h-screen bg-gray-50">
       {/* Hero Banner */}
       <div className="relative h-56 sm:h-72 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 overflow-hidden">
-        {/* Decorative blobs */}
         <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20" />
-        <div className="absolute inset-0 bg-[url('/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png')] bg-cover bg-center opacity-10" />
-
-        {/* Back button */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 pt-4">
-          <Link href="/search" className="inline-flex items-center gap-1 text-white/80 hover:text-white text-sm font-medium transition-colors">
+          <a href="/search" className="inline-flex items-center gap-1 text-white/80 hover:text-white text-sm font-medium transition-colors">
             <ChevronRight className="w-4 h-4 rotate-180" /> Back to Search
-          </Link>
+          </a>
         </div>
       </div>
 
-      {/* Profile Card — overlaps hero */}
+      {/* Profile Card */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-20 relative z-10 pb-16">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-          {/* Top section */}
           <div className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row gap-6">
               {/* Avatar */}
@@ -209,7 +207,6 @@ export default function BraiderProfilePage() {
                     <div className="w-full h-full flex items-center justify-center text-5xl">{professionEmoji}</div>
                   )}
                 </div>
-                {/* Profession badge */}
                 <div className={`absolute -bottom-2 -right-2 px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-lg ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
                   {professionEmoji} {professionLabel}
                 </div>
@@ -239,7 +236,6 @@ export default function BraiderProfilePage() {
                   </div>
                 </div>
 
-                {/* Stats row */}
                 <div className="flex flex-wrap gap-4 mb-3">
                   <div className="flex items-center gap-1.5">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -253,7 +249,7 @@ export default function BraiderProfilePage() {
                   {pro.experience_years > 0 && (
                     <div className="flex items-center gap-1.5 text-gray-600 text-sm">
                       <Bookmark className="w-4 h-4" />
-                      <span><strong className="text-gray-900">{pro.experience_years}</strong> yrs experience</span>
+                      <span><strong className="text-gray-900">{pro.experience_years}</strong> yrs exp</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-gray-600 text-sm">
@@ -262,10 +258,8 @@ export default function BraiderProfilePage() {
                   </div>
                 </div>
 
-                {/* Bio */}
                 {pro.bio && <p className="text-gray-600 text-sm leading-relaxed mb-3">{pro.bio}</p>}
 
-                {/* Specializations */}
                 {(pro.specialties?.length > 0 || pro.specialization) && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {pro.specialization && (
@@ -279,7 +273,6 @@ export default function BraiderProfilePage() {
                   </div>
                 )}
 
-                {/* Social links */}
                 <div className="flex gap-3">
                   {pro.instagram_url && (
                     <a href={pro.instagram_url.startsWith('http') ? pro.instagram_url : `https://instagram.com/${pro.instagram_url.replace('@', '')}`}
@@ -299,16 +292,16 @@ export default function BraiderProfilePage() {
               </div>
             </div>
 
-            {/* Book CTA */}
+            {/* Action Buttons */}
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <Link href={`/booking?braider_id=${pro.user_id}`}
+              <a href={`/booking?braider_id=${pro.user_id}`}
                 className={`flex-1 text-center py-3.5 rounded-2xl font-bold text-white text-sm shadow-lg hover:shadow-xl transition-all ${isBarber ? 'bg-gradient-to-r from-blue-600 to-indigo-600' : 'bg-gradient-to-r from-purple-600 to-pink-600'}`}>
-                Book {professionLabel} — {pro.services.length > 0 ? `From $${Math.min(...pro.services.map(s => s.price)).toFixed(0)}` : 'Get Quote'}
-              </Link>
-              <Link href={`/messages?braider_id=${pro.user_id}`}
+                📅 Book {professionLabel}{pro.services.length > 0 ? ` — From $${Math.min(...pro.services.map(s => s.price)).toFixed(0)}` : ''}
+              </a>
+              <a href={`/messages?braider_id=${pro.user_id}&name=${encodeURIComponent(pro.full_name)}`}
                 className="flex-1 text-center py-3.5 rounded-2xl font-bold text-gray-700 text-sm border-2 border-gray-200 hover:border-purple-400 hover:text-purple-600 transition-all">
-                💬 Message
-              </Link>
+                💬 Message {professionLabel}
+              </a>
             </div>
           </div>
 
@@ -318,9 +311,7 @@ export default function BraiderProfilePage() {
               {(['services', 'portfolio', 'reviews'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-3.5 text-sm font-semibold capitalize transition-all border-b-2 ${
-                    activeTab === tab
-                      ? `border-purple-600 text-purple-600`
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                    activeTab === tab ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
                   {tab === 'services' && `Services (${pro.services.length})`}
                   {tab === 'portfolio' && `Portfolio (${pro.portfolio_media.length})`}
@@ -332,13 +323,12 @@ export default function BraiderProfilePage() {
 
           {/* Tab Content */}
           <div className="p-6 sm:p-8">
-            {/* SERVICES TAB */}
             {activeTab === 'services' && (
               <div>
                 {pro.services.length > 0 ? (
                   <div className="space-y-3">
                     {pro.services.map(service => (
-                      <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-purple-50 transition-colors group">
+                      <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-purple-50 transition-colors">
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-gray-900 text-sm">{service.name}</h3>
                           {service.description && <p className="text-gray-500 text-xs mt-0.5 line-clamp-1">{service.description}</p>}
@@ -350,10 +340,10 @@ export default function BraiderProfilePage() {
                           <span className={`text-lg font-bold ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}>
                             ${service.price.toFixed(0)}
                           </span>
-                          <Link href={`/booking?braider_id=${pro.user_id}&service_id=${service.id}`}
+                          <a href={`/booking?braider_id=${pro.user_id}&service_id=${service.id}`}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
                             Book
-                          </Link>
+                          </a>
                         </div>
                       </div>
                     ))}
@@ -367,7 +357,6 @@ export default function BraiderProfilePage() {
               </div>
             )}
 
-            {/* PORTFOLIO TAB */}
             {activeTab === 'portfolio' && (
               <div>
                 {pro.portfolio_media.length > 0 ? (
@@ -403,7 +392,6 @@ export default function BraiderProfilePage() {
               </div>
             )}
 
-            {/* REVIEWS TAB */}
             {activeTab === 'reviews' && (
               <div>
                 {pro.reviews.length > 0 ? (

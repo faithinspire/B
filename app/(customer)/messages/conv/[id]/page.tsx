@@ -1,98 +1,108 @@
 'use client';
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
-import { Send, Loader, ArrowLeft, CheckCheck, Check } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { Send, CheckCheck, Check, Loader, ArrowLeft } from 'lucide-react';
 
 interface Message {
   id: string;
   conversation_id: string;
   sender_id: string;
+  sender_role: string;
   content: string;
+  message_type: string;
+  is_read: boolean;
   created_at: string;
-  read?: boolean;
-  is_read?: boolean;
 }
 
-export default function ConversationChatPage() {
+interface Conversation {
+  id: string;
+  braider_id: string;
+  customer_id: string;
+  booking_id?: string | null;
+  braider_name?: string;
+  braider_avatar?: string;
+}
+
+export default function DirectChatPage() {
   const router = useRouter();
   const params = useParams();
-  const convId = params?.id as string;
+  const conv_id = params?.id as string;
   const { user, loading: authLoading } = useSupabaseAuthStore();
-
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [otherName, setOtherName] = useState('Seller');
-  const [otherAvatar, setOtherAvatar] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && (!user || user.role !== 'customer')) {
       router.push('/login');
     }
   }, [user, authLoading, router]);
 
-  const loadMessages = useCallback(async () => {
-    if (!user || !convId) return;
+  const fetchData = useCallback(async () => {
+    if (!user || !conv_id) return;
     try {
-      const res = await fetch(`/api/messages/conversation/${convId}?user_id=${user.id}&limit=100`);
-      if (res.ok) {
-        const data = await res.json();
-        // Handle both array and { messages: [...] } shapes
-        const msgs = Array.isArray(data) ? data : (data?.messages || []);
-        setMessages(msgs);
-      }
-    } catch (err) {
-      // silent fail on poll
-    }
-  }, [user, convId]);
+      setLoading(true);
+      setError(null);
 
-  const loadData = useCallback(async () => {
-    if (!user || !convId) return;
-    setLoading(true);
-    try {
-      // Get conversation + other user info via API
-      const convRes = await fetch(`/api/conversations/${convId}`);
-      if (convRes.ok) {
-        const convData = await convRes.json();
-        // Handle both { conversation: {...} } and direct object shapes
-        const conv = convData.conversation || convData;
-        const otherId = conv.braider_id === user.id ? conv.customer_id : conv.braider_id;
-        if (otherId) {
-          const profileRes = await fetch(`/api/admin/users/${otherId}`);
+      // Get conversation details
+      const convRes = await fetch(`/api/conversations/${conv_id}`);
+      if (!convRes.ok) throw new Error('Conversation not found');
+      const convData = await convRes.json();
+      // Handle both { conversation: {...} } and direct object
+      const conv = convData.conversation || convData;
+
+      // Get braider name
+      const braiderId = conv.braider_id || conv.participant2_id;
+      if (braiderId) {
+        try {
+          const profileRes = await fetch(`/api/braiders/${braiderId}`);
           if (profileRes.ok) {
             const profile = await profileRes.json();
-            setOtherName(profile.full_name || profile.data?.full_name || 'Seller');
-            setOtherAvatar(profile.avatar_url || profile.data?.avatar_url || null);
+            conv.braider_name = profile.full_name;
+            conv.braider_avatar = profile.avatar_url;
           }
-        }
+        } catch {}
       }
 
-      // Load messages via API (uses service role, bypasses RLS)
-      await loadMessages();
+      setConversation({ ...conv, braider_id: braiderId });
+
+      // Get messages
+      const msgRes = await fetch(`/api/messages/conversation/${conv_id}?user_id=${user.id}&limit=100`);
+      if (msgRes.ok) {
+        const d = await msgRes.json();
+        setMessages(Array.isArray(d) ? d : (d?.messages || []));
+      }
     } catch (err) {
-      setError('Failed to load messages');
+      setError(err instanceof Error ? err.message : 'Failed to load chat');
     } finally {
       setLoading(false);
     }
-  }, [user, convId, loadMessages]);
+  }, [user, conv_id]);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      loadData();
-      // Poll for new messages every 3 seconds
-      pollRef.current = setInterval(loadMessages, 3000);
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [user, authLoading, loadData, loadMessages]);
+    if (!authLoading && user) fetchData();
+  }, [user, authLoading, fetchData]);
+
+  useEffect(() => {
+    if (!conversation || !supabase) return;
+    const ch = supabase
+      .channel('dc_' + conversation.id)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: 'conversation_id=eq.' + conversation.id,
+      }, (p: any) => {
+        const m: Message = p.new;
+        setMessages(prev => prev.find(x => x.id === m.id) ? prev : [...prev, m]);
+      })
+      .subscribe();
+    return () => { supabase?.removeChannel(ch); };
+  }, [conversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,144 +110,93 @@ export default function ConversationChatPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !convId || sending) return;
-    setSending(true);
-    const content = newMessage.trim();
-    setNewMessage('');
-    setError('');
+    if (!newMessage.trim() || !user || !conversation) return;
     try {
-      // Determine sender role
-      const senderRole = user.role === 'braider' ? 'braider' : 'customer';
+      setSending(true);
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversation_id: convId,
+          conversation_id: conversation.id,
           sender_id: user.id,
-          sender_role: senderRole,
-          content,
+          sender_role: 'customer',
+          content: newMessage.trim(),
           message_type: 'text',
         }),
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to send');
-      }
-      const data = await res.json();
-      // Optimistically add message
-      if (data.message) {
-        setMessages(prev => {
-          if (prev.find(m => m.id === data.message.id)) return prev;
-          return [...prev, data.message];
-        });
-      }
-      // Reload to get latest
-      await loadMessages();
+      if (!res.ok) throw new Error('Failed to send');
+      setNewMessage('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-      setNewMessage(content);
+      setError(err instanceof Error ? err.message : 'Failed to send');
     } finally {
       setSending(false);
     }
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader className="w-10 h-10 text-purple-600 animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Loading chat...</p>
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><Loader className="w-10 h-10 text-purple-600 animate-spin"/></div>;
   }
-
-  if (!user) return null;
+  if (!user || user.role !== 'customer') return null;
 
   return (
-    <div className="flex flex-col bg-gray-50" style={{ height: '100dvh' }}>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
-        <button
-          onClick={() => router.push('/messages')}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+        <button onClick={() => router.push('/messages')} className="p-1 hover:bg-gray-100 rounded">
+          <ArrowLeft className="w-5 h-5 text-gray-600"/>
         </button>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg overflow-hidden flex-shrink-0">
-          {otherAvatar
-            ? <img src={otherAvatar} className="w-full h-full object-cover" alt="" />
-            : otherName.charAt(0).toUpperCase()}
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold overflow-hidden">
+          {conversation?.braider_avatar
+            ? <img src={conversation.braider_avatar} className="w-full h-full object-cover" alt=""/>
+            : (conversation?.braider_name?.charAt(0)?.toUpperCase() || 'B')}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{otherName}</p>
-          <p className="text-xs text-green-500">Active</p>
+        <div className="flex-1">
+          <p className="font-semibold text-gray-900">{conversation?.braider_name || 'Braider'}</p>
+          <p className="text-xs text-green-500">Online</p>
         </div>
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 max-w-2xl mx-auto w-full">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-16">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-2xl">💬</span>
-            </div>
-            <p className="text-gray-500 font-medium">No messages yet</p>
-            <p className="text-gray-400 text-sm mt-1">Say hello to start the conversation!</p>
+          <div className="flex items-center justify-center h-full py-20">
+            <p className="text-gray-400 text-sm">No messages yet. Say hello! 👋</p>
           </div>
         ) : (
           messages.map(msg => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${
-                msg.sender_id === user.id
-                  ? 'bg-purple-600 text-white rounded-br-sm'
-                  : 'bg-white text-gray-900 rounded-bl-sm'
-              }`}>
-                <p className="leading-relaxed">{msg.content}</p>
-                <div className={`flex items-center gap-1 mt-1 text-xs justify-end ${
-                  msg.sender_id === user.id ? 'text-purple-200' : 'text-gray-400'
-                }`}>
-                  <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {msg.sender_id === user.id && (
-                    (msg.read || msg.is_read)
-                      ? <CheckCheck className="w-3 h-3" />
-                      : <Check className="w-3 h-3" />
-                  )}
+            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${msg.sender_id === user.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-900 shadow-sm'}`}>
+                <p>{msg.content}</p>
+                <div className="flex items-center gap-1 mt-1 text-xs opacity-60 justify-end">
+                  <span>{new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+                  {msg.sender_id === user.id && (msg.is_read ? <CheckCheck className="w-3 h-3"/> : <Check className="w-3 h-3"/>)}
                 </div>
               </div>
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef}/>
       </div>
 
-      {/* Input bar */}
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3 safe-area-bottom">
-        {error && (
-          <p className="text-red-500 text-xs mb-2 text-center">{error}</p>
-        )}
-        <form onSubmit={handleSend} className="flex items-center gap-2">
+      {/* Input */}
+      <div className="bg-white border-t border-gray-100 p-3 max-w-2xl mx-auto w-full">
+        {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
+        <form onSubmit={handleSend} className="flex gap-2 items-center">
           <input
             type="text"
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm bg-gray-50 transition-all"
+            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
             disabled={sending}
-            autoComplete="off"
+            autoFocus
           />
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="w-11 h-11 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 shadow-md"
+            disabled={sending || !newMessage.trim()}
+            className="p-2.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 transition-colors flex-shrink-0"
           >
-            {sending
-              ? <Loader className="w-4 h-4 animate-spin" />
-              : <Send className="w-4 h-4" />
-            }
+            <Send className="w-4 h-4"/>
           </button>
         </form>
       </div>

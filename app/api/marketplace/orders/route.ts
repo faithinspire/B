@@ -95,33 +95,62 @@ export async function POST(request: Request) {
       finalPaymentMethod = 'stripe';
     }
 
+    // First check which columns exist to handle missing migration gracefully
+    const { data: columnCheck } = await db
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_name', 'marketplace_orders')
+      .in('column_name', ['braider_id', 'payment_method', 'seller_country']);
+
+    const existingCols = new Set((columnCheck || []).map((c: any) => c.column_name));
+
+    // Build insert object based on what columns exist
+    const insertData: any = {
+      product_id,
+      buyer_id,
+      buyer_email,
+      buyer_name,
+      seller_id,
+      product_name,
+      product_image,
+      quantity: quantity || 1,
+      unit_price: unit_price || 0,
+      total_amount,
+      currency: currency || 'NGN',
+      delivery_address,
+      notes,
+      status: 'pending',
+      payment_status: 'unpaid',
+    };
+
+    // Only add columns that exist in the database
+    if (existingCols.has('braider_id')) insertData.braider_id = finalBraiderId;
+    if (existingCols.has('payment_method')) insertData.payment_method = finalPaymentMethod;
+    if (existingCols.has('seller_country')) insertData.seller_country = finalSellerCountry;
+
     const { data: order, error } = await db
       .from('marketplace_orders')
-      .insert({
-        product_id,
-        buyer_id,
-        buyer_email,
-        buyer_name,
-        seller_id,
-        braider_id: finalBraiderId,
-        product_name,
-        product_image,
-        quantity: quantity || 1,
-        unit_price: unit_price || 0,
-        total_amount,
-        currency: currency || 'NGN',
-        delivery_address,
-        notes,
-        status: 'pending',
-        payment_status: 'unpaid',
-        payment_method: finalPaymentMethod,
-        seller_country: finalSellerCountry,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
       console.error('Marketplace order insert error:', error);
+      // If still failing due to braider_id, try without it
+      if (error.message?.includes('braider_id') || error.message?.includes('schema cache')) {
+        delete insertData.braider_id;
+        delete insertData.payment_method;
+        delete insertData.seller_country;
+        const { data: order2, error: error2 } = await db
+          .from('marketplace_orders')
+          .insert(insertData)
+          .select()
+          .single();
+        if (error2) {
+          return NextResponse.json({ error: error2.message }, { status: 400 });
+        }
+        return NextResponse.json({ data: order2 }, { status: 201 });
+      }
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
