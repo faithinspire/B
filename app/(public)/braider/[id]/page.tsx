@@ -3,8 +3,9 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import {
   Star, MapPin, Clock, Shield, ChevronRight, AlertCircle, Crown,
   Instagram, Calendar, Bookmark, Play, Image as ImageIcon,
@@ -68,6 +69,8 @@ const TikTokIcon = () => (
 
 export default function BraiderProfilePage() {
   const params = useParams();
+  const router = useRouter();
+  const { user, loading: authLoading } = useSupabaseAuthStore();
   const [pro, setPro] = useState<BraiderProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,20 +78,38 @@ export default function BraiderProfilePage() {
   const [lightboxMedia, setLightboxMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
+    // Redirect non-authenticated users to login
+    if (!authLoading && !user) {
+      router.push('/login');
+      return;
+    }
+    
     if (params?.id) fetchProfile(params.id as string);
-  }, [params?.id]);
+  }, [params?.id, user, authLoading, router]);
 
   const fetchProfile = async (id: string) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/braiders/' + id);
+      const res = await fetch('/api/braiders/' + id, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(body.error || 'Professional not found');
         return;
       }
       const data = await res.json();
+      
+      // Validate required fields
+      if (!data.id || !data.user_id) {
+        setError('Invalid profile data');
+        return;
+      }
+      
       setPro({
         id: data.id,
         user_id: data.user_id,
@@ -118,7 +139,7 @@ export default function BraiderProfilePage() {
       });
     } catch (err) {
       console.error('Error fetching profile:', err);
-      setError('Failed to load profile');
+      setError('Failed to load profile. Please try again.');
     } finally {
       setLoading(false);
     }

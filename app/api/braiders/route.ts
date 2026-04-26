@@ -81,13 +81,24 @@ export async function GET(request: NextRequest) {
 
     // Map data to include all fields
     const braiders = (data || []).map((b: any) => {
-      // Detect barber from specialization prefix if profession_type column doesn't exist yet
-      let professionType = b.profession_type || 'braider';
+      // CRITICAL: Detect profession_type correctly
+      let professionType = 'braider'; // Default to braider
+      
+      // Check profession_type column first
+      if (b.profession_type && b.profession_type.toLowerCase() === 'barber') {
+        professionType = 'barber';
+      }
+      // Only check specialization if profession_type is not set
+      else if (!b.profession_type && b.specialization?.startsWith('barber:')) {
+        professionType = 'barber';
+      }
+      // Otherwise default to braider
+      
       let specialization = b.specialization || '';
       if (specialization.startsWith('barber:')) {
-        professionType = 'barber';
         specialization = specialization.substring(7);
       }
+      
       return {
         id: b.id || b.user_id,
         user_id: b.user_id,

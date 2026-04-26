@@ -85,13 +85,18 @@ export function useBraiders() {
       }
 
       const normalized = braidersList.map((b: any) => {
-        // Ensure profession_type is set correctly
-        let professionType = b.profession_type || 'braider';
+        // CRITICAL: Always set profession_type correctly
+        let professionType = 'braider'; // Default to braider
         
-        // If profession_type is missing, check specialization for barber prefix
-        if (!b.profession_type && b.specialization?.startsWith('barber:')) {
+        // Check profession_type column first
+        if (b.profession_type && b.profession_type.toLowerCase() === 'barber') {
           professionType = 'barber';
         }
+        // Only check specialization if profession_type is not set
+        else if (!b.profession_type && b.specialization?.startsWith('barber:')) {
+          professionType = 'barber';
+        }
+        // Otherwise default to braider
         
         return {
           ...b,
@@ -103,9 +108,13 @@ export function useBraiders() {
           available_balance: b.available_balance || 0,
         };
       });
+      
+      // Filter to only show braiders (not barbers) unless explicitly requested
+      const filteredBraiders = normalized.filter(b => b.profession_type === 'braider');
+      console.log(`=== HOOK: Filtered ${normalized.length} total to ${filteredBraiders.length} braiders ===`);
 
-      console.log(`=== HOOK: Setting ${normalized.length} braiders ===`);
-      setBraiders(normalized);
+      console.log(`=== HOOK: Setting ${filteredBraiders.length} braiders ===`);
+      setBraiders(filteredBraiders);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error(`=== HOOK: Error on attempt #${fetchAttemptRef.current} ===`, message);
