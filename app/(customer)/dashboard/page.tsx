@@ -262,6 +262,52 @@ export default function CustomerDashboard() {
               </div>
             </div>
 
+            {/* ALL SERVICES — clickable service categories */}
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 border border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-gray-900 text-sm">💆 Browse by Service</h3>
+                <a href="/search" className="text-purple-600 text-xs font-semibold hover:text-purple-700">View all →</a>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {[
+                  { name: 'Knotless Braids', emoji: '✂️', query: 'knotless' },
+                  { name: 'Box Braids', emoji: '✂️', query: 'box_braids' },
+                  { name: 'Cornrows', emoji: '✂️', query: 'cornrows' },
+                  { name: 'Goddess Braids', emoji: '✂️', query: 'goddess' },
+                  { name: 'Fulani Braids', emoji: '✂️', query: 'fulani' },
+                  { name: 'Micro Braids', emoji: '✂️', query: 'micro_braids' },
+                  { name: 'Senegalese Twists', emoji: '✂️', query: 'senegalese' },
+                  { name: 'Passion Twists', emoji: '✂️', query: 'passion_twists' },
+                  { name: 'Locs', emoji: '✂️', query: 'locs' },
+                  { name: 'Kids Braids', emoji: '✂️', query: 'kids' },
+                  { name: 'Weaves / Sew-In', emoji: '💇', query: 'weave' },
+                  { name: 'Frontal Install', emoji: '💇', query: 'frontal' },
+                  { name: 'Wig Install', emoji: '💇', query: 'wig' },
+                  { name: 'Slick Press', emoji: '🌿', query: 'slick_press' },
+                  { name: 'Silk Press', emoji: '🌿', query: 'silk_press' },
+                  { name: 'Natural Hair', emoji: '🌿', query: 'natural' },
+                  { name: 'Blow Out', emoji: '🌿', query: 'blowout' },
+                  { name: 'Protective Styles', emoji: '🌿', query: 'protective' },
+                  { name: 'Eyelash Extensions', emoji: '👁️', query: 'eyelashes' },
+                  { name: 'Nail Art', emoji: '💅', query: 'nails' },
+                  { name: 'Acrylic Nails', emoji: '💅', query: 'acrylic_nails' },
+                  { name: 'Gel Nails', emoji: '💅', query: 'gel_nails' },
+                  { name: 'Makeup', emoji: '💄', query: 'makeup' },
+                  { name: 'Bridal Styling', emoji: '👰', query: 'bridal' },
+                  { name: 'Wash & Go', emoji: '🌿', query: 'wash_go' },
+                ].map(service => (
+                  <button
+                    key={service.query}
+                    onClick={() => router.push(`/search?style=${service.query}`)}
+                    className="flex flex-col items-center gap-1 p-2.5 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-xl transition-all group text-center"
+                  >
+                    <span className="text-xl group-hover:scale-110 transition-transform">{service.emoji}</span>
+                    <span className="text-xs font-medium text-gray-700 leading-tight">{service.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader className="w-8 h-8 text-purple-600 animate-spin" />

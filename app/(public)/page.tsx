@@ -95,6 +95,16 @@ function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: 
     setFollowLoading(false);
   };
 
+  const trackView = () => {
+    try {
+      const profileId = braider.user_id || braider.id;
+      const stored = localStorage.getItem('recently_viewed_braiders');
+      const ids: string[] = stored ? JSON.parse(stored) : [];
+      const updated = [profileId, ...ids.filter(id => id !== profileId)].slice(0, 10);
+      localStorage.setItem('recently_viewed_braiders', JSON.stringify(updated));
+    } catch {}
+  };
+
   return (
     <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 group" style={{ width: 220 }}>
       <div className="relative h-48 bg-gradient-to-br from-purple-200 to-pink-200 overflow-hidden">
@@ -133,6 +143,7 @@ function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: 
         <div className="flex gap-2">
           <Link
             href={`/braider/${braider.user_id || braider.id}`}
+            onClick={trackView}
             className={`flex-1 text-center py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
           >
             View
@@ -149,7 +160,167 @@ function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: 
   );
 }
 
-// ─── StatusSection component ────────────────────────────────────────────────
+// ─── All Services data (braider services only) ────────────────────────────
+const ALL_SERVICES = [
+  // Hair Braiding
+  { name: 'Knotless Braids', emoji: '✂️', query: 'knotless', category: 'Braiding' },
+  { name: 'Box Braids', emoji: '✂️', query: 'box_braids', category: 'Braiding' },
+  { name: 'Cornrows', emoji: '✂️', query: 'cornrows', category: 'Braiding' },
+  { name: 'Goddess Braids', emoji: '✂️', query: 'goddess', category: 'Braiding' },
+  { name: 'Fulani Braids', emoji: '✂️', query: 'fulani', category: 'Braiding' },
+  { name: 'Micro Braids', emoji: '✂️', query: 'micro_braids', category: 'Braiding' },
+  { name: 'Senegalese Twists', emoji: '✂️', query: 'senegalese', category: 'Braiding' },
+  { name: 'Passion Twists', emoji: '✂️', query: 'passion_twists', category: 'Braiding' },
+  { name: 'Locs / Dreadlocks', emoji: '✂️', query: 'locs', category: 'Braiding' },
+  { name: 'Kids Braids', emoji: '✂️', query: 'kids', category: 'Braiding' },
+  // Hair Extensions & Weaves
+  { name: 'Weaves / Sew-In', emoji: '💇', query: 'weave', category: 'Extensions' },
+  { name: 'Quick Weave', emoji: '💇', query: 'quick_weave', category: 'Extensions' },
+  { name: 'Frontal Install', emoji: '💇', query: 'frontal', category: 'Extensions' },
+  { name: 'Closure Install', emoji: '💇', query: 'closure', category: 'Extensions' },
+  { name: 'Wig Install', emoji: '💇', query: 'wig', category: 'Extensions' },
+  { name: 'Tape-In Extensions', emoji: '💇', query: 'tape_in', category: 'Extensions' },
+  // Natural Hair
+  { name: 'Natural Hair Styling', emoji: '🌿', query: 'natural', category: 'Natural Hair' },
+  { name: 'Slick Press', emoji: '🌿', query: 'slick_press', category: 'Natural Hair' },
+  { name: 'Silk Press', emoji: '🌿', query: 'silk_press', category: 'Natural Hair' },
+  { name: 'Blow Out', emoji: '🌿', query: 'blowout', category: 'Natural Hair' },
+  { name: 'Wash & Go', emoji: '🌿', query: 'wash_go', category: 'Natural Hair' },
+  { name: 'Protective Styles', emoji: '🌿', query: 'protective', category: 'Natural Hair' },
+  // Beauty
+  { name: 'Eyelash Extensions', emoji: '👁️', query: 'eyelashes', category: 'Beauty' },
+  { name: 'Nail Art', emoji: '💅', query: 'nails', category: 'Beauty' },
+  { name: 'Acrylic Nails', emoji: '💅', query: 'acrylic_nails', category: 'Beauty' },
+  { name: 'Gel Nails', emoji: '💅', query: 'gel_nails', category: 'Beauty' },
+  { name: 'Makeup', emoji: '💄', query: 'makeup', category: 'Beauty' },
+  { name: 'Bridal Styling', emoji: '👰', query: 'bridal', category: 'Beauty' },
+];
+
+// ─── ServicesSection component ─────────────────────────────────────────────
+function ServicesSection({ onServiceClick }: { onServiceClick: (query: string) => void }) {
+  const categories = ['All', 'Braiding', 'Extensions', 'Natural Hair', 'Beauty'];
+  const [activeCategory, setActiveCategory] = useState('All');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const filtered = activeCategory === 'All' ? ALL_SERVICES : ALL_SERVICES.filter(s => s.category === activeCategory);
+
+  return (
+    <section className="py-10 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-gray-900">💆 All Services</h2>
+            <p className="text-gray-500 text-sm mt-0.5">Tap a service to find braiders who offer it</p>
+          </div>
+          <a href="/search" className="text-purple-600 text-sm font-semibold hover:text-purple-700">View all →</a>
+        </div>
+
+        {/* Category filter pills */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{ scrollbarWidth: 'none' }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                activeCategory === cat
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-700'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Services grid */}
+        <div ref={scrollRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+          {filtered.map(service => (
+            <button
+              key={service.query}
+              onClick={() => onServiceClick(service.query)}
+              className="flex flex-col items-center gap-1.5 p-3 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-2xl transition-all group hover:shadow-sm"
+            >
+              <span className="text-2xl group-hover:scale-110 transition-transform">{service.emoji}</span>
+              <span className="text-xs font-medium text-gray-700 text-center leading-tight">{service.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── RecentlyViewedSection component ──────────────────────────────────────
+function RecentlyViewedSection({ allBraiders }: { allBraiders: any[] }) {
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('recently_viewed_braiders');
+      if (stored) {
+        const ids: string[] = JSON.parse(stored);
+        const profiles = ids
+          .map(id => allBraiders.find(b => (b.user_id || b.id) === id))
+          .filter(Boolean)
+          .slice(0, 8);
+        setRecentlyViewed(profiles);
+      }
+    } catch {}
+  }, [allBraiders]);
+
+  if (recentlyViewed.length === 0) return null;
+
+  return (
+    <section className="py-10 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-gray-900">🕐 Recently Viewed</h2>
+            <p className="text-gray-500 text-sm mt-0.5">Professionals you've checked out</p>
+          </div>
+          <button
+            onClick={() => { localStorage.removeItem('recently_viewed_braiders'); setRecentlyViewed([]); }}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>
+          {recentlyViewed.map((braider, idx) => {
+            const isBarber = braider.profession_type === 'barber';
+            const profileId = braider.user_id || braider.id;
+            return (
+              <a
+                key={profileId}
+                href={`/braider/${profileId}`}
+                className="flex-shrink-0 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group"
+                style={{ width: 160 }}
+              >
+                <div className="relative h-32 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+                  {braider.avatar_url ? (
+                    <img src={braider.avatar_url} alt={braider.full_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl">{isBarber ? '💈' : '💇'}</div>
+                  )}
+                  <div className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
+                    {isBarber ? '💈' : '✂️'}
+                  </div>
+                </div>
+                <div className="p-2.5">
+                  <p className="font-semibold text-gray-900 text-xs truncate">{braider.full_name}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    <span className="text-xs text-gray-600">{braider.rating_avg ? braider.rating_avg.toFixed(1) : 'New'}</span>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
 function StatusSection({ braiders }: { braiders: any[] }) {
   const [statuses, setStatuses] = useState<any[]>([]);
   const [viewingStatus, setViewingStatus] = useState<any | null>(null);
@@ -329,6 +500,10 @@ export default function LandingPage(): JSX.Element {
     router.push(`/search?${params.toString()}`);
   };
 
+  const handleServiceClick = (query: string) => {
+    router.push(`/search?style=${query}`);
+  };
+
   const handleModalSearch = (country: string, loc: string) => {
     const params = new URLSearchParams();
     params.append('location', loc);
@@ -479,6 +654,12 @@ export default function LandingPage(): JSX.Element {
 
       {/* BRAIDER/BARBER STATUS — WhatsApp-style stories */}
       <StatusSection braiders={featuredBraiders} />
+
+      {/* ALL SERVICES — comprehensive service categories */}
+      <ServicesSection onServiceClick={handleServiceClick} />
+
+      {/* RECENTLY VIEWED */}
+      <RecentlyViewedSection allBraiders={braiders} />
 
       {/* FEATURED PROFESSIONALS */}
       <section className="py-16 bg-white">
