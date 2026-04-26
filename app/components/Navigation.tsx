@@ -55,7 +55,7 @@ export function Navigation() {
         { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
         { href: '/braider/status', icon: Radio, label: 'Status' },
         { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
-        { href: '/braider/wallet', icon: Wallet, label: 'Wallet' },
+        { href: '/braider/marketplace', icon: ShoppingBag, label: 'Store' },
       ];
     }
 

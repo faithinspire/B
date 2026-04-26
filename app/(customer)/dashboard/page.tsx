@@ -150,31 +150,29 @@ export default function CustomerDashboard() {
           )}
           <p className="text-xs text-gray-500 line-clamp-2 mb-3 flex-1 leading-relaxed">{pro.bio || `Professional ${isBarber ? 'barber' : 'braider'}`}</p>
 
-          {/* Action buttons — clean icon+text style, no tight boxes */}
-          <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-gray-50">
-            <a
-              href={`/braider/${profileId}`}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:bg-gray-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
+          {/* Action buttons — use router.push to keep auth context alive */}
+          <div className="grid grid-cols-3 gap-1 mt-auto pt-2 border-t border-gray-100">
+            <button
+              onClick={() => router.push(`/braider/${profileId}`)}
+              className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-xs font-semibold transition-colors hover:bg-purple-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
             >
-              <span className="text-base">👤</span>
+              <span className="text-lg">👤</span>
               <span>Profile</span>
-            </a>
-            <div className="w-px h-8 bg-gray-100" />
-            <a
-              href={`/messages?braider_id=${profileId}&name=${encodeURIComponent(pro.full_name)}`}
-              className="flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold text-green-600 transition-colors hover:bg-gray-50"
+            </button>
+            <button
+              onClick={() => router.push(`/messages?braider_id=${profileId}&name=${encodeURIComponent(pro.full_name)}`)}
+              className="flex flex-col items-center gap-0.5 py-2 rounded-xl text-xs font-semibold text-green-600 transition-colors hover:bg-green-50"
             >
-              <span className="text-base">💬</span>
+              <span className="text-lg">💬</span>
               <span>Chat</span>
-            </a>
-            <div className="w-px h-8 bg-gray-100" />
-            <a
-              href={`/booking?braider_id=${profileId}`}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:bg-gray-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
+            </button>
+            <button
+              onClick={() => router.push(`/booking?braider_id=${profileId}`)}
+              className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-xs font-semibold transition-colors hover:bg-purple-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
             >
-              <span className="text-base">📅</span>
+              <span className="text-lg">📅</span>
               <span>Book</span>
-            </a>
+            </button>
           </div>
         </div>
       </div>

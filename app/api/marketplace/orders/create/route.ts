@@ -73,29 +73,65 @@ export async function POST(request: NextRequest) {
     const currency = product.currency || (country_code === 'US' ? 'USD' : 'NGN');
     const order_number = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // Create order
+    // Create order - use buyer_id (matches DB schema from add_marketplace_orders.sql)
     const { data: order, error: orderError } = await supabase
       .from('marketplace_orders')
       .insert({
-        order_number,
         product_id,
         quantity,
-        customer_id: user.id,
-        braider_id: product.braider_id,
+        buyer_id: user.id,
+        buyer_email: user.email || '',
+        buyer_name: user.user_metadata?.full_name || user.email || '',
+        seller_id: product.braider_id,
+        product_name: product.name || '',
+        product_image: product.image_url || null,
+        unit_price,
         total_amount,
-        platform_fee,
-        seller_payout,
         currency,
+        delivery_address: shipping_address,
         status: 'pending',
-        payment_status: 'pending',
-        payment_method: payment_method || (country_code === 'NG' ? 'paystack' : 'stripe'),
-        shipping_address,
+        payment_status: 'unpaid',
       })
       .select()
       .single();
 
     if (orderError) {
       console.error('Order creation error:', orderError);
+      // If buyer_id fails, try with customer_id as fallback
+      if (orderError.message?.includes('buyer_id') || orderError.message?.includes('schema cache')) {
+        const { data: order2, error: orderError2 } = await supabase
+          .from('marketplace_orders')
+          .insert({
+            product_id,
+            quantity,
+            customer_id: user.id,
+            seller_id: product.braider_id,
+            product_name: product.name || '',
+            unit_price,
+            total_amount,
+            currency,
+            delivery_address: shipping_address,
+            status: 'pending',
+            payment_status: 'unpaid',
+          })
+          .select()
+          .single();
+        if (orderError2) {
+          return NextResponse.json({ success: false, error: orderError2.message }, { status: 500 });
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            order_id: order2.id,
+            order_number: order2.id.slice(0, 8).toUpperCase(),
+            total_amount,
+            platform_fee,
+            seller_payout,
+            currency,
+            payment: null,
+          },
+        });
+      }
       return NextResponse.json({ success: false, error: orderError.message }, { status: 500 });
     }
 
@@ -211,7 +247,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         order_id: order.id,
-        order_number,
+        order_number: order_number,
         total_amount,
         platform_fee,
         seller_payout,
