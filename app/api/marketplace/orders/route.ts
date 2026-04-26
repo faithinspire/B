@@ -96,11 +96,9 @@ export async function POST(request: Request) {
     }
 
     // Build the minimal insert that always works (only core columns)
-    const coreInsert: any = {
+    // Try customer_id first (some schemas), then buyer_id
+    const baseFields: any = {
       product_id,
-      buyer_id,
-      buyer_email: buyer_email || '',
-      buyer_name: buyer_name || '',
       seller_id,
       product_name: product_name || '',
       product_image: product_image || null,
@@ -114,51 +112,37 @@ export async function POST(request: Request) {
       payment_status: 'unpaid',
     };
 
-    // Try with all new columns first
-    const fullInsert = {
-      ...coreInsert,
-      braider_id: finalBraiderId,
-      payment_method: finalPaymentMethod,
-      seller_country: finalSellerCountry,
-    };
-
     let order: any = null;
-    let insertError: any = null;
+    let lastError: any = null;
 
-    // Attempt 1: Full insert with new columns
-    const result1 = await db.from('marketplace_orders').insert(fullInsert).select().single();
-    if (!result1.error) {
-      order = result1.data;
-    } else {
-      insertError = result1.error;
-      console.error('Full insert failed:', result1.error.message);
+    // Try all column name combinations to handle different schema versions
+    const insertVariants = [
+      // Variant 1: customer_id (original schema)
+      { ...baseFields, customer_id: buyer_id, buyer_email: buyer_email || '', buyer_name: buyer_name || '' },
+      // Variant 2: buyer_id (new schema)
+      { ...baseFields, buyer_id, buyer_email: buyer_email || '', buyer_name: buyer_name || '' },
+      // Variant 3: customer_id with new columns
+      { ...baseFields, customer_id: buyer_id, buyer_email: buyer_email || '', buyer_name: buyer_name || '', braider_id: finalBraiderId, payment_method: finalPaymentMethod, seller_country: finalSellerCountry },
+      // Variant 4: buyer_id with new columns
+      { ...baseFields, buyer_id, buyer_email: buyer_email || '', buyer_name: buyer_name || '', braider_id: finalBraiderId, payment_method: finalPaymentMethod, seller_country: finalSellerCountry },
+      // Variant 5: minimal - just the absolute essentials
+      { product_id, customer_id: buyer_id, seller_id, total_amount, currency: currency || 'NGN', status: 'pending', payment_status: 'unpaid' },
+    ];
 
-      // Attempt 2: Try without braider_id/payment_method/seller_country
-      const result2 = await db.from('marketplace_orders').insert(coreInsert).select().single();
-      if (!result2.error) {
-        order = result2.data;
-        insertError = null;
-      } else {
-        insertError = result2.error;
-        console.error('Core insert also failed:', result2.error.message);
-
-        // Attempt 3: Try with buyer_id as customer_id alias (some schemas use customer_id)
-        const altInsert = { ...coreInsert, customer_id: buyer_id };
-        delete altInsert.buyer_id;
-        const result3 = await db.from('marketplace_orders').insert(altInsert).select().single();
-        if (!result3.error) {
-          order = result3.data;
-          insertError = null;
-        } else {
-          insertError = result3.error;
-        }
+    for (const variant of insertVariants) {
+      const result = await db.from('marketplace_orders').insert(variant).select().single();
+      if (!result.error) {
+        order = result.data;
+        break;
       }
+      lastError = result.error;
+      console.log(`Insert variant failed: ${result.error.message}`);
     }
 
-    if (insertError || !order) {
-      console.error('All insert attempts failed:', insertError?.message);
+    if (!order) {
+      console.error('All insert variants failed. Last error:', lastError?.message);
       return NextResponse.json(
-        { error: insertError?.message || 'Failed to create order' },
+        { error: `Order creation failed: ${lastError?.message || 'Unknown error'}` },
         { status: 400 }
       );
     }

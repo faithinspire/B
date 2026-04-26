@@ -107,8 +107,9 @@ export default function CustomerDashboard() {
     const isBarber = pro.profession_type === 'barber';
     const profileId = pro.user_id || pro.id;
     return (
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 flex flex-col">
-        <div className="relative h-40 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 flex flex-col">
+        {/* Image */}
+        <div className="relative h-44 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
           {pro.avatar_url ? (
             <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
           ) : (
@@ -116,54 +117,63 @@ export default function CustomerDashboard() {
               {isBarber ? '💈' : '💇'}
             </div>
           )}
-          <button
-            onClick={() => toggleFavorite(pro.id)}
-            className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-full shadow hover:scale-110 transition-transform"
-          >
-            <Heart className={`w-4 h-4 ${favorites.includes(pro.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
-          </button>
+          {/* Profession badge */}
           <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
             {isBarber ? '💈 Barber' : '✂️ Braider'}
           </div>
+          {/* Favorite - no background circle */}
+          <button
+            onClick={() => toggleFavorite(pro.id)}
+            className="absolute top-2 right-2 hover:scale-125 transition-transform"
+            title={favorites.includes(pro.id) ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart className={`w-5 h-5 drop-shadow ${favorites.includes(pro.id) ? 'fill-red-500 text-red-500' : 'text-white/80 hover:text-red-400'}`} />
+          </button>
           {(pro.verification_status === 'verified' || pro.verification_status === 'approved') && (
-            <div className="absolute bottom-2 right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">✓</div>
+            <div className="absolute bottom-2 left-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">✓ Verified</div>
           )}
         </div>
+
+        {/* Info */}
         <div className="p-3 flex-1 flex flex-col">
-          <h3 className="font-bold text-gray-900 text-sm mb-0.5 truncate">{pro.full_name}</h3>
-          <div className="flex items-center gap-1 mb-1">
+          <h3 className="font-bold text-gray-900 text-sm truncate">{pro.full_name}</h3>
+          <div className="flex items-center gap-1 mt-0.5 mb-1">
             <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-semibold">{pro.rating_avg ? pro.rating_avg.toFixed(1) : 'New'}</span>
+            <span className="text-xs font-semibold text-gray-700">{pro.rating_avg ? pro.rating_avg.toFixed(1) : 'New'}</span>
             <span className="text-xs text-gray-400">({pro.rating_count || 0})</span>
           </div>
           {(pro.city || pro.state) && (
-            <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-              <MapPin className="w-3 h-3" />
+            <div className="flex items-center gap-1 text-xs text-gray-400 mb-1.5">
+              <MapPin className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">{[pro.city, pro.state].filter(Boolean).join(', ')}</span>
             </div>
           )}
-          <p className="text-xs text-gray-500 line-clamp-2 mb-3 flex-1">{pro.bio || `Professional ${isBarber ? 'barber' : 'braider'}`}</p>
-          <div className="flex gap-1.5 mt-auto">
-            {/* View Profile - full page navigation to avoid auth glitch */}
+          <p className="text-xs text-gray-500 line-clamp-2 mb-3 flex-1 leading-relaxed">{pro.bio || `Professional ${isBarber ? 'barber' : 'braider'}`}</p>
+
+          {/* Action buttons — clean icon+text style, no tight boxes */}
+          <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-gray-50">
             <a
               href={`/braider/${profileId}`}
-              className={`flex-1 text-center py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:bg-gray-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
             >
-              Profile
+              <span className="text-base">👤</span>
+              <span>Profile</span>
             </a>
-            {/* Chat button - starts direct conversation */}
+            <div className="w-px h-8 bg-gray-100" />
             <a
               href={`/messages?braider_id=${profileId}&name=${encodeURIComponent(pro.full_name)}`}
-              className="flex-1 text-center py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors"
+              className="flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold text-green-600 transition-colors hover:bg-gray-50"
             >
-              💬 Chat
+              <span className="text-base">💬</span>
+              <span>Chat</span>
             </a>
-            {/* Book button */}
+            <div className="w-px h-8 bg-gray-100" />
             <a
               href={`/booking?braider_id=${profileId}`}
-              className={`flex-1 text-center py-1.5 border-2 rounded-lg text-xs font-semibold transition-colors ${isBarber ? 'border-blue-600 text-blue-600 hover:bg-blue-50' : 'border-purple-600 text-purple-600 hover:bg-purple-50'}`}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:bg-gray-50 ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}
             >
-              Book
+              <span className="text-base">📅</span>
+              <span>Book</span>
             </a>
           </div>
         </div>

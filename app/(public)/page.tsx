@@ -108,14 +108,14 @@ function ProfessionalCard({ braider, idx, currentUserId }: { braider: any; idx: 
         <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
           {isBarber ? '💈 Barber' : '✂️ Braider'}
         </div>
-        {/* Follow button */}
+        {/* Follow button - no background circle */}
         <button
           onClick={toggleFollow}
           disabled={followLoading}
-          className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${isFollowing ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'}`}
+          className="absolute top-2 right-2 transition-all hover:scale-125"
           title={isFollowing ? 'Unfollow' : 'Follow'}
         >
-          <Heart className={`w-3.5 h-3.5 ${isFollowing ? 'fill-current' : ''}`} />
+          <Heart className={`w-5 h-5 drop-shadow-md ${isFollowing ? 'fill-red-500 text-red-500' : 'text-white/90 hover:text-red-400'}`} />
         </button>
         <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
           <div className="flex items-center gap-1 bg-white/90 rounded-full px-2 py-0.5">
