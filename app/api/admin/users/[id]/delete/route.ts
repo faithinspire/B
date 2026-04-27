@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+async function deleteUserData(userId: string, serviceSupabase: any) {
   try {
-    const userId = params.id;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
-
-    console.log(`=== DELETE USER: Starting deletion for user ${userId} ===`);
-
-    // Use service role client for admin operations
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
     // Delete in order of dependencies to avoid foreign key issues
     
     // 1. Delete messages
@@ -38,7 +17,7 @@ export async function POST(
     await serviceSupabase
       .from('conversations')
       .delete()
-      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+      .or(`customer_id.eq.${userId},braider_id.eq.${userId},admin_id.eq.${userId}`);
 
     // 3. Delete bookings
     console.log('=== DELETE USER: Deleting bookings ===');
@@ -88,18 +67,43 @@ export async function POST(
 
     if (authError) {
       console.error('=== DELETE USER: Auth delete error ===', authError);
+      throw new Error(`Failed to delete user: ${authError.message}`);
+    }
+
+    console.log(`=== DELETE USER: Successfully deleted user ${userId} ===`);
+    return { success: true, message: 'User deleted successfully' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('=== DELETE USER: Error ===', message);
+    throw error;
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = params.id;
+
+    if (!userId) {
       return NextResponse.json(
-        { error: `Failed to delete user: ${authError.message}` },
+        { error: 'User ID is required' },
         { status: 400 }
       );
     }
 
-    console.log(`=== DELETE USER: Successfully deleted user ${userId} ===`);
+    console.log(`=== DELETE USER: Starting deletion for user ${userId} ===`);
 
-    return NextResponse.json({
-      success: true,
-      message: 'User deleted successfully',
-    });
+    // Use service role client for admin operations
+    const serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    const result = await deleteUserData(userId, serviceSupabase);
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     console.error('=== DELETE USER: Error ===', message);

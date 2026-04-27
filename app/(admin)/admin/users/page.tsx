@@ -83,13 +83,16 @@ export default function UsersPage() {
   const handleDelete = async (user: User) => {
     try {
       setActionLoading(user.id);
+      setError(null);
+      
       const response = await fetch(`/api/admin/users/${user.id}/delete`, {
         method: 'DELETE',
       });
 
       const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to delete user');
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
       }
 
       setSuccessMsg(`User ${user.email} deleted successfully`);
@@ -97,7 +100,9 @@ export default function UsersPage() {
       await fetchUsers();
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to delete user';
+      setError(errorMsg);
+      console.error('Delete error:', err);
     } finally {
       setActionLoading(null);
     }
