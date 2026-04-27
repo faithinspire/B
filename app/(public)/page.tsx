@@ -13,7 +13,6 @@ import MarketplaceCarousel from '@/app/components/MarketplaceCarousel';
 
 // Lazy load heavy below-fold components
 const BackgroundAnimator = dynamicImport(() => import('@/app/components/BackgroundAnimator').then(m => ({ default: m.BackgroundAnimator })), { ssr: false, loading: () => <div className="absolute inset-0 bg-gradient-to-br from-purple-900 to-pink-900" /> });
-const BraidingStylesGallery = dynamicImport(() => import('@/app/components/BraidingStylesGallery').then(m => ({ default: m.BraidingStylesGallery })), { ssr: false, loading: () => null });
 
 // ─── Braiding style data ───────────────────────────────────────────────────
 const BRAIDING_STYLES = [
@@ -716,9 +715,6 @@ export default function LandingPage(): JSX.Element {
         subtitle="Premium braiding supplies, extensions, and accessories from verified sellers"
       />
 
-      {/* BRAIDING STYLES GALLERY */}
-      <BraidingStylesGallery />
-
       {/* TRUST SECTION */}
       <section className="py-20 bg-gradient-to-br from-purple-900 via-pink-900 to-blue-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -793,16 +789,34 @@ export default function LandingPage(): JSX.Element {
       {/* FOOTER */}
       <footer className="bg-gray-950 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* WhatsApp Banner - Prominent at top */}
+          <div className="mb-12 p-6 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.946 1.347l-.355.192-.368-.06c-1.286-.264-2.514-.666-3.554-1.207l-.658-.38-.67.54c-1.704 1.38-2.77 3.117-2.77 5.034 0 1.595.392 3.127 1.139 4.533l.359.687-.864.254c-1.102.325-2.074.84-2.845 1.544l-.564.504.635.368c1.905 1.105 4.105 1.714 6.514 1.714 8.094 0 14.712-6.618 14.712-14.712 0-1.93-.37-3.774-1.039-5.459l-.261-.667.56-.358c1.902-1.217 3.557-2.773 4.778-4.57l.305-.45-.523-.301c-1.997-1.15-4.285-1.783-6.683-1.783z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Need Help? Chat with Us on WhatsApp</h3>
+                <p className="text-green-100 text-sm">Available 24/7 for support and inquiries</p>
+              </div>
+            </div>
+            <a href="https://wa.me/15164625071" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white text-green-600 rounded-lg font-bold hover:bg-green-50 transition-colors whitespace-nowrap">
+              Chat Now
+            </a>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-12">
             <div className="col-span-2 sm:col-span-1">
               <h3 className="text-xl font-serif font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">BraidMee</h3>
               <p className="text-gray-400 text-sm mb-4">Premium braiding, barbering &amp; styling platform for Nigeria 🇳🇬 and USA 🇺🇸</p>
               <div className="flex gap-3">
-                <a href="https://wa.me/15164625071" target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-green-600 rounded-full flex items-center justify-center hover:bg-green-500 transition-colors">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.946 1.347l-.355.192-.368-.06c-1.286-.264-2.514-.666-3.554-1.207l-.658-.38-.67.54c-1.704 1.38-2.77 3.117-2.77 5.034 0 1.595.392 3.127 1.139 4.533l.359.687-.864.254c-1.102.325-2.074.84-2.845 1.544l-.564.504.635.368c1.905 1.105 4.105 1.714 6.514 1.714 8.094 0 14.712-6.618 14.712-14.712 0-1.93-.37-3.774-1.039-5.459l-.261-.667.56-.358c1.902-1.217 3.557-2.773 4.778-4.57l.305-.45-.523-.301c-1.997-1.15-4.285-1.783-6.683-1.783z"/></svg>
+                <a href="https://wa.me/15164625071" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center hover:bg-green-500 transition-colors" title="WhatsApp">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.946 1.347l-.355.192-.368-.06c-1.286-.264-2.514-.666-3.554-1.207l-.658-.38-.67.54c-1.704 1.38-2.77 3.117-2.77 5.034 0 1.595.392 3.127 1.139 4.533l.359.687-.864.254c-1.102.325-2.074.84-2.845 1.544l-.564.504.635.368c1.905 1.105 4.105 1.714 6.514 1.714 8.094 0 14.712-6.618 14.712-14.712 0-1.93-.37-3.774-1.039-5.459l-.261-.667.56-.358c1.902-1.217 3.557-2.773 4.778-4.57l.305-.45-.523-.301c-1.997-1.15-4.285-1.783-6.683-1.783z"/></svg>
                 </a>
-                <a href="mailto:Trulicares@gmail.com" className="w-9 h-9 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-500 transition-colors">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                <a href="mailto:Trulicares@gmail.com" className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-500 transition-colors" title="Email">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
                 </a>
               </div>
             </div>
@@ -818,7 +832,7 @@ export default function LandingPage(): JSX.Element {
             <div>
               <h4 className="font-semibold mb-4 text-gray-200">Support</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="https://wa.me/15164625071" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">WhatsApp Support</a></li>
+                <li><a href="https://wa.me/15164625071" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-2">💬 WhatsApp Support</a></li>
                 <li><a href="mailto:Trulicares@gmail.com" className="hover:text-white transition-colors">Email Us</a></li>
                 <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
