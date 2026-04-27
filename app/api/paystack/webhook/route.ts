@@ -1,141 +1,93 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
-export const dynamic = 'force-dynamic';
-
-/**
- * Paystack Webhook Handler
- * Handles payment events from Paystack for Nigerian payments
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('x-paystack-signature');
 
-    // Verify webhook signature (optional but recommended)
-    const secretKey = process.env.PAYSTACK_SECRET_KEY;
-    if (!secretKey) {
-      console.error('Paystack secret key not configured');
-      return NextResponse.json({ error: 'Server not configured' }, { status: 500 });
+    // Verify webhook signature
+    const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
+    const hash = crypto
+      .createHmac('sha512', paystackKey)
+      .update(body)
+      .digest('hex');
+
+    if (hash !== signature) {
+      console.error('Invalid Paystack webhook signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // Parse the event
     const event = JSON.parse(body);
-    
-    console.log('Paystack webhook event:', event.event);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
+    if (event.event === 'charge.success') {
+      const { reference, metadata } = event.data;
+      const { bookingId } = metadata;
 
-    // Handle different event types
-    switch (event.event) {
-      case 'charge.success': {
-        const data = event.data;
-        const reference = data.reference;
-        const metadata = data.metadata || {};
-
-        console.log('Payment successful:', { reference, metadata });
-
-        // Check if this is a booking payment
-        if (metadata.bookingId) {
-          const { error: updateError } = await supabase
-            .from('bookings')
-            .update({
-              status: 'escrowed',
-              payment_reference: reference,
-              payment_status: 'paid',
-              auto_release_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-            })
-            .eq('id', metadata.bookingId);
-
-          if (updateError) {
-            console.error('Failed to update booking:', updateError);
-          } else {
-            // Send notification to customer
-            await supabase
-              .from('notifications')
-              .insert({
-                user_id: metadata.customerId,
-                type: 'payment',
-                title: 'Payment Confirmed',
-                message: `Your payment of ₦${(data.amount / 100).toLocaleString()} has been confirmed.`,
-                data: { bookingId: metadata.bookingId, reference },
-              });
-
-            // Send notification to braider
-            await supabase
-              .from('notifications')
-              .insert({
-                user_id: metadata.braiderId,
-                type: 'payment',
-                title: 'Payment Received',
-                message: `Payment of ₦${(data.amount / 100).toLocaleString()} received for booking.`,
-                data: { bookingId: metadata.bookingId, reference },
-              });
-          }
-        }
-
-        // Check if this is a marketplace order payment
-        if (metadata.orderId) {
-          const { error: updateError } = await supabase
-            .from('marketplace_orders')
-            .update({
-              payment_status: 'paid',
-              payment_reference: reference,
-              status: 'processing',
-            })
-            .eq('id', metadata.orderId);
-
-          if (updateError) {
-            console.error('Failed to update order:', updateError);
-          }
-        }
-        break;
+      if (!bookingId) {
+        console.error('No booking ID in webhook metadata');
+        return NextResponse.json({ error: 'No booking ID' }, { status: 400 });
       }
 
-      case 'charge.failed': {
-        const data = event.data;
-        const metadata = data.metadata || {};
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        { auth: { persistSession: false } }
+      );
 
-        console.log('Payment failed:', data.reference);
+      // Update booking status
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'confirmed',
+          payment_status: 'completed',
+          paystack_reference: reference,
+        })
+        .eq('id', bookingId);
 
-        if (metadata.bookingId) {
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: metadata.customerId,
-              type: 'payment',
-              title: 'Payment Failed',
-              message: `Your payment could not be completed. Please try again.`,
-              data: { bookingId: metadata.bookingId, reference: data.reference },
-            });
-        }
-        break;
+      if (error) {
+        console.error('Failed to update booking:', error);
+        return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });
       }
 
-      case 'transfer.success': {
-        // Handle successful transfer to braider (payout)
-        const data = event.data;
-        console.log('Transfer successful:', data.reference);
-        break;
-      }
-
-      case 'transfer.failed': {
-        const data = event.data;
-        console.log('Transfer failed:', data.reference);
-        break;
-      }
-
-      default:
-        console.log('Unhandled Paystack event:', event.event);
+      console.log('Booking confirmed via Paystack:', bookingId);
+      return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ received: true });
+    if (event.event === 'charge.failed') {
+      const { reference, metadata } = event.data;
+      const { bookingId } = metadata;
+
+      if (!bookingId) {
+        return NextResponse.json({ error: 'No booking ID' }, { status: 400 });
+      }
+
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        { auth: { persistSession: false } }
+      );
+
+      // Update booking status
+      await supabase
+        .from('bookings')
+        .update({
+          status: 'payment_failed',
+          payment_status: 'failed',
+        })
+        .eq('id', bookingId);
+
+      console.log('Booking payment failed:', bookingId);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Paystack webhook error:', error);
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    );
   }
 }

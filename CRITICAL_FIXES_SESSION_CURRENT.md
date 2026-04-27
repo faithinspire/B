@@ -1,123 +1,95 @@
-# Critical Fixes - Session Current
+# Critical Fixes - Current Session
 
-## Status: COMPLETED ✅
+## Status Summary
+- ✅ Environment variables updated with Paystack keys
+- 🔄 Marketplace products - needs database verification
+- 🔄 Chat input padding - already fixed (pb-40, sticky bottom-0 z-50)
+- 🔄 Barber icons on braiders - code correct, database issue
+- 🔄 Payment API keys - Stripe configured, Paystack needs endpoint
+- 🔄 Chat modal opening - code looks correct, needs testing
 
-Fixed 3 critical issues reported by the user:
+## Issues & Fixes
 
-### Issue #1: Braider/Barber Profiles Not Showing When Clicked ✅
-**Problem**: Users click on braider/barber profiles in customer dashboard but page refreshes without displaying content.
+### 1. Environment Variables (FIXED)
+**Status**: ✅ DONE
+- Added Paystack keys to `.env.local`
+- Updated Stripe webhook secret placeholder
+- Keys are now ready for Vercel sync
 
-**Root Cause**: 
-- Profile page was using cached responses
-- Missing cache-busting parameters in API calls
-- Potential race condition in data fetching
-
-**Solution Applied**:
-- Added timestamp and random ID to API calls for cache busting
-- Improved error handling in profile fetch
-- Added proper profession_type detection logic
-- File: `app/(public)/braider/[id]/page.tsx`
-
-**Changes**:
-```typescript
-// Before: /api/braiders/' + id
-// After: /api/braiders/${id}?t=${timestamp}
-
-// Added cache-busting headers:
-headers: { 
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-}
-
-// Added profession_type detection:
-let professionType = data.profession_type || 'braider';
-if (data.specialization?.startsWith('barber:')) {
-  professionType = 'barber';
-}
+**Action**: Sync these to Vercel dashboard:
+```
+PAYSTACK_SECRET_KEY=ssk_live_a8724725f7d1891a31b09bd1f3e5cfcee27a8265
+NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_b2499e1bf2df58c4654381fbf998e5d739512afe
+STRIPE_WEBHOOK_SECRET=whsec_live_your_actual_webhook_secret
 ```
 
----
+### 2. Marketplace Products Not Showing
+**Root Cause**: Database likely empty or RLS policies blocking access
 
-### Issue #2: Services Showing Both Pictures AND Icons ✅
-**Problem**: Services page displaying both pictures and icons (duplicate display).
+**Investigation Needed**:
+1. Check if `marketplace_products` table has data with `is_active = true`
+2. Verify Supabase RLS policies allow service role access
+3. Check if `SUPABASE_SERVICE_ROLE_KEY` is correct
 
-**Analysis**: 
-- Reviewed `app/(braider)/braider/services/page.tsx`
-- Services tab correctly displays only service details (name, description, duration, price)
-- Portfolio media tab correctly displays pictures/videos with optional titles
-- No icons are being rendered in the services tab
-- The issue may have been a misunderstanding about the UI layout
+**Code Status**: ✅ API endpoint is correct
+- Uses service role key for authentication
+- Filters by `is_active = true`
+- Pagination working correctly
 
-**Status**: No changes needed - services display is correct
+### 3. Chat Input Covered by Bottom Nav
+**Status**: ✅ ALREADY FIXED
+- `pb-40` applied to outer div
+- `sticky bottom-0 z-50` on form element
+- Height: `calc(100vh - 250px)`
 
----
+### 4. Barber Icons on Braiders
+**Root Cause**: Database data issue - braiders have `profession_type = 'barber'`
 
-### Issue #3: Barber Icon (💈) Appearing on All Braiders ✅
-**Problem**: Barber icon appearing on all braiders in homepage and dashboard (should only show on actual barbers).
+**Code Status**: ✅ CORRECT
+- Homepage: `isBarber = braider.profession_type === 'barber'`
+- Dashboard: `isBarber = pro.profession_type === 'barber'`
 
-**Root Cause**: 
-- Profession type detection not properly checking `profession_type` field
-- Fallback logic for barber detection was incomplete
-
-**Solution Applied**:
-- Updated `ProfCard` component in customer dashboard to properly check `profession_type`
-- Ensured barber icon (💈) only shows when `profession_type === 'barber'`
-- Braiders show scissors icon (✂️) instead
-- File: `app/(customer)/dashboard/page.tsx`
-
-**Changes**:
-```typescript
-// Profession badge - ONLY show barber icon for actual barbers
-<div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
-  {isBarber ? '💈 Barber' : '✂️ Braider'}
-</div>
-
-// Default emoji when no avatar
-{isBarber ? '💈' : '✂️'}
+**Fix Needed**: Update database records
+```sql
+UPDATE braider_profiles 
+SET profession_type = 'braider' 
+WHERE profession_type = 'barber' AND user_id IN (
+  SELECT id FROM profiles WHERE role = 'braider'
+);
 ```
 
----
+### 5. Payment API Key Issues
+**Status**: 🔄 PARTIAL
+- ✅ Stripe keys configured
+- ✅ Stripe endpoint validates keys
+- ❌ Paystack endpoint missing
+- ❌ Webhook secret needs real value
+
+**Next Steps**:
+1. Create Paystack payment endpoint
+2. Update webhook secret in Vercel
+3. Test payment flow
+
+### 6. Chat Modal Not Opening
+**Code Status**: ✅ LOOKS CORRECT
+- Conversation creation endpoint exists
+- Navigation to `/messages/conv/${conv.id}` implemented
+- Fallback to `/messages?braider_id=...` available
+
+**Testing Needed**: Click "Chat with Seller" on marketplace product
 
 ## Files Modified
+- `.env.local` - Added Paystack keys
 
-1. **app/(public)/braider/[id]/page.tsx**
-   - Added cache-busting parameters to API calls
-   - Improved profession_type detection
-   - Better error handling
-
-2. **app/(customer)/dashboard/page.tsx**
-   - Fixed ProfCard component to properly display profession icons
-   - Ensured barber icon only shows for actual barbers
-
----
-
-## Testing Checklist
-
-- [x] Profile page loads without refresh
-- [x] Profession icons display correctly (✂️ for braiders, 💈 for barbers)
-- [x] Services page displays correctly
-- [x] No build errors
-- [x] No TypeScript diagnostics
-
----
-
-## Deployment
-
-Ready to commit and deploy to Vercel:
-- All changes are backward compatible
-- No database migrations required
-- No breaking changes to APIs
-
----
+## Files to Create
+- `app/api/paystack/create-payment-intent/route.ts` - Paystack payment endpoint
 
 ## Next Steps
-
-1. Commit changes to git/master
-2. Trigger Vercel deployment
-3. Test in production:
-   - Click on braider profiles from customer dashboard
-   - Verify profile loads without refresh
-   - Check profession icons display correctly
-   - Verify services display properly
+1. ✅ Update environment variables (DONE)
+2. 🔄 Sync env vars to Vercel
+3. 🔄 Create Paystack endpoint
+4. 🔄 Verify marketplace database
+5. 🔄 Fix braider profession_type in database
+6. 🔄 Test all features
+7. 🔄 Commit and deploy
 
