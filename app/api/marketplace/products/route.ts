@@ -9,11 +9,7 @@ export async function GET(request: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('Missing Supabase credentials');
-      return NextResponse.json(
-        { success: false, error: 'Server configuration error', data: [] },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'Server configuration error', data: [] }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -30,29 +26,24 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // Build query — use neq(false) instead of eq(true) to also catch NULL values
+    // Start with base query — no is_active filter to show all products
     let query = supabase
       .from('marketplace_products')
       .select('*', { count: 'exact' })
-      .neq('is_active', false)
       .order('created_at', { ascending: false });
 
     if (country_code && country_code !== '') {
       query = query.eq('country_code', country_code);
     }
-
     if (braider_id && braider_id !== '') {
       query = query.eq('braider_id', braider_id);
     }
-
     if (category && category !== '') {
       query = query.eq('category', category);
     }
-
     if (state && state !== '') {
       query = query.eq('location_state', state);
     }
-
     if (search && search !== '') {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
@@ -60,31 +51,8 @@ export async function GET(request: Request) {
     const { data: products, count, error } = await query.range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('Products fetch error:', error);
-      // Try without is_active filter as fallback
-      const { data: fallbackProducts, count: fallbackCount, error: fallbackError } = await supabase
-        .from('marketplace_products')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (fallbackError) {
-        return NextResponse.json(
-          { success: false, error: error.message, data: [] },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: fallbackProducts || [],
-        pagination: {
-          page,
-          limit,
-          total: fallbackCount || 0,
-          pages: Math.ceil((fallbackCount || 0) / limit),
-        },
-      });
+      console.error('Products fetch error:', error.message);
+      return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -97,11 +65,8 @@ export async function GET(request: Request) {
         pages: Math.ceil((count || 0) / limit),
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Marketplace products API error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Server error', data: [] },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Server error', data: [] }, { status: 500 });
   }
 }

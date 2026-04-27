@@ -9,7 +9,8 @@ interface MarketplaceChatProps {
   orderId: string;
   otherUserId: string;
   otherUserName: string;
-  onClose: () => void;
+  otherUserAvatar?: string | null;
+  onClose?: () => void;
   isModal?: boolean;
 }
 
@@ -22,7 +23,7 @@ interface Message {
   read: boolean;
 }
 
-export function MarketplaceChat({ orderId, otherUserId, otherUserName, onClose, isModal = false }: MarketplaceChatProps) {
+export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUserAvatar, onClose, isModal = false }: MarketplaceChatProps) {
   const { user } = useSupabaseAuthStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -139,7 +140,7 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, onClose, 
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -152,20 +153,31 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, onClose, 
   };
 
   const content = (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-lg" style={{ height: isModal ? '100%' : '70vh', minHeight: '400px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-        <div>
-          <h3 className="font-bold">{otherUserName}</h3>
-          <p className="text-xs text-purple-100">Order #{orderId.slice(0, 8)}</p>
+      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-pink-600 text-white flex-shrink-0">
+        <div className="flex items-center gap-3">
+          {otherUserAvatar ? (
+            <img src={otherUserAvatar} alt={otherUserName} className="w-9 h-9 rounded-full object-cover border-2 border-white/30" />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">
+              {otherUserName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <h3 className="font-bold text-sm">{otherUserName}</h3>
+            <p className="text-xs text-purple-100">Order #{orderId.slice(0, 8)}</p>
+          </div>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-          <X className="w-5 h-5" />
-        </button>
+        {onClose && (
+          <button onClick={() => onClose()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+      {/* Messages — scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader className="w-6 h-6 animate-spin text-purple-600" />
@@ -199,24 +211,24 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, onClose, 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-white">
-        <div className="flex gap-2">
+      {/* Input — always visible at bottom */}
+      <div className="flex-shrink-0 p-3 border-t bg-white">
+        <div className="flex gap-2 items-center">
           <input
             type="text"
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-            disabled={sending}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+            disabled={sending || loading}
           />
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim() || sending}
-            className="p-2 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={!newMessage.trim() || sending || loading}
+            className="p-2.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
-            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
       </div>
@@ -226,12 +238,12 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, onClose, 
   if (isModal) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[600px] max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="w-full max-w-md h-[600px] max-h-[85vh]">
           {content}
         </div>
       </div>
     );
   }
 
-  return content;
+  return <div className="w-full">{content}</div>;
 }
