@@ -192,15 +192,25 @@ const ALL_SERVICES = [
   { name: 'Gel Nails', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/gel nails.jpeg', query: 'gel_nails', category: 'Beauty' },
   { name: 'Makeup', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/make up.jpeg', query: 'makeup', category: 'Beauty' },
   { name: 'Bridal Styling', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/bridal makeup.jpeg', query: 'bridal', category: 'Beauty' },
+  // Spa & Wellness
+  { name: 'Massage', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/MASSAGE.png', query: 'massage', category: 'Spa' },
+  { name: 'Facial', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/FACIAL.png', query: 'facial', category: 'Spa' },
+  { name: 'Body Spa', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/BODY SPA.png', query: 'body_spa', category: 'Spa' },
+  { name: 'Threading', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/THREADING.png', query: 'threading', category: 'Spa' },
+  // Art & Tattoo
+  { name: 'Tattoo', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/TATTOO.png', query: 'tattoo', category: 'Art' },
+  { name: 'Henna', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/HENNA.png', query: 'henna', category: 'Art' },
+  { name: 'Body Art', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/BODY ART.png', query: 'body_art', category: 'Art' },
+  { name: 'Piercing', image: '/images/braiding-styles/BRAIDER AND BARBER/all services/PIERCING.png', query: 'piercing', category: 'Art' },
 ];
 
 // ─── ServicesSection component ─────────────────────────────────────────────
 function ServicesSection({ onServiceClick }: { onServiceClick: (query: string) => void }) {
-  const categories = ['All', 'Braiding', 'Extensions', 'Natural Hair', 'Beauty'];
-  const [activeCategory, setActiveCategory] = useState('All');
+  const categories = ['Braiding', 'Extensions', 'Natural Hair', 'Beauty', 'Spa', 'Art'];
+  const [activeCategory, setActiveCategory] = useState('Braiding');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const filtered = activeCategory === 'All' ? ALL_SERVICES : ALL_SERVICES.filter(s => s.category === activeCategory);
+  const filtered = ALL_SERVICES.filter(s => s.category === activeCategory);
 
   return (
     <section className="py-10 bg-white">
