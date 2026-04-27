@@ -75,16 +75,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 4: Send reset email via Supabase
+    // Step 4: Send reset email via Resend or Supabase
     try {
       const resetUrl = `${appUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
-      // Use Supabase's built-in email sending or Resend
-      const resendApiKey = process.env.RESEND_API_KEY;
+      const resendApiKey = (process.env.RESEND_API_KEY || '').trim();
       const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
 
-      if (resendApiKey) {
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Password Reset Request</h2>
+          <p>Hi ${profile.full_name || 'there'},</p>
+          <p>We received a request to reset your password. Click the link below to create a new password:</p>
+          <p style="margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Reset Password
+            </a>
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            Or copy this link: <br/>
+            <code style="background-color: #f0f0f0; padding: 8px; border-radius: 4px; display: inline-block; margin-top: 8px;">
+              ${resetUrl}
+            </code>
+          </p>
+          <p style="color: #999; font-size: 12px; margin-top: 30px;">
+            This link will expire in 24 hours. If you didn't request this, please ignore this email.
+          </p>
+        </div>
+      `;
+
+      if (resendApiKey && resendApiKey.length > 0) {
         // Use Resend for email sending
+        console.log('Sending email via Resend...');
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -95,43 +116,40 @@ export async function POST(request: NextRequest) {
             from: resendFromEmail,
             to: email,
             subject: 'Reset Your BraidMe Password',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Password Reset Request</h2>
-                <p>Hi ${profile.full_name || 'there'},</p>
-                <p>We received a request to reset your password. Click the link below to create a new password:</p>
-                <p style="margin: 30px 0;">
-                  <a href="${resetUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                    Reset Password
-                  </a>
-                </p>
-                <p style="color: #666; font-size: 14px;">
-                  Or copy this link: <br/>
-                  <code style="background-color: #f0f0f0; padding: 8px; border-radius: 4px; display: inline-block; margin-top: 8px;">
-                    ${resetUrl}
-                  </code>
-                </p>
-                <p style="color: #999; font-size: 12px; margin-top: 30px;">
-                  This link will expire in 24 hours. If you didn't request this, please ignore this email.
-                </p>
-              </div>
-            `,
+            html: emailHtml,
           }),
         });
 
         if (!response.ok) {
           const error = await response.json();
           console.error('Resend email error:', error);
-          // Don't fail - token was created successfully
+          throw new Error(`Resend error: ${error.message}`);
         }
+
+        const result = await response.json();
+        console.log('Email sent successfully via Resend:', result.id);
       } else {
         // Fallback: Use Supabase auth email
-        console.log('Resend not configured, using Supabase email');
-        // Supabase will handle this via their email service
+        console.log('Resend not configured, attempting Supabase email...');
+        
+        // Try using Supabase's email service
+        const { error: emailError } = await supabase.auth.admin.sendRawEmail({
+          to: email,
+          subject: 'Reset Your BraidMe Password',
+          html: emailHtml,
+        });
+
+        if (emailError) {
+          console.error('Supabase email error:', emailError);
+          throw new Error(`Email service error: ${emailError.message}`);
+        }
+
+        console.log('Email sent successfully via Supabase');
       }
     } catch (emailError) {
       console.error('Email sending error:', emailError);
-      // Don't fail - token was created successfully
+      // Log but don't fail - token was created successfully
+      // User can still use the token if they retrieve it another way
     }
 
     return NextResponse.json({
