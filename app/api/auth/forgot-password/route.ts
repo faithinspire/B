@@ -78,47 +78,71 @@ export async function POST(request: NextRequest) {
       // Continue anyway - try to send email
     }
 
-    // Send email with reset link
+    // Build reset link
     const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
-    
-    try {
-      // Try using Supabase's email service first
-      const { error: emailError } = await supabase.auth.admin.generateLink({
-        type: 'recovery',
-        email: email,
-        options: {
-          redirectTo: resetLink,
-        },
-      });
 
-      if (!emailError) {
-        console.log('Password reset email sent via Supabase to:', email);
+    // Send email using Resend
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        const result = await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com',
+          to: email,
+          subject: 'Reset Your BraidMe Password',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                <h1 style="color: white; margin: 0;">BraidMe</h1>
+              </div>
+              <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 8px 8px;">
+                <h2 style="color: #333; margin-top: 0;">Password Reset Request</h2>
+                <p style="color: #666; line-height: 1.6;">
+                  We received a request to reset your password. Click the button below to create a new password.
+                </p>
+                <p style="color: #666; line-height: 1.6;">
+                  <strong>This link will expire in 24 hours.</strong>
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetLink}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                    Reset Password
+                  </a>
+                </div>
+                <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                  If you didn't request this password reset, please ignore this email or contact support if you have concerns.
+                </p>
+                <p style="color: #999; font-size: 12px;">
+                  Or copy and paste this link in your browser:<br/>
+                  <code style="background: #f0f0f0; padding: 5px; border-radius: 3px;">${resetLink}</code>
+                </p>
+              </div>
+            </div>
+          `,
+        });
+
+        console.log('Password reset email sent successfully to:', email);
+        console.log('Resend response:', result);
+
+        return NextResponse.json({
+          success: true,
+          message: 'If an account exists with this email, a password reset link has been sent.',
+        });
+      } catch (emailError) {
+        console.error('Resend email error:', emailError);
+        // Don't fail the request - token was created, just email failed
         return NextResponse.json({
           success: true,
           message: 'If an account exists with this email, a password reset link has been sent.',
         });
       }
-    } catch (err) {
-      console.log('Supabase email failed, trying alternative method:', err);
+    } else {
+      console.warn('RESEND_API_KEY not configured, skipping email');
+      return NextResponse.json({
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been sent.',
+      });
     }
-
-    // Fallback: Send email using fetch to a simple email service
-    // This is a workaround - in production, use SendGrid, Resend, or similar
-    const emailContent = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset for your BraidMe account.</p>
-      <p>Click the link below to reset your password (valid for 24 hours):</p>
-      <p><a href="${resetLink}">Reset Password</a></p>
-      <p>If you didn't request this, please ignore this email.</p>
-    `;
-
-    console.log('Password reset link generated for:', email);
-    console.log('Reset link:', resetLink);
-
-    return NextResponse.json({
-      success: true,
-      message: 'If an account exists with this email, a password reset link has been sent.',
-    });
   } catch (error) {
     console.error('Forgot password error:', error);
     return NextResponse.json(
