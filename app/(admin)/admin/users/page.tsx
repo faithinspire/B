@@ -91,14 +91,18 @@ export default function UsersPage() {
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || `HTTP ${response.status}`);
       }
 
       setSuccessMsg(`User ${user.email} deleted successfully`);
       setDeleteConfirm(null);
+      
+      // Wait a moment for database to sync, then refresh
+      await new Promise(resolve => setTimeout(resolve, 1000));
       await fetchUsers();
-      setTimeout(() => setSuccessMsg(''), 3000);
+      
+      setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to delete user';
       setError(errorMsg);

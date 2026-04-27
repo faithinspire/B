@@ -3,82 +3,117 @@ import { createClient } from '@supabase/supabase-js';
 
 async function deleteUserData(userId: string, serviceSupabase: any) {
   try {
-    // Delete in order of dependencies to avoid foreign key issues
-    // IMPORTANT: Delete auth user FIRST to ensure it exists, then cascade delete related data
-    
-    // 0. Delete from auth FIRST (this is the source of truth)
-    console.log('=== DELETE USER: Deleting auth user ===');
-    const { error: authError } = await serviceSupabase.auth.admin.deleteUser(userId);
+    console.log(`=== DELETE USER: Starting deletion for user ${userId} ===`);
 
-    if (authError) {
-      console.error('=== DELETE USER: Auth delete error ===', authError);
-      // Don't throw - continue with data cleanup even if auth user not found
-      console.log('=== DELETE USER: Auth user not found, continuing with data cleanup ===');
+    // Step 1: Verify user exists before deletion
+    const { data: profileCheck } = await serviceSupabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (!profileCheck) {
+      console.log(`=== DELETE USER: User ${userId} not found in profiles ===`);
+      return { success: false, message: 'User not found' };
     }
 
-    // 1. Delete messages
-    console.log('=== DELETE USER: Deleting messages ===');
-    const { error: msgError } = await serviceSupabase
-      .from('messages')
-      .delete()
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-    if (msgError) console.error('Message delete error:', msgError);
+    // Step 2: Delete all related data in correct order (dependencies first)
+    const deletionSteps = [
+      {
+        name: 'messages',
+        query: () => serviceSupabase
+          .from('messages')
+          .delete()
+          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      },
+      {
+        name: 'conversations',
+        query: () => serviceSupabase
+          .from('conversations')
+          .delete()
+          .or(`customer_id.eq.${userId},braider_id.eq.${userId},admin_id.eq.${userId}`)
+      },
+      {
+        name: 'bookings',
+        query: () => serviceSupabase
+          .from('bookings')
+          .delete()
+          .or(`customer_id.eq.${userId},braider_id.eq.${userId}`)
+      },
+      {
+        name: 'payments',
+        query: () => serviceSupabase
+          .from('payments')
+          .delete()
+          .eq('user_id', userId)
+      },
+      {
+        name: 'notifications',
+        query: () => serviceSupabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId)
+      },
+      {
+        name: 'braider_profiles',
+        query: () => serviceSupabase
+          .from('braider_profiles')
+          .delete()
+          .eq('user_id', userId)
+      },
+      {
+        name: 'braider_verification',
+        query: () => serviceSupabase
+          .from('braider_verification')
+          .delete()
+          .eq('user_id', userId)
+      },
+      {
+        name: 'profiles',
+        query: () => serviceSupabase
+          .from('profiles')
+          .delete()
+          .eq('id', userId)
+      }
+    ];
 
-    // 2. Delete conversations
-    console.log('=== DELETE USER: Deleting conversations ===');
-    const { error: convError } = await serviceSupabase
-      .from('conversations')
-      .delete()
-      .or(`customer_id.eq.${userId},braider_id.eq.${userId},admin_id.eq.${userId}`);
-    if (convError) console.error('Conversation delete error:', convError);
+    // Execute all deletions
+    for (const step of deletionSteps) {
+      console.log(`=== DELETE USER: Deleting ${step.name} ===`);
+      const { error } = await step.query();
+      if (error) {
+        console.error(`=== DELETE USER: Error deleting ${step.name} ===`, error);
+        // Continue with other deletions even if one fails
+      }
+    }
 
-    // 3. Delete bookings
-    console.log('=== DELETE USER: Deleting bookings ===');
-    const { error: bookError } = await serviceSupabase
-      .from('bookings')
-      .delete()
-      .or(`customer_id.eq.${userId},braider_id.eq.${userId}`);
-    if (bookError) console.error('Booking delete error:', bookError);
+    // Step 3: Delete auth user (this is the final step)
+    console.log('=== DELETE USER: Deleting auth user ===');
+    const { error: authError } = await serviceSupabase.auth.admin.deleteUser(userId);
+    if (authError) {
+      console.error('=== DELETE USER: Auth delete error ===', authError);
+      // Don't fail if auth user already deleted
+    }
 
-    // 4. Delete payments
-    console.log('=== DELETE USER: Deleting payments ===');
-    const { error: payError } = await serviceSupabase
-      .from('payments')
-      .delete()
-      .eq('user_id', userId);
-    if (payError) console.error('Payment delete error:', payError);
-
-    // 5. Delete notifications
-    console.log('=== DELETE USER: Deleting notifications ===');
-    const { error: notifError } = await serviceSupabase
-      .from('notifications')
-      .delete()
-      .eq('user_id', userId);
-    if (notifError) console.error('Notification delete error:', notifError);
-
-    // 6. Delete braider profile if exists
-    console.log('=== DELETE USER: Deleting braider profile ===');
-    const { error: braiderProfError } = await serviceSupabase
-      .from('braider_profiles')
-      .delete()
-      .eq('user_id', userId);
-    if (braiderProfError) console.error('Braider profile delete error:', braiderProfError);
-
-    // 7. Delete braider verification if exists
-    console.log('=== DELETE USER: Deleting braider verification ===');
-    const { error: verifyError } = await serviceSupabase
-      .from('braider_verification')
-      .delete()
-      .eq('user_id', userId);
-    if (verifyError) console.error('Verification delete error:', verifyError);
-
-    // 8. Delete profile
-    console.log('=== DELETE USER: Deleting profile ===');
-    const { error: profError } = await serviceSupabase
+    // Step 4: Verify deletion - check if profile still exists
+    const { data: verifyDelete } = await serviceSupabase
       .from('profiles')
-      .delete()
-      .eq('id', userId);
-    if (profError) console.error('Profile delete error:', profError);
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (verifyDelete) {
+      console.error(`=== DELETE USER: Profile still exists after deletion ===`);
+      // Try one more time with a direct delete
+      const { error: retryError } = await serviceSupabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      
+      if (retryError) {
+        throw new Error(`Failed to delete profile: ${retryError.message}`);
+      }
+    }
 
     console.log(`=== DELETE USER: Successfully deleted user ${userId} ===`);
     return { success: true, message: 'User deleted successfully' };
@@ -113,6 +148,11 @@ export async function POST(
     );
 
     const result = await deleteUserData(userId, serviceSupabase);
+    
+    if (!result.success) {
+      return NextResponse.json(result, { status: 404 });
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
