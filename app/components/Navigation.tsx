@@ -34,7 +34,10 @@ export function Navigation() {
     router.push('/');
   };
 
-  const isActive = (path: string) => pathname === path || (pathname?.startsWith(path + '/') ?? false);
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/';
+    return pathname === path || (pathname?.startsWith(path + '/') ?? false);
+  };
 
   const getBottomNavItems = () => {
     if (!user) return [];

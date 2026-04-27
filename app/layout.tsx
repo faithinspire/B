@@ -75,14 +75,14 @@ export default function RootLayout({
         <AIAssistant />
         
         {/* Fixed container that holds everything */}
-        <div className="fixed inset-0 flex flex-col" style={{ margin: 0, padding: 0 }}>
+        <div className="min-h-screen flex flex-col" style={{ margin: 0, padding: 0 }}>
           {/* Fixed Navigation at top */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 sticky top-0 z-50">
             <Navigation />
           </div>
           
           {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ margin: 0, padding: 0 }}>
+          <div className="flex-1" style={{ margin: 0, padding: 0 }}>
             {children}
           </div>
         </div>

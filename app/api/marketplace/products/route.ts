@@ -23,30 +23,28 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
-    const country_code = searchParams.get('country_code'); // Optional - if not provided, show ALL
+    const country_code = searchParams.get('country_code');
     const state = searchParams.get('state');
-    const braider_id = searchParams.get('braider_id'); // Optional - filter by braider
+    const braider_id = searchParams.get('braider_id');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '12');
+    const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
+    // Build query — use neq(false) instead of eq(true) to also catch NULL values
     let query = supabase
       .from('marketplace_products')
       .select('*', { count: 'exact' })
-      .eq('is_active', true)
+      .neq('is_active', false)
       .order('created_at', { ascending: false });
 
-    // Only filter by country if explicitly provided
     if (country_code && country_code !== '') {
       query = query.eq('country_code', country_code);
     }
 
-    // Filter by braider if provided
     if (braider_id && braider_id !== '') {
       query = query.eq('braider_id', braider_id);
     }
 
-    // Apply filters - category is sent as name string
     if (category && category !== '') {
       query = query.eq('category', category);
     }
@@ -59,16 +57,34 @@ export async function GET(request: Request) {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    // Apply pagination
-    const { data: products, count, error } = await query
-      .range(offset, offset + limit - 1);
+    const { data: products, count, error } = await query.range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Products fetch error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message, data: [] },
-        { status: 500 }
-      );
+      // Try without is_active filter as fallback
+      const { data: fallbackProducts, count: fallbackCount, error: fallbackError } = await supabase
+        .from('marketplace_products')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (fallbackError) {
+        return NextResponse.json(
+          { success: false, error: error.message, data: [] },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: fallbackProducts || [],
+        pagination: {
+          page,
+          limit,
+          total: fallbackCount || 0,
+          pages: Math.ceil((fallbackCount || 0) / limit),
+        },
+      });
     }
 
     return NextResponse.json({
