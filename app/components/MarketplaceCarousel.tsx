@@ -101,38 +101,57 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Fetch all products without country filter to get everything
+        setLoading(true);
+
+        // Build query with cache busting
         const timestamp = Date.now();
-        const res = await fetch(`/api/marketplace/products?limit=12&page=1&t=${timestamp}`, {
+        const params = new URLSearchParams({
+          limit: '12',
+          page: '1',
+          t: timestamp.toString(),
+        });
+
+        if (category) {
+          params.append('category', category);
+        }
+
+        const url = `/api/marketplace/products?${params.toString()}`;
+
+        const res = await fetch(url, {
+          method: 'GET',
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
+            'Expires': '0',
           },
         });
 
         if (!res.ok) {
-          console.error('Failed to fetch products:', res.status);
-          setProducts([]);
-          setLoading(false);
+          console.error('Failed to fetch products:', res.status, res.statusText);
+          setProducts(DEMO_PRODUCTS);
           return;
         }
 
         const json = await res.json();
-        const products = json.data || [];
         
-        // Filter by category if provided
-        let filtered = products;
-        if (category) {
-          filtered = products.filter((p: Product) => 
-            p.category?.toLowerCase() === category.toLowerCase()
-          );
+        if (!json.success) {
+          console.error('API returned error:', json.error);
+          setProducts(DEMO_PRODUCTS);
+          return;
         }
 
-        setProducts(filtered);
+        const fetchedProducts = json.data || [];
+        
+        if (fetchedProducts.length === 0) {
+          console.log('No products found, using demo products');
+          setProducts(DEMO_PRODUCTS);
+        } else {
+          setProducts(fetchedProducts);
+        }
       } catch (err) {
         console.error('Error fetching products:', err);
-        setProducts([]);
+        setProducts(DEMO_PRODUCTS);
       } finally {
         setLoading(false);
       }

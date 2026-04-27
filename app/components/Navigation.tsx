@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
-import { Menu, X, LogOut, LayoutDashboard, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users } from 'lucide-react';
+import { Menu, X, LogOut, Home, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users, LayoutDashboard } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -41,31 +41,31 @@ export function Navigation() {
 
     if (user.role === 'customer') {
       return [
-        { href: '/', icon: LayoutDashboard, label: 'Home' },
-        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { href: '/booking', icon: Zap, label: 'Book' },
-        { href: '/marketplace', icon: ShoppingBag, label: 'Shop' },
-        { href: '/messages', icon: MessageSquare, label: 'Messages' },
+        { href: '/', icon: Home, label: 'Home', emoji: '🏠' },
+        { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', emoji: '📊' },
+        { href: '/booking', icon: Zap, label: 'Book', emoji: '⚡' },
+        { href: '/marketplace', icon: ShoppingBag, label: 'Shop', emoji: '🛍️' },
+        { href: '/messages', icon: MessageSquare, label: 'Messages', emoji: '💬' },
       ];
     }
 
     if (user.role === 'braider') {
       return [
-        { href: '/', icon: LayoutDashboard, label: 'Home' },
-        { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
-        { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
-        { href: '/braider/marketplace', icon: ShoppingBag, label: 'Store' },
+        { href: '/', icon: Home, label: 'Home', emoji: '🏠' },
+        { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard', emoji: '📊' },
+        { href: '/braider/bookings', icon: Zap, label: 'Bookings', emoji: '📅' },
+        { href: '/braider/messages', icon: MessageSquare, label: 'Messages', emoji: '💬' },
+        { href: '/braider/marketplace', icon: ShoppingBag, label: 'Store', emoji: '🏪' },
       ];
     }
 
     if (user.role === 'admin') {
       return [
-        { href: '/', icon: LayoutDashboard, label: 'Home' },
-        { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-        { href: '/admin/users', icon: Users, label: 'Users' },
-        { href: '/admin/payments', icon: DollarSign, label: 'Payments' },
-        { href: '/admin/conversations', icon: MessageCircle, label: 'Chats' },
+        { href: '/', icon: Home, label: 'Home', emoji: '🏠' },
+        { href: '/admin', icon: LayoutDashboard, label: 'Dashboard', emoji: '📊' },
+        { href: '/admin/users', icon: Users, label: 'Users', emoji: '👥' },
+        { href: '/admin/payments', icon: DollarSign, label: 'Payments', emoji: '💰' },
+        { href: '/admin/conversations', icon: MessageCircle, label: 'Chats', emoji: '💬' },
       ];
     }
 
@@ -222,25 +222,28 @@ export function Navigation() {
         )}
       </nav>
 
-      {/* Bottom Navigation Bar - International Standard Design */}
+      {/* Bottom Navigation Bar - Mobile Only, Always Visible */}
       {user && bottomNavItems.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl md:hidden">
-          <div className="flex items-center justify-around h-20 px-1">
-            {bottomNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all duration-300 flex-1 h-full ${
-                  isActive(item.href)
-                    ? 'text-primary-600 bg-primary-50'
-                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
-                }`}
-                title={item.label}
-              >
-                <item.icon className="w-6 h-6" />
-                <span className="text-xs font-semibold leading-tight">{item.label}</span>
-              </Link>
-            ))}
+          <div className="flex items-center justify-around h-20 px-0.5 gap-0.5">
+            {bottomNavItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex flex-col items-center justify-center gap-0.5 px-1 py-1.5 rounded-lg transition-all duration-200 flex-1 h-full min-w-0 ${
+                    active
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
+                  }`}
+                  title={item.label}
+                >
+                  <span className="text-lg leading-none">{item.emoji}</span>
+                  <span className="text-xs font-semibold leading-tight text-center truncate">{item.label}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

@@ -84,8 +84,13 @@ export default function BraiderProfilePage() {
     try {
       setLoading(true);
       setError(null);
+      
+      // Cache busting with timestamp
       const timestamp = Date.now();
-      const res = await fetch(`/api/braiders/${id}?t=${timestamp}`, {
+      const url = `/api/braiders/${id}?t=${timestamp}`;
+      
+      const res = await fetch(url, {
+        method: 'GET',
         cache: 'no-store',
         headers: { 
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -97,12 +102,15 @@ export default function BraiderProfilePage() {
       if (!res.ok) {
         console.error('Profile fetch failed:', res.status);
         setError('Professional not found');
+        setPro(null);
         return;
       }
       
       const data = await res.json();
+      
       if (!data || (!data.id && !data.user_id)) {
         setError('Profile not found');
+        setPro(null);
         return;
       }
       
@@ -112,7 +120,7 @@ export default function BraiderProfilePage() {
         professionType = 'barber';
       }
       
-      setPro({
+      const profile: BraiderProfile = {
         id: data.id || data.user_id,
         user_id: data.user_id || data.id,
         bio: data.bio || null,
@@ -138,10 +146,14 @@ export default function BraiderProfilePage() {
         portfolio_media: data.portfolio_media || [],
         services: data.services || [],
         reviews: data.reviews || [],
-      });
+      };
+      
+      setPro(profile);
+      setError(null);
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError('Failed to load profile. Please try again.');
+      setPro(null);
     } finally {
       setLoading(false);
     }
