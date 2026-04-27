@@ -216,7 +216,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Create initial notification
+    // 4. If phone provided, create phone login mapping
+    if (phone && phone_country) {
+      const { error: phoneMappingError } = await serviceSupabase
+        .from('phone_login_mappings')
+        .insert({
+          user_id: userId,
+          phone,
+          phone_country,
+        });
+
+      if (phoneMappingError) {
+        console.error('Phone mapping creation error:', phoneMappingError);
+        // Log but don't fail - phone login can be added later
+      }
+    }
+
+    // 5. Create initial notification
     const { error: notificationError } = await serviceSupabase
       .from('notifications')
       .insert({
@@ -233,7 +249,7 @@ export async function POST(request: NextRequest) {
       console.error('Notification error:', notificationError)
     }
 
-    // 5. Return success - session will be created on next auth check
+    // 6. Return success - session will be created on next auth check
     return NextResponse.json({
       success: true,
       user: {

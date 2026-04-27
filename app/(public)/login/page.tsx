@@ -16,7 +16,12 @@ export default function LoginPage() {
 
         <MultiCountryLoginForm />
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 space-y-3 text-center">
+          <p className="text-gray-600 text-sm">
+            <Link href="/forgot-password" className="text-primary-600 hover:text-primary-700 font-semibold">
+              Forgot Password?
+            </Link>
+          </p>
           <p className="text-gray-600 text-sm">
             Don't have an account?{' '}
             <Link href="/signup" className="text-primary-600 hover:text-primary-700 font-semibold">

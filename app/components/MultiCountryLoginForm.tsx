@@ -53,108 +53,161 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
     setLoading(true);
 
     try {
-      let loginEmail = email;
-
-      // If logging in with phone, we need to find the email first
       if (loginMethod === 'phone') {
-        const normalizedPhone = normalizePhoneNumber(phone, country);
+        // Use phone login endpoint
+        const response = await fetch('/api/auth/login-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone,
+            phone_country: country,
+            password,
+          }),
+        });
 
-        // In a real app, you'd query your database to find the user by phone
-        // For now, we'll use a special format: phone@country.local
-        loginEmail = `${normalizedPhone.replace(/\D/g, '')}@${country.toLowerCase()}.local`;
-      }
+        const data = await response.json();
 
-      // Attempt login
-      try {
-        await signIn(loginEmail, password);
+        if (!response.ok) {
+          setError(data.error || 'Phone login failed');
+          setLoading(false);
+          return;
+        }
 
-        // Wait a moment for the store to update
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Store session and user info
+        if (data.session) {
+          // Update auth store with user data
+          useSupabaseAuthStore.setState({
+            user: data.user,
+            session: data.session,
+          });
+        }
 
-        // Get the user from the store to check their role
-        const { user } = useSupabaseAuthStore.getState();
-
-        console.log('=== LOGIN FORM: User role after login ===', { role: user?.role, email: user?.email });
-
-        // Verify and fix role if needed
-        if (user?.id) {
+        // Verify role
+        if (data.user?.id) {
           try {
-            console.log('=== LOGIN FORM: Verifying user role ===');
             const verifyResponse = await fetch('/api/auth/verify-role', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id }),
+              body: JSON.stringify({ userId: data.user.id }),
             });
 
             if (verifyResponse.ok) {
               const verifyData = await verifyResponse.json();
-              console.log('=== LOGIN FORM: Role verification result ===', verifyData);
-
-              // If role was updated, update the store
               if (verifyData.action === 'updated' && verifyData.newRole) {
-                console.log('=== LOGIN FORM: Role was updated, updating store ===', { newRole: verifyData.newRole });
                 useSupabaseAuthStore.setState({
-                  user: { ...user, role: verifyData.newRole as 'customer' | 'braider' | 'admin' }
+                  user: { ...data.user, role: verifyData.newRole as 'customer' | 'braider' | 'admin' }
                 });
               }
             }
           } catch (verifyErr) {
-            console.warn('=== LOGIN FORM: Role verification failed ===', verifyErr instanceof Error ? verifyErr.message : verifyErr);
-            // Continue anyway - don't block login
-          }
-        }
-
-        // If role is still customer but user has braider_profiles, they're a braider
-        if (user?.role === 'customer' && user?.id) {
-          console.log('=== LOGIN FORM: Role is customer, checking braider_profiles ===');
-          const { data: braiderProfile } = await supabase
-            .from('braider_profiles')
-            .select('user_id')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (braiderProfile) {
-            console.log('=== LOGIN FORM: Found braider_profiles record, user is actually a braider ===');
-            // Update the store with correct role
-            useSupabaseAuthStore.setState({
-              user: { ...user, role: 'braider' }
-            });
+            console.warn('Role verification failed:', verifyErr);
           }
         }
 
         // Get updated user
         const { user: updatedUser } = useSupabaseAuthStore.getState();
 
-        // Success - redirect based on role
+        // Redirect based on role
         if (onSuccess) {
           onSuccess();
         } else {
-          // Check for redirect param in URL (e.g., after payment redirect)
           const urlParams = new URLSearchParams(window.location.search);
           const redirectTo = urlParams.get('redirect');
           
           if (redirectTo) {
-            // Always honor the redirect param — user was trying to go somewhere specific
-            console.log('=== LOGIN FORM: Redirecting to saved URL ===', redirectTo);
             router.push(redirectTo);
           } else {
-            // Redirect based on user role
             if (updatedUser?.role === 'braider') {
-              console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
               router.push('/braider/dashboard');
             } else if (updatedUser?.role === 'admin') {
-              console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
               router.push('/admin');
             } else {
-              console.log('=== LOGIN FORM: Redirecting customer to /dashboard ===');
               router.push('/dashboard');
             }
           }
         }
-      } catch (signInError) {
-        const errorMsg = signInError instanceof Error ? signInError.message : 'Login failed';
-        setError(errorMsg);
-        return;
+      } else {
+        // Email login (existing logic)
+        try {
+          await signIn(email, password);
+
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          const { user } = useSupabaseAuthStore.getState();
+
+          console.log('=== LOGIN FORM: User role after login ===', { role: user?.role, email: user?.email });
+
+          if (user?.id) {
+            try {
+              console.log('=== LOGIN FORM: Verifying user role ===');
+              const verifyResponse = await fetch('/api/auth/verify-role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id }),
+              });
+
+              if (verifyResponse.ok) {
+                const verifyData = await verifyResponse.json();
+                console.log('=== LOGIN FORM: Role verification result ===', verifyData);
+
+                if (verifyData.action === 'updated' && verifyData.newRole) {
+                  console.log('=== LOGIN FORM: Role was updated, updating store ===', { newRole: verifyData.newRole });
+                  useSupabaseAuthStore.setState({
+                    user: { ...user, role: verifyData.newRole as 'customer' | 'braider' | 'admin' }
+                  });
+                }
+              }
+            } catch (verifyErr) {
+              console.warn('=== LOGIN FORM: Role verification failed ===', verifyErr instanceof Error ? verifyErr.message : verifyErr);
+            }
+          }
+
+          if (user?.role === 'customer' && user?.id) {
+            console.log('=== LOGIN FORM: Role is customer, checking braider_profiles ===');
+            const { data: braiderProfile } = await supabase
+              .from('braider_profiles')
+              .select('user_id')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (braiderProfile) {
+              console.log('=== LOGIN FORM: Found braider_profiles record, user is actually a braider ===');
+              useSupabaseAuthStore.setState({
+                user: { ...user, role: 'braider' }
+              });
+            }
+          }
+
+          const { user: updatedUser } = useSupabaseAuthStore.getState();
+
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get('redirect');
+            
+            if (redirectTo) {
+              console.log('=== LOGIN FORM: Redirecting to saved URL ===', redirectTo);
+              router.push(redirectTo);
+            } else {
+              if (updatedUser?.role === 'braider') {
+                console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
+                router.push('/braider/dashboard');
+              } else if (updatedUser?.role === 'admin') {
+                console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
+                router.push('/admin');
+              } else {
+                console.log('=== LOGIN FORM: Redirecting customer to /dashboard ===');
+                router.push('/dashboard');
+              }
+            }
+          }
+        } catch (signInError) {
+          const errorMsg = signInError instanceof Error ? signInError.message : 'Login failed';
+          setError(errorMsg);
+          setLoading(false);
+          return;
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

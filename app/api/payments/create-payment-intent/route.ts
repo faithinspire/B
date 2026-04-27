@@ -1,168 +1,350 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+/**
+ * Universal payment intent creation endpoint
+ * Routes to Stripe (USD) or Paystack (NGN) based on:
+ * 1. User's country from profile
+ * 2. Currency of the booking
+ * 3. Amount in specific currency
+ */
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { booking_id, amount, currency, customer_id, braider_id, braider_country } = body;
+    const { bookingId, amount, currency, customerId, braiderId } = body;
 
-    if (!booking_id || !amount || !customer_id || !braider_id) {
+    if (!bookingId || !amount) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: bookingId and amount' },
         { status: 400 }
       );
     }
 
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
-    // Determine payment gateway based on country
-    const country = braider_country || 'NG';
-    const isNigeria = country === 'NG';
-
-    if (isNigeria) {
-      // Use Paystack for Nigeria
-      return await handlePaystackPayment(db, booking_id, amount, customer_id, braider_id);
-    } else {
-      // Use Stripe for USA and other countries
-      return await handleStripePayment(db, booking_id, amount, currency || 'USD', customer_id, braider_id);
+    if (typeof amount !== 'number' || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Amount must be a positive number' },
+        { status: 400 }
+      );
     }
-  } catch (error: any) {
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
+
+    // Step 1: Get booking details
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .single();
+
+    if (bookingError || !booking) {
+      console.error('Booking not found:', bookingId);
+      return NextResponse.json(
+        { error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
+
+    // Step 2: Get customer profile to determine country
+    const { data: customerProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('country, phone_country')
+      .eq('id', booking.customer_id)
+      .single();
+
+    if (profileError) {
+      console.error('Customer profile not found:', booking.customer_id);
+      return NextResponse.json(
+        { error: 'Customer profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Step 3: Determine payment method based on currency or country
+    let paymentMethod = 'stripe';
+    let finalCurrency = currency || 'USD';
+
+    // If currency is explicitly NGN, use Paystack
+    if (currency === 'NGN') {
+      paymentMethod = 'paystack';
+      finalCurrency = 'NGN';
+    }
+    // If currency is USD, use Stripe
+    else if (currency === 'USD') {
+      paymentMethod = 'stripe';
+      finalCurrency = 'USD';
+    }
+    // If no currency specified, check user's country
+    else {
+      const userCountry = customerProfile?.country || customerProfile?.phone_country || 'NG';
+      
+      if (userCountry === 'NG') {
+        paymentMethod = 'paystack';
+        finalCurrency = 'NGN';
+      } else if (userCountry === 'US') {
+        paymentMethod = 'stripe';
+        finalCurrency = 'USD';
+      } else {
+        // Default to Stripe for other countries
+        paymentMethod = 'stripe';
+        finalCurrency = 'USD';
+      }
+    }
+
+    console.log('Payment routing:', {
+      bookingId,
+      amount,
+      currency: finalCurrency,
+      paymentMethod,
+      userCountry: customerProfile?.country,
+    });
+
+    // Step 4: Route to appropriate payment gateway
+    if (paymentMethod === 'paystack') {
+      return await createPaystackPayment(
+        supabase,
+        bookingId,
+        amount,
+        finalCurrency,
+        booking,
+        customerId,
+        braiderId
+      );
+    } else {
+      return await createStripePayment(
+        supabase,
+        bookingId,
+        amount,
+        finalCurrency,
+        booking,
+        customerId,
+        braiderId
+      );
+    }
+  } catch (error) {
     console.error('Payment creation error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to create payment' },
+      { error: error instanceof Error ? error.message : 'Failed to create payment' },
       { status: 500 }
     );
   }
 }
 
-async function handleStripePayment(
-  db: any,
-  booking_id: string,
+/**
+ * Create Stripe payment intent (USD)
+ */
+async function createStripePayment(
+  supabase: any,
+  bookingId: string,
   amount: number,
   currency: string,
-  customer_id: string,
-  braider_id: string
+  booking: any,
+  customerId?: string,
+  braiderId?: string
 ) {
+  const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+
+  if (!stripeKey) {
+    console.error('STRIPE_SECRET_KEY not configured');
+    return NextResponse.json(
+      {
+        error: 'Stripe payment not configured. Contact support.',
+        code: 'STRIPE_NOT_CONFIGURED',
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
+    console.error('Invalid Stripe key format');
+    return NextResponse.json(
+      {
+        error: 'Invalid Stripe configuration',
+        code: 'INVALID_STRIPE_KEY',
+      },
+      { status: 503 }
+    );
+  }
+
   try {
-    // Create Stripe payment intent
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency: currency.toLowerCase(),
+      amount: Math.round(amount * 100), // convert to cents
+      currency: 'usd',
+      payment_method_types: ['card'],
       metadata: {
-        booking_id,
-        customer_id,
-        braider_id,
+        bookingId,
+        customerId: customerId || booking.customer_id || '',
+        braiderId: braiderId || booking.braider_id || '',
       },
     });
 
-    // Update booking with Stripe payment intent ID
-    await db
+    console.log('Stripe payment intent created:', paymentIntent.id);
+
+    // Update booking with payment method and intent ID
+    await supabase
       .from('bookings')
       .update({
         stripe_payment_intent_id: paymentIntent.id,
+        payment_method: 'stripe',
+        currency: 'USD',
         status: 'pending_payment',
       })
-      .eq('id', booking_id);
+      .eq('id', bookingId);
+
+    return NextResponse.json({
+      success: true,
+      paymentMethod: 'stripe',
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      currency: 'USD',
+    });
+  } catch (error: any) {
+    console.error('Stripe error:', error);
+
+    if (error.type === 'StripeInvalidRequestError') {
+      return NextResponse.json(
+        { error: `Stripe error: ${error.message}`, code: 'STRIPE_ERROR' },
+        { status: 400 }
+      );
+    }
+
+    if (error.type === 'StripeAuthenticationError') {
+      return NextResponse.json(
+        { error: 'Stripe authentication failed', code: 'STRIPE_AUTH_ERROR' },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json(
-      {
-        success: true,
-        payment_method: 'stripe',
-        client_secret: paymentIntent.client_secret,
-        payment_intent_id: paymentIntent.id,
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error('Stripe payment error:', error);
-    return NextResponse.json(
-      { error: `Stripe error: ${error?.message}` },
+      { error: error?.message || 'Stripe payment failed', code: 'STRIPE_PAYMENT_ERROR' },
       { status: 500 }
     );
   }
 }
 
-async function handlePaystackPayment(
-  db: any,
-  booking_id: string,
+/**
+ * Create Paystack payment (NGN)
+ */
+async function createPaystackPayment(
+  supabase: any,
+  bookingId: string,
   amount: number,
-  customer_id: string,
-  braider_id: string
+  currency: string,
+  booking: any,
+  customerId?: string,
+  braiderId?: string
 ) {
+  const paystackKey = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+
+  if (!paystackKey) {
+    console.error('PAYSTACK_SECRET_KEY not configured');
+    return NextResponse.json(
+      {
+        error: 'Paystack payment not configured. Contact support.',
+        code: 'PAYSTACK_NOT_CONFIGURED',
+      },
+      { status: 503 }
+    );
+  }
+
   try {
-    // Get customer email
-    const { data: customer } = await db
+    // Get customer email for Paystack
+    const { data: customerProfile } = await supabase
       .from('profiles')
-      .select('email')
-      .eq('id', customer_id)
+      .select('email, full_name')
+      .eq('id', booking.customer_id)
       .single();
 
-    if (!customer?.email) {
+    if (!customerProfile?.email) {
       return NextResponse.json(
         { error: 'Customer email not found' },
         { status: 400 }
       );
     }
 
+    // Create Paystack payment reference
+    const reference = `${bookingId}-${Date.now()}`;
+
     // Initialize Paystack transaction
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${paystackKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: customer.email,
+        email: customerProfile.email,
         amount: Math.round(amount * 100), // Paystack uses kobo (1/100 of naira)
+        reference,
         metadata: {
-          booking_id,
-          customer_id,
-          braider_id,
+          bookingId,
+          customerId: customerId || booking.customer_id || '',
+          braiderId: braiderId || booking.braider_id || '',
+          customerName: customerProfile.full_name || 'Customer',
         },
       }),
     });
 
-    const data = await response.json();
-
-    if (!data.status) {
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Paystack error:', error);
       return NextResponse.json(
-        { error: data.message || 'Failed to initialize Paystack payment' },
+        { error: `Paystack error: ${error.message}`, code: 'PAYSTACK_ERROR' },
         { status: 400 }
       );
     }
 
-    // Update booking with Paystack reference
-    await db
+    const paystackData = await response.json();
+
+    if (!paystackData.status) {
+      console.error('Paystack initialization failed:', paystackData);
+      return NextResponse.json(
+        { error: 'Failed to initialize Paystack payment', code: 'PAYSTACK_INIT_ERROR' },
+        { status: 500 }
+      );
+    }
+
+    console.log('Paystack payment initialized:', reference);
+
+    // Update booking with payment method and reference
+    await supabase
       .from('bookings')
       .update({
-        paystack_reference: data.data.reference,
+        paystack_reference: reference,
+        payment_method: 'paystack',
+        currency: 'NGN',
         status: 'pending_payment',
       })
-      .eq('id', booking_id);
+      .eq('id', bookingId);
 
-    return NextResponse.json(
-      {
-        success: true,
-        payment_method: 'paystack',
-        authorization_url: data.data.authorization_url,
-        access_code: data.data.access_code,
-        reference: data.data.reference,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true,
+      paymentMethod: 'paystack',
+      authorizationUrl: paystackData.data.authorization_url,
+      accessCode: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+      currency: 'NGN',
+    });
   } catch (error: any) {
     console.error('Paystack payment error:', error);
     return NextResponse.json(
-      { error: `Paystack error: ${error?.message}` },
+      { error: error?.message || 'Paystack payment failed', code: 'PAYSTACK_PAYMENT_ERROR' },
       { status: 500 }
     );
   }
