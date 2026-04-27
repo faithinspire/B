@@ -124,17 +124,17 @@ export default function ResetPasswordPage() {
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-red-700 text-sm">{error}</p>
-              {error.includes('Invalid reset link') && (
+              {error.includes('Invalid') || error.includes('expired') ? (
                 <Link href="/forgot-password" className="text-red-600 hover:text-red-700 font-semibold text-sm mt-2 inline-block">
                   Request a new reset link
                 </Link>
-              )}
+              ) : null}
             </div>
           </div>
         )}
 
         {/* Form */}
-        {!success && !error.includes('Invalid reset link') ? (
+        {!success && !error.includes('Invalid') && !error.includes('expired') ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* New Password Input */}
             <div>

@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Password reset endpoint
- * Validates reset token and updates password
+ * Reset password endpoint
+ * Verifies the reset token and updates the user's password
  */
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     if (!token || !email || !newPassword) {
       return NextResponse.json(
-        { success: false, error: 'Token, email, and new password required' },
+        { success: false, error: 'Token, email, and new password are required' },
         { status: 400 }
       );
     }
@@ -40,44 +40,68 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false }
     });
 
-    // Step 1: Validate reset token
-    const { data: resetToken, error: tokenError } = await supabase
+    console.log('Attempting password reset for email:', email);
+
+    // Verify the reset token
+    const { data: tokenData, error: tokenError } = await supabase
       .from('password_reset_tokens')
-      .select('user_id, expires_at, used_at')
+      .select('*')
       .eq('token', token)
       .eq('email', email)
       .single();
 
-    if (tokenError || !resetToken) {
-      console.error('Invalid reset token:', { token, email });
+    if (tokenError || !tokenData) {
+      console.error('Token verification error:', tokenError);
       return NextResponse.json(
-        { success: false, error: 'Invalid or expired reset token' },
-        { status: 401 }
+        { success: false, error: 'Invalid or expired reset link' },
+        { status: 400 }
       );
     }
 
-    // Step 2: Check if token is expired
-    const expiresAt = new Date(resetToken.expires_at);
-    if (expiresAt < new Date()) {
+    // Check if token has expired
+    const expiryTime = new Date(tokenData.expires_at).getTime();
+    const currentTime = new Date().getTime();
+
+    if (currentTime > expiryTime) {
+      console.log('Reset token expired');
       return NextResponse.json(
-        { success: false, error: 'Reset token has expired' },
-        { status: 401 }
+        { success: false, error: 'Reset link has expired. Please request a new one.' },
+        { status: 400 }
       );
     }
 
-    // Step 3: Check if token was already used
-    if (resetToken.used_at) {
+    // Check if token has already been used
+    if (tokenData.used_at) {
+      console.log('Reset token already used');
       return NextResponse.json(
-        { success: false, error: 'Reset token has already been used' },
-        { status: 401 }
+        { success: false, error: 'This reset link has already been used' },
+        { status: 400 }
       );
     }
 
-    const userId = resetToken.user_id;
+    // Get the user
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
 
-    // Step 4: Update user password
+    if (listError) {
+      console.error('Error listing users:', listError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to verify user' },
+        { status: 400 }
+      );
+    }
+
+    const user = users?.find(u => u.email === email);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 400 }
+      );
+    }
+
+    // Update user password
     const { error: updateError } = await supabase.auth.admin.updateUserById(
-      userId,
+      user.id,
       { password: newPassword }
     );
 
@@ -85,24 +109,26 @@ export async function POST(request: NextRequest) {
       console.error('Password update error:', updateError);
       return NextResponse.json(
         { success: false, error: 'Failed to update password' },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
-    // Step 5: Mark token as used
+    // Mark token as used
     const { error: markUsedError } = await supabase
       .from('password_reset_tokens')
       .update({ used_at: new Date().toISOString() })
-      .eq('token', token);
+      .eq('id', tokenData.id);
 
     if (markUsedError) {
       console.error('Error marking token as used:', markUsedError);
-      // Don't fail - password was already updated
+      // Continue anyway - password was updated
     }
+
+    console.log('Password reset successful for:', email);
 
     return NextResponse.json({
       success: true,
-      message: 'Password has been reset successfully. You can now log in with your new password.',
+      message: 'Password has been reset successfully',
     });
   } catch (error) {
     console.error('Reset password error:', error);
