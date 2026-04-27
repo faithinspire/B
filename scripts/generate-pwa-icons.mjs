@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+
+/**
+ * Generate PWA icons from SVG favicon
+ * Creates 192x192 and 512x512 PNG icons for PWA manifest
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(__dirname, '../public');
+
+// SVG content (BraidMe logo)
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="50%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Braided B shape -->
+  <path d="M20 10 L20 90 L55 90 Q80 90 80 70 Q80 55 62 52 Q78 48 78 32 Q78 10 55 10 Z" fill="url(#g1)" opacity="0.15"/>
+  <!-- Braid strands forming B -->
+  <path d="M25 15 C25 15 35 20 40 28 C45 36 38 44 45 50 C52 56 58 52 62 58 C66 64 62 72 55 75 L25 75 Z" fill="url(#g1)" opacity="0.9"/>
+  <path d="M25 15 L25 75" stroke="url(#g1)" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <!-- Upper bump of B -->
+  <path d="M25 15 Q60 15 60 32 Q60 50 25 50" stroke="url(#g1)" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Lower bump of B -->
+  <path d="M25 50 Q65 50 65 68 Q65 85 25 85" stroke="url(#g1)" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Braid diagonal cuts on upper bump -->
+  <path d="M32 18 L28 30" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M42 17 L36 32" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M52 20 L46 35" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <!-- Braid diagonal cuts on lower bump -->
+  <path d="M34 53 L30 65" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M45 52 L40 67" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M56 55 L50 70" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+</svg>`;
+
+// Create SVG files for conversion
+const svg192Path = path.join(publicDir, 'icon-192.svg');
+const svg512Path = path.join(publicDir, 'icon-512.svg');
+
+fs.writeFileSync(svg192Path, svgContent);
+fs.writeFileSync(svg512Path, svgContent);
+
+console.log('✅ SVG icons created:');
+console.log(`   - ${svg192Path}`);
+console.log(`   - ${svg512Path}`);
+console.log('\n📝 Note: These SVG files can be converted to PNG using:');
+console.log('   - Online tools: https://convertio.co/svg-png/');
+console.log('   - Or use: npx svg2png icon-192.svg icon-512.svg');
+console.log('\n💡 For now, using favicon.svg as fallback in manifest.json');
