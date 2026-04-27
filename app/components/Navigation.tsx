@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
-import { Menu, X, LogOut, User, Settings, LayoutDashboard, MessageSquare, Wallet, Heart, Zap, BarChart3, Users, DollarSign, MessageCircle, ShoppingBag, Radio } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users } from 'lucide-react';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -41,19 +41,19 @@ export function Navigation() {
 
     if (user.role === 'customer') {
       return [
+        { href: '/', icon: LayoutDashboard, label: 'Home' },
         { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/booking', icon: Zap, label: 'Book' },
         { href: '/marketplace', icon: ShoppingBag, label: 'Shop' },
         { href: '/messages', icon: MessageSquare, label: 'Messages' },
-        { href: '/profile', icon: User, label: 'Profile' },
       ];
     }
 
     if (user.role === 'braider') {
       return [
+        { href: '/', icon: LayoutDashboard, label: 'Home' },
         { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/braider/bookings', icon: Zap, label: 'Bookings' },
-        { href: '/braider/status', icon: Radio, label: 'Status' },
         { href: '/braider/messages', icon: MessageSquare, label: 'Messages' },
         { href: '/braider/marketplace', icon: ShoppingBag, label: 'Store' },
       ];
@@ -61,11 +61,11 @@ export function Navigation() {
 
     if (user.role === 'admin') {
       return [
+        { href: '/', icon: LayoutDashboard, label: 'Home' },
         { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
         { href: '/admin/users', icon: Users, label: 'Users' },
         { href: '/admin/payments', icon: DollarSign, label: 'Payments' },
         { href: '/admin/conversations', icon: MessageCircle, label: 'Chats' },
-        { href: '/admin/disputes', icon: BarChart3, label: 'Disputes' },
       ];
     }
 

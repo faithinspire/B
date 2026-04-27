@@ -93,11 +93,13 @@ export default function BraiderProfilePage() {
           'Expires': '0',
         },
       });
+      
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error || 'Professional not found');
+        console.error('Profile fetch failed:', res.status);
+        setError('Professional not found');
         return;
       }
+      
       const data = await res.json();
       if (!data || (!data.id && !data.user_id)) {
         setError('Profile not found');
@@ -168,9 +170,15 @@ export default function BraiderProfilePage() {
         <div className="text-center max-w-md bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-white text-lg font-semibold mb-2">{error || 'Profile not found'}</p>
-          <a href="/search" className="inline-block mt-4 px-6 py-3 bg-white text-purple-700 rounded-xl font-bold hover:shadow-xl transition-all">
-            Back to Search
-          </a>
+          <p className="text-white/60 text-sm mb-6">The professional you're looking for doesn't exist or has been removed.</p>
+          <div className="flex gap-3">
+            <a href="/search" className="flex-1 px-6 py-3 bg-white text-purple-700 rounded-xl font-bold hover:shadow-xl transition-all">
+              Search Professionals
+            </a>
+            <a href="/" className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all">
+              Go Home
+            </a>
+          </div>
         </div>
       </div>
     );

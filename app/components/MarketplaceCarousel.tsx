@@ -14,6 +14,7 @@ interface Product {
   rating_count: number;
   braider_id: string;
   country_code: string;
+  category?: string;
 }
 
 interface MarketplaceCarouselProps {
@@ -100,21 +101,35 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Fetch from both countries to show all products
-        const [ngRes, usRes] = await Promise.allSettled([
-          fetch(`/api/marketplace/products?limit=6&country_code=NG${category ? `&category=${encodeURIComponent(category)}` : ''}`),
-          fetch(`/api/marketplace/products?limit=6&country_code=US${category ? `&category=${encodeURIComponent(category)}` : ''}`),
-        ]);
+        // Fetch all products without country filter to get everything
+        const timestamp = Date.now();
+        const res = await fetch(`/api/marketplace/products?limit=12&page=1&t=${timestamp}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        });
 
-        const ngProducts = ngRes.status === 'fulfilled' && ngRes.value.ok
-          ? (await ngRes.value.json()).data || []
-          : [];
-        const usProducts = usRes.status === 'fulfilled' && usRes.value.ok
-          ? (await usRes.value.json()).data || []
-          : [];
+        if (!res.ok) {
+          console.error('Failed to fetch products:', res.status);
+          setProducts([]);
+          setLoading(false);
+          return;
+        }
 
-        const combined = [...ngProducts, ...usProducts];
-        setProducts(combined);
+        const json = await res.json();
+        const products = json.data || [];
+        
+        // Filter by category if provided
+        let filtered = products;
+        if (category) {
+          filtered = products.filter((p: Product) => 
+            p.category?.toLowerCase() === category.toLowerCase()
+          );
+        }
+
+        setProducts(filtered);
       } catch (err) {
         console.error('Error fetching products:', err);
         setProducts([]);
