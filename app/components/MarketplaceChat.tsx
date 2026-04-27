@@ -52,14 +52,19 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUser
     try {
       setLoading(true);
 
+      // Determine who is customer and who is braider based on context
+      // The current user could be either buyer or seller
+      const customerId = user.id;
+      const braiderId = otherUserId;
+
       // Create or get conversation
       const res = await fetch('/api/chat/create-conversation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer_id: user.id,
-          braider_id: otherUserId,
-          initial_message: `Hi! I have a question about order #${orderId}.`,
+          customer_id: customerId,
+          braider_id: braiderId,
+          initial_message: undefined, // Don't auto-send initial message
         }),
       });
 
@@ -68,6 +73,21 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUser
       if (data.success && data.conversation) {
         setConversationId(data.conversation.id);
         await fetchMessages(data.conversation.id);
+      } else {
+        // API failed — still allow typing by creating a local conversation ID placeholder
+        console.error('Failed to init conversation:', data.error);
+        // Try the conversations API as fallback
+        const fallbackRes = await fetch(`/api/conversations?user_id=${user.id}&role=customer`);
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const existing = Array.isArray(fallbackData) 
+            ? fallbackData.find((c: any) => c.braider_id === otherUserId || c.customer_id === otherUserId)
+            : null;
+          if (existing) {
+            setConversationId(existing.id);
+            await fetchMessages(existing.id);
+          }
+        }
       }
     } catch (error) {
       console.error('Error initializing conversation:', error);
@@ -99,19 +119,95 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUser
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !conversationId || !user || sending) return;
+    if (!newMessage.trim() || !user || sending) return;
 
     setSending(true);
     const content = newMessage.trim();
     setNewMessage('');
 
     try {
+      // If we have a conversation ID, use the messages API
+      if (conversationId) {
+        const res = await fetch('/api/messages/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            sender_role: 'customer',
+            content,
+            message_type: 'text',
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const newMsg = data.message || data;
+          if (newMsg?.id) {
+            setMessages(prev => [...prev, newMsg]);
+          } else {
+            // Optimistic update
+            setMessages(prev => [...prev, {
+              id: `temp-${Date.now()}`,
+              conversation_id: conversationId,
+              sender_id: user.id,
+              content,
+              created_at: new Date().toISOString(),
+              read: false,
+            }]);
+          }
+        } else {
+          // Fallback: direct Supabase insert
+          await sendViaSupabase(content);
+        }
+      } else {
+        // No conversation yet — create one first then send
+        const createRes = await fetch('/api/chat/create-conversation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: user.id,
+            braider_id: otherUserId,
+          }),
+        });
+        const createData = await createRes.json();
+        if (createData.success && createData.conversation) {
+          const newConvId = createData.conversation.id;
+          setConversationId(newConvId);
+          
+          const res = await fetch('/api/messages/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversation_id: newConvId,
+              sender_id: user.id,
+              sender_role: 'customer',
+              content,
+              message_type: 'text',
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const newMsg = data.message || data;
+            if (newMsg?.id) setMessages(prev => [...prev, newMsg]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setNewMessage(content); // Restore message on error
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendViaSupabase = async (content: string) => {
+    if (!conversationId || !user) return;
+    try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       if (!supabaseUrl || !anonKey) return;
-
       const client = createClient(supabaseUrl, anonKey);
-
       const { data, error } = await client
         .from('messages')
         .insert({
@@ -123,20 +219,11 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUser
         })
         .select()
         .single();
-
       if (!error && data) {
         setMessages(prev => [...prev, data]);
-
-        // Update conversation updated_at
-        await client
-          .from('conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId);
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setSending(false);
+    } catch (err) {
+      console.error('Supabase send error:', err);
     }
   };
 
@@ -221,11 +308,11 @@ export function MarketplaceChat({ orderId, otherUserId, otherUserName, otherUser
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
-            disabled={sending || loading}
+            disabled={sending}
           />
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim() || sending || loading}
+            disabled={!newMessage.trim() || sending}
             className="p-2.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
             {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

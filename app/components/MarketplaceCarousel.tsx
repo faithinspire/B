@@ -143,12 +143,9 @@ export default function MarketplaceCarousel({ title, subtitle, category }: Marke
 
         const fetchedProducts = json.data || [];
         
-        if (fetchedProducts.length === 0) {
-          console.log('No products found, using demo products');
-          setProducts(DEMO_PRODUCTS);
-        } else {
-          setProducts(fetchedProducts);
-        }
+        // Use real products if available, otherwise show demo products
+        // Demo products are clearly labeled so users know they're placeholders
+        setProducts(fetchedProducts.length > 0 ? fetchedProducts : DEMO_PRODUCTS);
       } catch (err) {
         console.error('Error fetching products:', err);
         setProducts(DEMO_PRODUCTS);

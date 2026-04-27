@@ -193,14 +193,22 @@ export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useSupabaseAuthStore();
+  const { user, loading: authLoading } = useSupabaseAuthStore();
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [paymentComplete, setPaymentComplete] = useState(false);
 
+  // Auth guard — redirect to login with return URL if not logged in
   useEffect(() => {
-    if (params?.id) fetchBooking();
-  }, [params?.id]);
+    if (authLoading) return;
+    if (!user && params?.id) {
+      router.push(`/login?redirect=/booking/${params.id}`);
+    }
+  }, [user, authLoading, params?.id, router]);
+
+  useEffect(() => {
+    if (params?.id && user) fetchBooking();
+  }, [params?.id, user]);
 
   // Handle Paystack callback: ?payment=success&ref=xxx
   useEffect(() => {
@@ -231,6 +239,13 @@ export default function BookingDetailPage() {
   };
 
   if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader className="w-12 h-12 text-purple-600 animate-spin" />
+    </div>
+  );
+
+  // Show loading while auth is resolving
+  if (authLoading || !user) return (
     <div className="min-h-screen flex items-center justify-center">
       <Loader className="w-12 h-12 text-purple-600 animate-spin" />
     </div>

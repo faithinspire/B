@@ -129,16 +129,26 @@ export function MultiCountryLoginForm({ onSuccess }: MultiCountryLoginFormProps)
         if (onSuccess) {
           onSuccess();
         } else {
-          // Redirect based on user role
-          if (updatedUser?.role === 'braider') {
-            console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
-            router.push('/braider/dashboard');
-          } else if (updatedUser?.role === 'admin') {
-            console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
-            router.push('/admin');
+          // Check for redirect param in URL (e.g., after payment redirect)
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirectTo = urlParams.get('redirect');
+          
+          if (redirectTo) {
+            // Always honor the redirect param — user was trying to go somewhere specific
+            console.log('=== LOGIN FORM: Redirecting to saved URL ===', redirectTo);
+            router.push(redirectTo);
           } else {
-            console.log('=== LOGIN FORM: Redirecting customer to /dashboard ===');
-            router.push('/dashboard');
+            // Redirect based on user role
+            if (updatedUser?.role === 'braider') {
+              console.log('=== LOGIN FORM: Redirecting braider to /braider/dashboard ===');
+              router.push('/braider/dashboard');
+            } else if (updatedUser?.role === 'admin') {
+              console.log('=== LOGIN FORM: Redirecting admin to /admin ===');
+              router.push('/admin');
+            } else {
+              console.log('=== LOGIN FORM: Redirecting customer to /dashboard ===');
+              router.push('/dashboard');
+            }
           }
         }
       } catch (signInError) {
