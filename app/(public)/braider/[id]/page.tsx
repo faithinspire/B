@@ -78,16 +78,20 @@ export default function BraiderProfilePage() {
     if (params?.id) {
       fetchProfile(params.id as string);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.id]);
 
   const fetchProfile = async (id: string) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/braiders/' + id, {
+      const timestamp = Date.now();
+      const res = await fetch(`/api/braiders/${id}?t=${timestamp}`, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        headers: { 
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -99,6 +103,13 @@ export default function BraiderProfilePage() {
         setError('Profile not found');
         return;
       }
+      
+      // Ensure profession_type is properly set
+      let professionType = data.profession_type || 'braider';
+      if (data.specialization?.startsWith('barber:')) {
+        professionType = 'barber';
+      }
+      
       setPro({
         id: data.id || data.user_id,
         user_id: data.user_id || data.id,
@@ -113,7 +124,7 @@ export default function BraiderProfilePage() {
         avatar_url: data.avatar_url || null,
         specialties: data.specialties || [],
         specialization: data.specialization || null,
-        profession_type: data.profession_type || 'braider',
+        profession_type: professionType,
         state: data.state || null,
         city: data.city || null,
         country: data.country || null,

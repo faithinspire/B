@@ -114,10 +114,10 @@ export default function CustomerDashboard() {
             <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl">
-              {isBarber ? '💈' : '💇'}
+              {isBarber ? '💈' : '✂️'}
             </div>
           )}
-          {/* Profession badge */}
+          {/* Profession badge - ONLY show barber icon for actual barbers */}
           <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}>
             {isBarber ? '💈 Barber' : '✂️ Braider'}
           </div>
