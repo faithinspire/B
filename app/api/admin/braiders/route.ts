@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       { auth: { persistSession: false } }
     );
 
-    // UNIFIED SOURCE: Query braider_profiles (single source of truth for braiders)
+    // UNIFIED SOURCE: Query braider_profiles with profiles join to exclude deleted users
     const { data: braiders, error } = await supabaseAdmin
       .from('braider_profiles')
       .select(`
@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
         rating_avg,
         rating_count,
         created_at,
-        updated_at
+        updated_at,
+        profiles!inner(is_deleted)
       `)
+      .eq('profiles.is_deleted', false)
       .order('created_at', { ascending: false });
 
     if (error) {

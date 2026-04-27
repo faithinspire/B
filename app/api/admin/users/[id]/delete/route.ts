@@ -95,24 +95,31 @@ async function deleteUserData(userId: string, serviceSupabase: any) {
       // Don't fail if auth user already deleted
     }
 
-    // Step 4: Verify deletion - check if profile still exists
+    // Step 4: Mark profile as soft deleted
+    console.log('=== DELETE USER: Marking profile as deleted ===');
+    const { error: softDeleteError } = await serviceSupabase
+      .from('profiles')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (softDeleteError) {
+      console.error('=== DELETE USER: Soft delete error ===', softDeleteError);
+      throw new Error(`Failed to mark profile as deleted: ${softDeleteError.message}`);
+    }
+
+    // Step 5: Verify deletion - check if profile is marked as deleted
     const { data: verifyDelete } = await serviceSupabase
       .from('profiles')
-      .select('id')
+      .select('id, is_deleted')
       .eq('id', userId)
       .single();
 
-    if (verifyDelete) {
-      console.error(`=== DELETE USER: Profile still exists after deletion ===`);
-      // Try one more time with a direct delete
-      const { error: retryError } = await serviceSupabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-      
-      if (retryError) {
-        throw new Error(`Failed to delete profile: ${retryError.message}`);
-      }
+    if (!verifyDelete || !verifyDelete.is_deleted) {
+      console.error(`=== DELETE USER: Profile not marked as deleted ===`);
+      throw new Error('Failed to mark profile as deleted');
     }
 
     console.log(`=== DELETE USER: Successfully deleted user ${userId} ===`);

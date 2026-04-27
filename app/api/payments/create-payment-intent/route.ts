@@ -58,22 +58,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Get customer profile to determine country
-    const { data: customerProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('country, phone_country')
-      .eq('id', booking.customer_id)
+    // Step 2: Get braider profile to determine country (braider receives payment)
+    const { data: braiderProfile, error: braiderError } = await supabase
+      .from('braider_profiles')
+      .select('user_id, country')
+      .eq('user_id', booking.braider_id)
       .single();
 
-    if (profileError) {
-      console.error('Customer profile not found:', booking.customer_id);
-      return NextResponse.json(
-        { error: 'Customer profile not found' },
-        { status: 404 }
-      );
+    if (braiderError) {
+      console.error('Braider profile not found:', booking.braider_id);
+      // Fallback to customer profile if braider profile not found
+      const { data: customerProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('country, phone_country')
+        .eq('id', booking.customer_id)
+        .single();
+
+      if (profileError) {
+        console.error('Customer profile not found:', booking.customer_id);
+        return NextResponse.json(
+          { error: 'Customer profile not found' },
+          { status: 404 }
+        );
+      }
+      
+      var userCountry = customerProfile?.country || customerProfile?.phone_country || 'NG';
+    } else {
+      var userCountry = braiderProfile?.country || 'NG';
     }
 
-    // Step 3: Determine payment method based on currency or country
+    // Step 3: Determine payment method based on currency or braider's country
     let paymentMethod = 'stripe';
     let finalCurrency = currency || 'USD';
 
@@ -87,10 +101,8 @@ export async function POST(request: NextRequest) {
       paymentMethod = 'stripe';
       finalCurrency = 'USD';
     }
-    // If no currency specified, check user's country
+    // If no currency specified, check braider's country
     else {
-      const userCountry = customerProfile?.country || customerProfile?.phone_country || 'NG';
-      
       if (userCountry === 'NG') {
         paymentMethod = 'paystack';
         finalCurrency = 'NGN';

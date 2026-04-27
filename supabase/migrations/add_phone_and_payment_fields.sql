@@ -74,10 +74,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'NG';
 CREATE INDEX IF NOT EXISTS idx_profiles_country ON profiles(country);
 
 -- ============================================================================
--- VERIFICATION QUERIES
+-- 5. Add soft delete flag to profiles
 -- ============================================================================
--- Run these to verify the migration:
--- SELECT column_name FROM information_schema.columns WHERE table_name = 'profiles';
--- SELECT column_name FROM information_schema.columns WHERE table_name = 'bookings';
--- SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE '%password_reset%';
--- SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE '%phone_login%';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+CREATE INDEX IF NOT EXISTS idx_profiles_is_deleted ON profiles(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_profiles_deleted_at ON profiles(deleted_at);

@@ -23,10 +23,11 @@ export async function GET() {
       auth: { persistSession: false }
     });
 
-    // Get all profiles (source of truth for users)
+    // Get all profiles (source of truth for users) - EXCLUDE DELETED USERS
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, email, full_name, role, phone, avatar_url, created_at')
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
     if (profilesError) {

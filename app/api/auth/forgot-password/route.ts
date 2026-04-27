@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       // Use Supabase's built-in email sending or Resend
       const resendApiKey = process.env.RESEND_API_KEY;
-      const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidmee.com';
+      const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
 
       if (resendApiKey) {
         // Use Resend for email sending
