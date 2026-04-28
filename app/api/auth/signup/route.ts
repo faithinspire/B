@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
       years_experience,
       services,
       bio,
+      country: bodyCountry, // explicit country from signup form
     } = body
 
     if (!email || !password || !full_name || !role) {
@@ -30,6 +31,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Resolve country — use explicit body.country, then phone_country, never default to 'NG'
+    const resolvedCountry: string = bodyCountry || phone_country || 'NG';
 
     // Use service role client for admin operations
     const serviceSupabase = createClient(
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
       full_name,
       role, // EXPLICIT role - MUST be set here, not defaulting to customer
       phone,
+      country: resolvedCountry, // CRITICAL: save actual country, never default
       avatar_url: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -109,7 +114,6 @@ export async function POST(request: NextRequest) {
         next_of_kin_phone,
         next_of_kin_relationship,
         profession_type,
-        country: profileCountry,
       } = body
 
       // Create braider profile - CRITICAL: This MUST succeed for braider to be visible
@@ -130,7 +134,7 @@ export async function POST(request: NextRequest) {
         specialties: specialization ? [specialization] : [],
         total_earnings: 0,
         available_balance: 0,
-        country: profileCountry || 'NG',
+        country: resolvedCountry, // Use resolved country — never hardcode 'NG'
       };
 
       // Store profession_type safely — try to set it but don't fail if column doesn't exist
@@ -156,6 +160,9 @@ export async function POST(request: NextRequest) {
       if (id_type) braiderProfileData.id_type = id_type;
       if (id_number) braiderProfileData.id_number = id_number;
       if (id_document_url) braiderProfileData.id_document_url = id_document_url;
+      // Social media links
+      if (body.instagram_url) braiderProfileData.instagram_url = body.instagram_url;
+      if (body.tiktok_url) braiderProfileData.tiktok_url = body.tiktok_url;
 
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
@@ -193,7 +200,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         status: 'pending',
         full_name,
-        location_country: 'NG',
+        location_country: resolvedCountry, // Use actual country
       };
 
       if (phone) verificationData.phone = phone;

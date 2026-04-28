@@ -275,9 +275,14 @@ export default function BookingDetailPage() {
 
   // Determine payment provider based on braider country
   // Use Paystack for Nigerian bookings, Stripe for USA/international
-  const braiderCountry = booking.braider_country || booking.country || 'NG';
-  const currency = booking.currency || 'NGN';
+  // Priority: booking.braider_country > booking.currency > user.country
+  const braiderCountry = booking.braider_country || booking.country || user?.country || null;
+  const currency = booking.currency || null;
+  // Only show Paystack if we have explicit NG evidence — never assume
   const isNigerianBooking = braiderCountry === 'NG' || currency === 'NGN';
+  const isUSABooking = braiderCountry === 'US' || currency === 'USD';
+  // If we can't determine, fall back to user's own country
+  const showPaystack = isNigerianBooking || (!isUSABooking && user?.country === 'NG');
   const customerEmail = user?.email || booking.customer_email || 'customer@braidmee.com';
 
   return (
@@ -375,7 +380,7 @@ export default function BookingDetailPage() {
 
             {/* Payment method based on country */}
             {isPending && !paymentComplete && (
-              isNigerianBooking ? (
+              showPaystack ? (
                 <PaystackPaymentForm bookingId={booking.id} amount={booking.total_amount || 0} email={customerEmail} />
               ) : (
                 <StripePaymentForm

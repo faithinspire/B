@@ -193,6 +193,8 @@ export default function BookingPage() {
         customer_name: user.full_name || 'Customer',
         braider_id: selectedBraider.user_id,
         braider_name: selectedBraider.full_name,
+        braider_country: (selectedBraider as any).country || 'NG', // CRITICAL: pass braider's country for payment routing
+        currency: (selectedBraider as any).country === 'US' ? 'USD' : 'NGN',
         service_id: selectedService.id,
         service_name: selectedService.name,
         service_price: selectedService.price,

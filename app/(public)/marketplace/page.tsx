@@ -117,10 +117,10 @@ function MarketplaceContent() {
     return user?.role === 'braider' && user?.id === product.braider_id;
   };
 
-  const getCurrencySymbol = (product: Product) => {
-    if (product.country_code === 'NG' || product.currency === 'NGN') return '₦';
+  const getCurrencySymbol = (product: Product): string => {
+    if (product.country_code === 'NG' || product.currency === 'NGN') return '\u20A6';
     if (product.country_code === 'US' || product.currency === 'USD') return '$';
-    return '₦'; // Default to Naira
+    return '\u20A6';
   };
 
   const FilterPanel = () => (
@@ -148,10 +148,10 @@ function MarketplaceContent() {
                 selectedCountry === code ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="text-xl">{config.flag}</span>
+              <span className="text-xl">{(config as any).flag}</span>
               <div>
-                <div className="font-semibold">{config.name}</div>
-                <div className="text-xs text-gray-500">{config.currency}</div>
+                <div className="font-semibold">{(config as any).name}</div>
+                <div className="text-xs text-gray-500">{(config as any).currency}</div>
               </div>
             </button>
           ))}
@@ -259,15 +259,13 @@ function MarketplaceContent() {
 
           {/* Products */}
           <div className="lg:col-span-3">
-            {/* Braider/Barber notice */}
             {user?.role === 'braider' && (
               <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
                 <Crown className="w-5 h-5 text-purple-600" />
-                <p className="text-purple-700 text-sm font-semibold">Braider/Barber: Your products are highlighted with a purple border</p>
+                <p className="text-purple-700 text-sm font-semibold">Your products are highlighted with a purple border</p>
               </div>
             )}
 
-            {/* Error */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -281,7 +279,6 @@ function MarketplaceContent() {
               </div>
             )}
 
-            {/* Loading */}
             {loading && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -290,7 +287,6 @@ function MarketplaceContent() {
               </div>
             )}
 
-            {/* Empty */}
             {!loading && !error && products.length === 0 && (
               <div className="text-center py-16">
                 <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -307,7 +303,6 @@ function MarketplaceContent() {
               </div>
             )}
 
-            {/* Products Grid */}
             {!loading && !error && products.length > 0 && (
               <>
                 <p className="text-sm text-gray-500 mb-4">{products.length} product{products.length !== 1 ? 's' : ''} found</p>
@@ -319,25 +314,20 @@ function MarketplaceContent() {
                         <div className={`bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-full flex flex-col transform hover:-translate-y-1 ${
                           isOwn ? 'ring-2 ring-purple-500 ring-offset-2' : ''
                         }`}>
-                          {/* Image */}
                           <div className="relative h-48 sm:h-56 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
                             {product.image_url ? (
                               <img
                                 src={product.image_url}
                                 alt={product.name}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-5xl">🛍️</div>
                             )}
-                            {/* Country badge */}
                             <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-semibold text-gray-700 shadow">
                               {product.country_code === 'US' ? '🇺🇸' : '🇳🇬'}
                             </div>
-                            {/* Own product badge */}
                             {isOwn && (
                               <div className="absolute top-2 left-2 bg-purple-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
                                 <Crown className="w-3 h-3" />
@@ -346,7 +336,6 @@ function MarketplaceContent() {
                             )}
                           </div>
 
-                          {/* Content */}
                           <div className="p-4 sm:p-5 flex-1 flex flex-col">
                             <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
                               {product.name}
@@ -392,12 +381,8 @@ function MarketplaceContent() {
                                     onClick={async (e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      if (!user) {
-                                        router.push('/login');
-                                        return;
-                                      }
+                                      if (!user) { router.push('/login'); return; }
                                       try {
-                                        // Create or find conversation with seller
                                         const res = await fetch('/api/conversations', {
                                           method: 'POST',
                                           headers: { 'Content-Type': 'application/json' },
@@ -409,10 +394,7 @@ function MarketplaceContent() {
                                         });
                                         if (res.ok) {
                                           const conv = await res.json();
-                                          if (conv.id) {
-                                            router.push(`/messages/conv/${conv.id}`);
-                                            return;
-                                          }
+                                          if (conv.id) { router.push(`/messages/conv/${conv.id}`); return; }
                                         }
                                       } catch (err) {
                                         console.error('Chat error:', err);
@@ -434,7 +416,6 @@ function MarketplaceContent() {
                   })}
                 </div>
 
-                {/* Pagination */}
                 <div className="flex justify-center gap-2">
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}

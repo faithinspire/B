@@ -42,6 +42,8 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
   const [yearsExperience, setYearsExperience] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bio, setBio] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [tiktokHandle, setTiktokHandle] = useState('');
   
   // Identification
   const [idType, setIdType] = useState('');
@@ -227,12 +229,15 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
           email,
           phone: normalizedPhone,
           phone_country: country,
+          country, // CRITICAL: explicit country — never let backend default to 'NG'
           password,
           role: 'braider',
           specialization,
           years_experience: parseInt(yearsExperience),
           services: selectedServices,
           bio,
+          instagram_url: instagramHandle ? (instagramHandle.startsWith('http') ? instagramHandle : `https://instagram.com/${instagramHandle.replace('@', '')}`) : null,
+          tiktok_url: tiktokHandle ? (tiktokHandle.startsWith('http') ? tiktokHandle : `https://tiktok.com/@${tiktokHandle.replace('@', '')}`) : null,
           state,
           city,
           address,
@@ -589,6 +594,36 @@ export function BraiderSignupForm({ onSuccess }: BraiderSignupFormProps) {
                 rows={4}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600"
               />
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Social Media (Optional)</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Instagram Handle</label>
+                <div className="flex items-center border-2 border-gray-300 rounded-lg focus-within:border-primary-600 overflow-hidden">
+                  <span className="px-3 py-3 bg-gray-50 text-gray-500 text-sm border-r border-gray-300">@</span>
+                  <input
+                    type="text"
+                    value={instagramHandle}
+                    onChange={(e) => setInstagramHandle(e.target.value)}
+                    placeholder="yourhandle"
+                    className="flex-1 px-3 py-3 focus:outline-none text-sm"
+                  />
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">TikTok Handle</label>
+                <div className="flex items-center border-2 border-gray-300 rounded-lg focus-within:border-primary-600 overflow-hidden">
+                  <span className="px-3 py-3 bg-gray-50 text-gray-500 text-sm border-r border-gray-300">@</span>
+                  <input
+                    type="text"
+                    value={tiktokHandle}
+                    onChange={(e) => setTiktokHandle(e.target.value)}
+                    placeholder="yourhandle"
+                    className="flex-1 px-3 py-3 focus:outline-none text-sm"
+                  />
+                </div>
+              </div>
             </div>
           </>
         )}

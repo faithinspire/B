@@ -7,6 +7,7 @@ interface User {
   role: 'customer' | 'braider' | 'admin';
   full_name: string;
   avatar_url?: string;
+  country?: string; // 'NG' | 'US' — used for payment routing
 }
 
 interface AuthStore {
@@ -38,7 +39,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, email, full_name, role, avatar_url')
+        .select('id, email, full_name, role, avatar_url, country')
         .eq('id', session.user.id)
         .single();
 
@@ -51,6 +52,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           role: (profile.role || 'customer') as 'customer' | 'braider' | 'admin',
           full_name: profile.full_name || '',
           avatar_url: profile.avatar_url || undefined,
+          country: profile.country || undefined,
         },
         accessToken: session.access_token,
       });
@@ -127,6 +129,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           role: data.user.role,
           full_name: data.user.full_name,
           avatar_url: data.user.avatar_url,
+          country: data.user.country || undefined,
         },
         accessToken: authData.session?.access_token || data.session?.access_token || null,
       });
@@ -161,7 +164,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, email, full_name, role, avatar_url')
+        .select('id, email, full_name, role, avatar_url, country')
         .eq('id', session.user.id)
         .single();
 
@@ -174,6 +177,7 @@ export const useSupabaseAuthStore = create<AuthStore>((set) => ({
           role: (profile.role || 'customer') as 'customer' | 'braider' | 'admin',
           full_name: profile.full_name || '',
           avatar_url: profile.avatar_url || undefined,
+          country: profile.country || undefined,
         },
         accessToken: session.access_token,
       });

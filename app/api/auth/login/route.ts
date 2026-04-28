@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
 
     const userId = authData.user.id;
 
-    // CRITICAL: Fetch profile to get CORRECT role
+    // CRITICAL: Fetch profile to get CORRECT role and country
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, role, avatar_url')
+      .select('id, email, full_name, role, avatar_url, country')
       .eq('id', userId)
       .single();
 
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         full_name: profile.full_name,
         role: correctRole,
         avatar_url: profile.avatar_url,
+        country: profile.country || null,
       },
       session: authData.session,
     });
