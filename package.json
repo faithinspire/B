@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "migrate": "node scripts/run-migrations.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

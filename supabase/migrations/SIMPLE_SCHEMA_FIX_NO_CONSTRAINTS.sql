@@ -1,25 +1,20 @@
 -- ============================================================================
--- COMPREHENSIVE SCHEMA AND RLS FIX
+-- SIMPLE SCHEMA FIX - NO CONSTRAINTS
 -- ============================================================================
--- This migration fixes all schema issues and RLS problems in one go:
--- 1. Removes the problematic braider profile trigger that causes race condition
--- 2. Ensures all required columns exist in all tables
--- 3. Disables RLS on all tables to allow app to function
--- 4. Grants proper permissions to authenticated users
+-- This migration:
+-- 1. Removes the problematic trigger
+-- 2. Adds missing columns WITHOUT constraints
+-- 3. Disables RLS on all tables
 -- ============================================================================
 
 -- ============================================================================
--- STEP 1: REMOVE PROBLEMATIC TRIGGER THAT CAUSES RACE CONDITION
+-- STEP 1: REMOVE PROBLEMATIC TRIGGER
 -- ============================================================================
--- The trigger check_braider_profile_trigger fires BEFORE braider_profiles is created
--- during signup, causing "Braider profile must exist for role=braider" error.
--- We remove it and rely on application-level validation instead.
-
 DROP TRIGGER IF EXISTS check_braider_profile_trigger ON profiles;
 DROP FUNCTION IF EXISTS check_braider_profile_exists();
 
 -- ============================================================================
--- STEP 2: ENSURE ALL REQUIRED COLUMNS EXIST IN profiles TABLE
+-- STEP 2: ADD MISSING COLUMNS TO profiles TABLE
 -- ============================================================================
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS country TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
@@ -30,9 +25,10 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZON
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- ============================================================================
--- STEP 3: ENSURE ALL REQUIRED COLUMNS EXIST IN braider_profiles TABLE
+-- STEP 3: ADD MISSING COLUMNS TO braider_profiles TABLE
 -- ============================================================================
-ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE;
+-- Add columns one by one without constraints to avoid conflicts
+ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS user_id UUID;
 ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
@@ -68,7 +64,7 @@ ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH 
 ALTER TABLE braider_profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- ============================================================================
--- STEP 4: ENSURE ALL REQUIRED COLUMNS EXIST IN bookings TABLE
+-- STEP 4: ADD MISSING COLUMNS TO bookings TABLE
 -- ============================================================================
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS braider_country TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_country TEXT;
@@ -81,7 +77,7 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS paystack_reference TEXT;
 
 -- ============================================================================
--- STEP 5: ENSURE ALL REQUIRED COLUMNS EXIST IN payment_transactions TABLE
+-- STEP 5: CREATE payment_transactions TABLE IF NOT EXISTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS payment_transactions (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -99,12 +95,12 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 );
 
 -- ============================================================================
--- STEP 6: ENSURE ALL REQUIRED COLUMNS EXIST IN marketplace_products TABLE
+-- STEP 6: ADD MISSING COLUMNS TO marketplace_products TABLE
 -- ============================================================================
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 
 -- ============================================================================
--- STEP 7: ENSURE ALL REQUIRED COLUMNS EXIST IN conversations TABLE
+-- STEP 7: ADD MISSING COLUMNS TO conversations TABLE
 -- ============================================================================
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS customer_id UUID;
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS braider_id UUID;
@@ -112,7 +108,7 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS admin_id UUID;
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS booking_id TEXT;
 
 -- ============================================================================
--- STEP 8: ENSURE ALL REQUIRED COLUMNS EXIST IN messages TABLE
+-- STEP 8: ADD MISSING COLUMNS TO messages TABLE
 -- ============================================================================
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS conversation_id TEXT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id UUID;
@@ -120,11 +116,11 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS content TEXT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- ============================================================================
--- STEP 9: ENSURE ALL REQUIRED COLUMNS EXIST IN braider_verification TABLE
+-- STEP 9: CREATE braider_verification TABLE IF NOT EXISTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS braider_verification (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID,
   status TEXT DEFAULT 'pending',
   full_name TEXT,
   phone TEXT,
@@ -145,11 +141,11 @@ CREATE TABLE IF NOT EXISTS braider_verification (
 );
 
 -- ============================================================================
--- STEP 10: ENSURE ALL REQUIRED COLUMNS EXIST IN phone_login_mappings TABLE
+-- STEP 10: CREATE phone_login_mappings TABLE IF NOT EXISTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS phone_login_mappings (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID,
   phone TEXT NOT NULL,
   phone_country TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -219,7 +215,7 @@ CREATE INDEX IF NOT EXISTS idx_braider_verification_status ON braider_verificati
 -- MIGRATION COMPLETE
 -- ============================================================================
 -- ✅ Removed problematic trigger causing race condition
--- ✅ Added all missing columns to all tables
+-- ✅ Added all missing columns to all tables (without constraints)
 -- ✅ Disabled RLS on all tables
 -- ✅ Granted permissions to authenticated users
 -- ✅ Created necessary indexes for performance

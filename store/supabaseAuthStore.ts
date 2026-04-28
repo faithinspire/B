@@ -24,6 +24,7 @@ interface AuthState {
   logout: () => void;
   recoverSession: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
 }
 
 const STORAGE_KEY = 'braidmee_auth_session';
@@ -194,6 +195,51 @@ export const useSupabaseAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Session refresh error:', error);
       get().logout();
+    }
+  },
+
+  /**
+   * Sign in with email and password
+   * Fetches user profile and stores in state
+   */
+  signIn: async (email: string, password: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      // Call the login API endpoint
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      if (data.session && data.user) {
+        const user: User = {
+          id: data.user.id,
+          email: data.user.email,
+          full_name: data.user.full_name,
+          role: data.user.role || 'customer',
+          avatar_url: data.user.avatar_url,
+          country: data.user.country,
+        };
+
+        set({ user, session: data.session, loading: false, error: null });
+        get().setSession(data.session);
+        get().setUser(user);
+        console.log('✅ User signed in successfully');
+      } else {
+        throw new Error('Invalid login response');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Login failed';
+      set({ loading: false, error: errorMsg });
+      throw error;
     }
   },
 }));
