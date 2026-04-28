@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
+  const searchParams = useSearchParams();
+  const callbackError = searchParams?.get('error');
+
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(
+    callbackError === 'link_expired'
+      ? 'Your reset link has expired. Enter your email to get a new one.'
+      : ''
+  );
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -15,15 +23,8 @@ export default function ForgotPasswordPage() {
     setError('');
     setSuccess(false);
 
-    if (!email.trim()) {
-      setError('Email is required');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (!email.includes('@')) { setError('Please enter a valid email address'); return; }
 
     setLoading(true);
 
@@ -53,26 +54,26 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
       <div className="max-w-md mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Reset Password</h1>
           <p className="text-gray-600">Enter your email to receive a password reset link</p>
         </div>
 
-        {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-green-900 font-semibold">Check your email</p>
               <p className="text-green-700 text-sm mt-1">
-                We've sent a password reset link to your email. The link will expire in 24 hours.
+                We've sent a password reset link to your email. Click the link in the email to set a new password.
+              </p>
+              <p className="text-green-600 text-xs mt-2">
+                Don't see it? Check your spam/junk folder.
               </p>
             </div>
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -80,10 +81,8 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        {/* Form */}
-        {!success ? (
+        {!success && (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address *
@@ -93,15 +92,15 @@ export default function ForgotPasswordPage() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
                   placeholder="john@example.com"
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
                   disabled={loading}
+                  autoFocus
                 />
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -111,16 +110,14 @@ export default function ForgotPasswordPage() {
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
 
-            {/* Info Box */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900">
-                <strong>Tip:</strong> Check your spam folder if you don't see the email within a few minutes.
+                <strong>How it works:</strong> You'll receive an email with a secure link. Click it to set a new password. The link expires after 1 hour.
               </p>
             </div>
           </form>
-        ) : null}
+        )}
 
-        {/* Back to Login Link */}
         <div className="mt-6 text-center">
           <p className="text-gray-600 text-sm">
             Remember your password?{' '}
@@ -131,5 +128,17 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    }>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }
