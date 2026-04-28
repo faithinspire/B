@@ -67,13 +67,6 @@ export async function GET(request: Request) {
     } else {
       // No conversations found - return empty array, not error
       conversations = [];
-        .select('*')
-        .or(`participant1_id.eq.${userId},participant2_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
-
-      if (!oldError && oldData) {
-        conversations = oldData.map(normalize);
-      }
     }
 
     // Add unread counts
