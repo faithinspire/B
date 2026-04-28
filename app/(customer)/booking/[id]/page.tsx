@@ -273,8 +273,11 @@ export default function BookingDetailPage() {
   const isPending = booking.status === 'pending' || booking.status === 'pending_payment';
   const isConfirmed = booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'escrowed';
 
+  // Determine payment provider based on braider country
   // Use Paystack for Nigerian bookings, Stripe for USA/international
-  const isNigerianBooking = booking.braider_country === 'NG' || booking.currency === 'NGN' || booking.country === 'NG';
+  const braiderCountry = booking.braider_country || booking.country || 'NG';
+  const currency = booking.currency || 'NGN';
+  const isNigerianBooking = braiderCountry === 'NG' || currency === 'NGN';
   const customerEmail = user?.email || booking.customer_email || 'customer@braidmee.com';
 
   return (

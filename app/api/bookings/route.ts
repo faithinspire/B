@@ -103,6 +103,7 @@ export async function POST(request: Request) {
       customer_name: body.customer_name,
       braider_id: body.braider_id,
       braider_name: body.braider_name,
+      braider_country: body.braider_country || 'NG', // Default to Nigeria
       service_id: body.service_id,
       service_name: body.service_name,
       service_price: parseFloat(body.service_price),
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
       total_amount: parseFloat(body.total_amount),
       platform_fee: parseFloat(body.platform_fee),
       braider_payout: parseFloat(body.braider_payout),
+      currency: body.currency || 'NGN', // Default to Nigerian Naira
       escrow_released: body.escrow_released || false,
       stripe_payment_intent_id: body.stripe_payment_intent_id || null,
       stripe_charge_id: body.stripe_charge_id || null,

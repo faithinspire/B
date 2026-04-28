@@ -1,20 +1,18 @@
 -- Create password_reset_tokens table for storing password reset tokens
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
-  token TEXT NOT NULL UNIQUE,
+  token_hash TEXT NOT NULL,
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  used_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create index on token for fast lookups
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+-- Create index on token_hash for fast lookups
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 
--- Create index on user_id for cleanup queries
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+-- Create index on email for lookups
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_email ON password_reset_tokens(email);
 
 -- Create index on expires_at for cleanup of expired tokens
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);

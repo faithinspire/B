@@ -1,95 +1,141 @@
-# Critical Fixes - Current Session
+# 🚨 CRITICAL FIXES - SESSION CURRENT
 
-## Status Summary
-- ✅ Environment variables updated with Paystack keys
-- 🔄 Marketplace products - needs database verification
-- 🔄 Chat input padding - already fixed (pb-40, sticky bottom-0 z-50)
-- 🔄 Barber icons on braiders - code correct, database issue
-- 🔄 Payment API keys - Stripe configured, Paystack needs endpoint
-- 🔄 Chat modal opening - code looks correct, needs testing
+## 4 PRODUCTION ISSUES + PASSWORD RESET FIX
 
-## Issues & Fixes
+### Issues to Fix:
+1. ✅ **USA Braider Users Showing Paystack Instead of Stripe** - CRITICAL
+2. ✅ **Chat Not Working Between Buyer and Seller** - CRITICAL  
+3. ✅ **Marketplace Showing "Empty" Instead of Products** - CRITICAL
+4. ✅ **Status Not Showing on Braider/Barber Pages** - HIGH
+5. ✅ **Password Reset Email** - Use Supabase (not Resend)
 
-### 1. Environment Variables (FIXED)
-**Status**: ✅ DONE
-- Added Paystack keys to `.env.local`
-- Updated Stripe webhook secret placeholder
-- Keys are now ready for Vercel sync
+---
 
-**Action**: Sync these to Vercel dashboard:
-```
-PAYSTACK_SECRET_KEY=ssk_live_a8724725f7d1891a31b09bd1f3e5cfcee27a8265
-NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_b2499e1bf2df58c4654381fbf998e5d739512afe
-STRIPE_WEBHOOK_SECRET=whsec_live_your_actual_webhook_secret
-```
+## ISSUE 1: USA BRAIDER USERS SHOWING PAYSTACK INSTEAD OF STRIPE
 
-### 2. Marketplace Products Not Showing
-**Root Cause**: Database likely empty or RLS policies blocking access
+### Root Cause
+Payment provider selection in `app/(customer)/booking/[id]/page.tsx` checks `booking.braider_country`, `booking.currency`, `booking.country` but these fields aren't properly populated from the database.
 
-**Investigation Needed**:
-1. Check if `marketplace_products` table has data with `is_active = true`
-2. Verify Supabase RLS policies allow service role access
-3. Check if `SUPABASE_SERVICE_ROLE_KEY` is correct
+### Fix
+1. Update booking creation to include braider country
+2. Fix payment provider selection logic
+3. Add fallback to check braider profile country
 
-**Code Status**: ✅ API endpoint is correct
-- Uses service role key for authentication
-- Filters by `is_active = true`
-- Pagination working correctly
+### Files to Fix
+- `app/(customer)/booking/[id]/page.tsx` - Payment provider selection
+- `app/api/bookings/route.ts` - Ensure country is captured
+- `app/api/paystack/initialize/route.ts` - Only for NG
+- `app/api/stripe/create-payment-intent/route.ts` - Only for USA
 
-### 3. Chat Input Covered by Bottom Nav
-**Status**: ✅ ALREADY FIXED
-- `pb-40` applied to outer div
-- `sticky bottom-0 z-50` on form element
-- Height: `calc(100vh - 250px)`
+---
 
-### 4. Barber Icons on Braiders
-**Root Cause**: Database data issue - braiders have `profession_type = 'barber'`
+## ISSUE 2: CHAT NOT WORKING BETWEEN BUYER AND SELLER
 
-**Code Status**: ✅ CORRECT
-- Homepage: `isBarber = braider.profession_type === 'barber'`
-- Dashboard: `isBarber = pro.profession_type === 'barber'`
+### Root Cause
+Database schema mismatch:
+- `conversations` table: customer_id/braider_id vs participant1_id/participant2_id
+- `messages` table: `read` vs `is_read` column inconsistency
+- Fallback logic masks real problems
 
-**Fix Needed**: Update database records
-```sql
-UPDATE braider_profiles 
-SET profession_type = 'braider' 
-WHERE profession_type = 'barber' AND user_id IN (
-  SELECT id FROM profiles WHERE role = 'braider'
-);
-```
+### Fix
+1. Verify conversations table schema
+2. Verify messages table schema
+3. Fix API endpoints to handle schema properly
+4. Add proper error logging
 
-### 5. Payment API Key Issues
-**Status**: 🔄 PARTIAL
-- ✅ Stripe keys configured
-- ✅ Stripe endpoint validates keys
-- ❌ Paystack endpoint missing
-- ❌ Webhook secret needs real value
+### Files to Fix
+- `app/api/conversations/route.ts` - Schema detection
+- `app/api/messages/send/route.ts` - Message insertion
+- `app/api/messages/conversation/[id]/route.ts` - Message fetching
+- `app/(customer)/messages/[booking_id]/page.tsx` - Message display
 
-**Next Steps**:
-1. Create Paystack payment endpoint
-2. Update webhook secret in Vercel
-3. Test payment flow
+---
 
-### 6. Chat Modal Not Opening
-**Code Status**: ✅ LOOKS CORRECT
-- Conversation creation endpoint exists
-- Navigation to `/messages/conv/${conv.id}` implemented
-- Fallback to `/messages?braider_id=...` available
+## ISSUE 3: MARKETPLACE SHOWING "EMPTY" INSTEAD OF PRODUCTS
 
-**Testing Needed**: Click "Chat with Seller" on marketplace product
+### Root Cause
+Products not being fetched or created:
+- API returns empty array on error
+- Frontend doesn't show demo products as fallback
+- marketplace_products table may be empty
 
-## Files Modified
-- `.env.local` - Added Paystack keys
+### Fix
+1. Verify marketplace_products table has data
+2. Check product creation is working
+3. Add demo products fallback
+4. Add better error logging
 
-## Files to Create
-- `app/api/paystack/create-payment-intent/route.ts` - Paystack payment endpoint
+### Files to Fix
+- `app/api/marketplace/products/route.ts` - Product fetching
+- `app/(public)/marketplace/page.tsx` - Empty state handling
+- Database: Verify marketplace_products table
 
-## Next Steps
-1. ✅ Update environment variables (DONE)
-2. 🔄 Sync env vars to Vercel
-3. 🔄 Create Paystack endpoint
-4. 🔄 Verify marketplace database
-5. 🔄 Fix braider profession_type in database
-6. 🔄 Test all features
-7. 🔄 Commit and deploy
+---
 
+## ISSUE 4: STATUS NOT SHOWING ON BRAIDER/BARBER PAGES
+
+### Root Cause
+Status feature not being used:
+- braider_status table may be empty
+- Statuses expire after 24 hours
+- No "Create Status" button on dashboard
+- Homepage filters out braiders without statuses
+
+### Fix
+1. Verify braider_status table exists
+2. Add "Create Status" button to dashboard
+3. Show placeholder when no statuses
+4. Add status creation endpoint
+
+### Files to Fix
+- `app/api/braider/status/route.ts` - Status fetching
+- `app/components/BraiderStatus.tsx` - Status display
+- `app/(braider)/braider/status/page.tsx` - Status creation
+- `app/(public)/page.tsx` - Homepage status section
+
+---
+
+## ISSUE 5: PASSWORD RESET EMAIL - USE SUPABASE
+
+### Current Issue
+Previous implementation used Resend (third-party service)
+
+### Fix
+Use Supabase's native email service:
+1. Update forgot-password endpoint to use Supabase
+2. Use Supabase's resetPasswordForEmail() method
+3. Keep token-based verification system
+4. Remove Resend dependency
+
+### Files to Fix
+- `app/api/auth/forgot-password/route.ts` - Use Supabase email
+- Keep token verification system
+- Remove Resend references
+
+---
+
+## IMPLEMENTATION ORDER
+
+1. **Password Reset** - Switch to Supabase (quick fix)
+2. **Payment Provider** - Fix USA/Paystack issue (critical for revenue)
+3. **Chat System** - Fix messaging (critical for user engagement)
+4. **Marketplace** - Fix empty products (critical for marketplace)
+5. **Status Feature** - Add missing functionality (nice to have)
+
+---
+
+## ESTIMATED TIME
+
+- Password Reset: 10 minutes
+- Payment Provider: 15 minutes
+- Chat System: 20 minutes
+- Marketplace: 15 minutes
+- Status Feature: 15 minutes
+
+**Total: ~75 minutes**
+
+---
+
+## STATUS
+
+Starting implementation now...
