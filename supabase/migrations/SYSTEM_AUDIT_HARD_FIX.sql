@@ -65,25 +65,30 @@ CREATE TABLE IF NOT EXISTS status_views (
   viewed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 9. FIX COUNTRY MISCLASSIFICATION: Update users who signed up with US country
--- This corrects existing data where country was defaulted to 'NG' incorrectly
--- Only update if metadata indicates US
-UPDATE profiles
-SET country = 'US'
-WHERE country IS NULL
-  AND (
-    raw_user_meta_data->>'country' = 'US'
-    OR raw_user_meta_data->>'phone_country' = 'US'
-  );
+-- 9. FIX COUNTRY MISCLASSIFICATION: Sync braider_profiles country from auth.users metadata
+-- auth.users has raw_user_meta_data; profiles table does not
+UPDATE profiles p
+SET country = au.raw_user_meta_data->>'country'
+FROM auth.users au
+WHERE p.id = au.id
+  AND p.country IS NULL
+  AND au.raw_user_meta_data->>'country' IS NOT NULL;
 
--- Also fix braider_profiles country from profiles
+-- Also sync phone_country into profiles.country where country is still null
+UPDATE profiles p
+SET country = au.raw_user_meta_data->>'phone_country'
+FROM auth.users au
+WHERE p.id = au.id
+  AND p.country IS NULL
+  AND au.raw_user_meta_data->>'phone_country' IS NOT NULL;
+
+-- Sync braider_profiles country from profiles (now that profiles has correct country)
 UPDATE braider_profiles bp
 SET country = p.country
 FROM profiles p
 WHERE bp.user_id = p.id
   AND p.country IS NOT NULL
-  AND (bp.country IS NULL OR bp.country = 'NG')
-  AND p.country = 'US';
+  AND (bp.country IS NULL OR bp.country != p.country);
 
 -- 10. INDEXES for performance
 CREATE INDEX IF NOT EXISTS idx_profiles_country ON profiles(country);
