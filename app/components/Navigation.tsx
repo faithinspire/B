@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
 import { Menu, X, LogOut, Home, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users, LayoutDashboard } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 const BACKGROUND_IMAGES = [
   '/images/braiding-styles/gpt-image-1.5-high-fidelity_a_Hero_Background_Imag.png',
@@ -116,6 +117,7 @@ export function Navigation() {
                   <Link href="/search" className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">
                     Browse
                   </Link>
+                  <NotificationBell />
                   <button
                     onClick={handleLogout}
                     className="ml-4 px-6 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-300 font-semibold"

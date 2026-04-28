@@ -164,6 +164,9 @@ export default function BraiderProfilePage() {
   const professionLabel = isBarber ? 'Barber' : 'Braider';
   const countryFlag = pro?.country === 'NG' ? '🇳🇬' : pro?.country === 'US' ? '🇺🇸' : '';
   const locationStr = [pro?.city, pro?.state, countryFlag].filter(Boolean).join(', ');
+  // Currency based on braider's country
+  const currencySymbol = pro?.country === 'US' ? '$' : '₦';
+  const paymentProvider = pro?.country === 'US' ? 'Stripe' : 'Paystack';
 
   if (loading) {
     return (
@@ -354,7 +357,7 @@ export default function BraiderProfilePage() {
                         </div>
                         <div className="flex items-center gap-3 ml-4">
                           <span className={`text-lg font-bold ${isBarber ? 'text-blue-600' : 'text-purple-600'}`}>
-                            ${service.price.toFixed(0)}
+                            {currencySymbol}{service.price.toFixed(0)}
                           </span>
                           <a href={`/booking?braider_id=${pro.user_id}&service_id=${service.id}`}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isBarber ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}>

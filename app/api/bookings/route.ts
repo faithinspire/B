@@ -217,6 +217,21 @@ export async function POST(request: Request) {
 
     console.log('=== BOOKING: Created successfully ===', data?.id);
 
+    // ── Notify the braider about the new booking ──────────────────────────
+    try {
+      await db.from('notifications').insert({
+        user_id: body.braider_id,
+        type: 'booking',
+        title: '📅 New Booking Request!',
+        message: `${body.customer_name || 'A customer'} wants to book "${body.service_name}" on ${appointmentDate}`,
+        booking_id: bookingId,
+        read: false,
+        created_at: new Date().toISOString(),
+      });
+    } catch (notifErr) {
+      console.warn('=== BOOKING: Notification failed (non-critical) ===', notifErr);
+    }
+
     // Return booking with payment info attached
     return NextResponse.json({
       ...data,
