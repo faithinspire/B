@@ -1,104 +1,107 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, NextRequest } from 'next/server';
 
-// Disable caching for this API route
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
 
-// Helper to check if URL is valid
-const isValidUrl = (url: string): boolean => {
-  try {
-    return url.startsWith('http://') || url.startsWith('https://');
-  } catch {
-    return false;
-  }
-};
-
+/**
+ * COUNTRY-BASED SEARCH ENDPOINT
+ * Separates USA (Stripe) and Nigeria (Paystack) braiders/barbers
+ * Ensures proper payment provider routing
+ */
 export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    console.log('=== API: /api/braiders GET request ===');
-    console.log('=== API: Supabase URL configured:', !!supabaseUrl);
-    console.log('=== API: Service role key configured:', !!serviceRoleKey);
-
-    // Check if Supabase is configured
-    if (!supabaseUrl || !serviceRoleKey || !isValidUrl(supabaseUrl)) {
-      console.error('=== API: Supabase not properly configured ===');
-      console.error('=== API: URL valid:', isValidUrl(supabaseUrl));
-      console.error('=== API: URL:', supabaseUrl);
+    if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json([], { status: 200 });
     }
 
-    // Get query parameters for location filtering
-    const { searchParams } = new URL(request.url);
-    const state = searchParams.get('state');
-    const city = searchParams.get('city');
-    const country = searchParams.get('country'); // Don't default to 'NG' - show all braiders
-
-    // Use service role client to bypass RLS
     const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
 
-    console.log('=== API: Fetching braiders from braider_profiles table ===');
-    console.log('=== API: Filters - state:', state, 'city:', city, 'country:', country);
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const country = searchParams.get('country') || 'NG'; // Default to Nigeria
+    const profession = searchParams.get('profession'); // 'braider' or 'barber'
+    const state = searchParams.get('state');
+    const city = searchParams.get('city');
+    const searchQuery = searchParams.get('q');
+    const minRating = searchParams.get('minRating');
 
-    // Fetch braiders from braider_profiles table - Show ALL braiders (pending, verified, approved)
-    // Don't filter by verification status - let users see all professionals
+    console.log('=== SEARCH API ===', { country, profession, state, city, searchQuery });
+
+    // Build query
     let query = serviceSupabase
       .from('braider_profiles')
-      .select('*');
+      .select('*')
+      .eq('country', country); // CRITICAL: Filter by country
 
-    // Apply location filters only if explicitly provided
+    // Filter by profession type
+    if (profession === 'braider') {
+      query = query.neq('profession_type', 'barber');
+    } else if (profession === 'barber') {
+      query = query.eq('profession_type', 'barber');
+    }
+
+    // Filter by location
     if (state) {
       query = query.ilike('state', `%${state}%`);
     }
     if (city) {
       query = query.ilike('city', `%${city}%`);
     }
-    if (country) {
-      // Only filter by country if explicitly requested
-      query = query.eq('country', country);
+
+    // Filter by search query (name, bio, specialization)
+    if (searchQuery) {
+      query = query.or(
+        `full_name.ilike.%${searchQuery}%,bio.ilike.%${searchQuery}%,specialization.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%`
+      );
     }
 
+    // Filter by minimum rating
+    if (minRating) {
+      const rating = parseFloat(minRating);
+      if (!isNaN(rating)) {
+        query = query.gte('rating_avg', rating);
+      }
+    }
+
+    // Execute query
     const { data, error } = await query
       .order('rating_avg', { ascending: false })
       .order('created_at', { ascending: false });
 
-    console.log('=== API: Braiders fetch result ===', { dataCount: data?.length, hasError: !!error });
-
     if (error) {
-      console.error('=== API: Error fetching braiders ===', error);
+      console.error('Search error:', error);
       return NextResponse.json([], { status: 200 });
     }
 
     if (!data || data.length === 0) {
-      console.warn('=== API: WARNING - No braiders found in database ===');
+      console.log(`No ${profession || 'professionals'} found in ${country}`);
       return NextResponse.json([], { status: 200 });
     }
 
-    // Map data to include all fields
-    const braiders = (data || []).map((b: any) => {
-      // CRITICAL: Detect profession_type correctly
-      let professionType = 'braider'; // Default to braider
-      
-      // Check profession_type column first
+    // Map data with payment provider info
+    const professionals = (data || []).map((b: any) => {
+      let professionType = 'braider';
       if (b.profession_type && b.profession_type.toLowerCase() === 'barber') {
         professionType = 'barber';
       }
-      // Only check specialization if profession_type is not set
-      else if (!b.profession_type && b.specialization?.startsWith('barber:')) {
-        professionType = 'barber';
+
+      // Determine payment provider based on country
+      let paymentProvider = 'paystack'; // Default to Paystack for Nigeria
+      if (country === 'US' || country === 'USA') {
+        paymentProvider = 'stripe'; // Use Stripe for USA
       }
-      // Otherwise default to braider
-      
+
       let specialization = b.specialization || '';
       if (specialization.startsWith('barber:')) {
         specialization = specialization.substring(7);
       }
-      
+
       return {
         id: b.id || b.user_id,
         user_id: b.user_id,
@@ -118,7 +121,7 @@ export async function GET(request: NextRequest) {
         profession_type: professionType,
         state: b.state || '',
         city: b.city || '',
-        country: b.country || 'NG',
+        country: b.country || country,
         latitude: b.latitude || null,
         longitude: b.longitude || null,
         is_premium: b.is_premium || false,
@@ -131,13 +134,14 @@ export async function GET(request: NextRequest) {
         instagram_url: b.instagram_url || null,
         tiktok_url: b.tiktok_url || null,
         portfolio_media: b.portfolio_media || [],
+        payment_provider: paymentProvider, // CRITICAL: Add payment provider
         created_at: b.created_at,
         updated_at: b.updated_at,
       };
     });
 
-    console.log(`=== API: Returning ${braiders.length} braiders ===`);
-    return NextResponse.json(braiders, {
+    console.log(`Returning ${professionals.length} professionals from ${country}`);
+    return NextResponse.json(professionals, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -146,7 +150,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('=== API: Braiders API error ===', error);
+    console.error('Search API error:', error);
     return NextResponse.json([], { status: 200 });
   }
 }
