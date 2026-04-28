@@ -165,6 +165,13 @@ export default function BookingPage() {
   const selectedBraider = braiders.find((b) => b.user_id === formData.braider_id);
   const selectedService = selectedBraider?.services.find((s) => s.id === formData.service_id);
 
+  // Currency based on braider's country
+  const braiderCountry = (selectedBraider as any)?.country || 'NG';
+  const currencySymbol = braiderCountry === 'US' ? '$' : '₦';
+  const currencyCode = braiderCountry === 'US' ? 'USD' : 'NGN';
+  const paymentProvider = braiderCountry === 'US' ? 'Stripe' : 'Paystack';
+  const paymentFlag = braiderCountry === 'US' ? '🇺🇸' : '🇳🇬';
+
   const handleNext = () => {
     if (step === 1 && formData.braider_id) {
       setStep(2);
@@ -318,6 +325,10 @@ export default function BookingPage() {
                               {braider.travel_radius_miles} miles
                             </span>
                             <span>{braider.services.length} services</span>
+                            {/* Country + payment badge */}
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${(braider as any).country === 'US' ? 'bg-blue-500' : 'bg-green-600'}`}>
+                              {(braider as any).country === 'US' ? '🇺🇸 Stripe' : '🇳🇬 Paystack'}
+                            </span>
                           </div>
                         </div>
                         <div className="flex-shrink-0 ml-4">
@@ -380,7 +391,8 @@ export default function BookingPage() {
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0 ml-4">
-                          <p className="text-2xl font-bold text-primary-600">${service.price.toFixed(2)}</p>
+                          <p className="text-2xl font-bold text-primary-600">{currencySymbol}{service.price.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400">{currencyCode}</p>
                           <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mt-2 mx-auto ${
                             formData.service_id === service.id
                               ? 'border-primary-600 bg-primary-600'
@@ -494,9 +506,13 @@ export default function BookingPage() {
                 </div>
 
                 <div className="bg-primary-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-900">Total Price</span>
-                    <span className="text-2xl font-bold text-primary-600">${selectedService.price.toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-primary-600">{currencySymbol}{selectedService.price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{paymentFlag}</span>
+                    <span>Payment via <strong>{paymentProvider}</strong> ({currencyCode})</span>
                   </div>
                 </div>
               </div>
