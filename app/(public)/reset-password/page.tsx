@@ -1,32 +1,64 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Lock } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get('token');
-  const email = searchParams.get('email');
-
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [validating, setValidating] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    // Validate token and email on mount
-    if (!token || !email) {
-      setError('Invalid reset link. Please request a new password reset.');
-      setValidating(false);
-    } else {
-      setValidating(false);
-    }
-  }, [token, email]);
+    // Check if Supabase has automatically set a session from the magic link
+    const checkSession = async () => {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !anonKey) {
+          setError('Configuration error');
+          setValidating(false);
+          return;
+        }
+
+        const supabase = createClient(supabaseUrl, anonKey);
+
+        // Get the current session - Supabase automatically sets it from the URL hash
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Invalid or expired reset link. Please request a new password reset.');
+          setValidating(false);
+          return;
+        }
+
+        if (!session) {
+          setError('Invalid or expired reset link. Please request a new password reset.');
+          setValidating(false);
+          return;
+        }
+
+        // Session is valid
+        setHasSession(true);
+        setValidating(false);
+      } catch (err) {
+        console.error('Error checking session:', err);
+        setError('An error occurred. Please request a new password reset.');
+        setValidating(false);
+      }
+    };
+
+    checkSession();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,28 +80,29 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (!token || !email) {
-      setError('Invalid reset link');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          email,
-          newPassword: password,
-        }),
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !anonKey) {
+        setError('Configuration error');
+        setLoading(false);
+        return;
+      }
+
+      const supabase = createClient(supabaseUrl, anonKey);
+
+      // Update the password using the current session
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to reset password');
+      if (updateError) {
+        console.error('Password update error:', updateError);
+        setError(updateError.message || 'Failed to reset password');
+        setLoading(false);
         return;
       }
 
@@ -77,13 +110,16 @@ export default function ResetPasswordPage() {
       setPassword('');
       setConfirmPassword('');
 
+      // Sign out the user and redirect to login
+      await supabase.auth.signOut();
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push('/login');
       }, 3000);
     } catch (err) {
+      console.error('Reset password error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
       setLoading(false);
     }
   };
@@ -134,7 +170,7 @@ export default function ResetPasswordPage() {
         )}
 
         {/* Form */}
-        {!success && !error.includes('Invalid') && !error.includes('expired') ? (
+        {!success && hasSession && !error.includes('Invalid') && !error.includes('expired') ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* New Password Input */}
             <div>
