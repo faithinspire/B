@@ -22,6 +22,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   logout: () => void;
+  signOut: () => Promise<void>; // alias for logout, used by Navigation
   recoverSession: () => Promise<void>;
   refreshSession: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -82,6 +83,23 @@ export const useSupabaseAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem(USER_STORAGE_KEY);
     } catch (e) {
       console.error('Failed to clear localStorage on logout:', e);
+    }
+  },
+
+  // signOut is an alias for logout — used by Navigation component
+  signOut: async () => {
+    set({ user: null, session: null, error: null });
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      // Also sign out from Supabase to invalidate the token
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Failed to sign out:', e);
     }
   },
 

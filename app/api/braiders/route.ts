@@ -5,7 +5,6 @@ import { NextResponse, NextRequest } from 'next/server';
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
 
-// Helper to check if URL is valid
 const isValidUrl = (url: string): boolean => {
   try {
     return url.startsWith('http://') || url.startsWith('https://');
@@ -18,90 +17,108 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-    console.log('=== API: /api/braiders GET request ===');
-    console.log('=== API: Supabase URL configured:', !!supabaseUrl);
-    console.log('=== API: Service role key configured:', !!serviceRoleKey);
-
-    // Check if Supabase is configured
-    if (!supabaseUrl || !serviceRoleKey || !isValidUrl(supabaseUrl)) {
-      console.error('=== API: Supabase not properly configured ===');
-      console.error('=== API: URL valid:', isValidUrl(supabaseUrl));
-      console.error('=== API: URL:', supabaseUrl);
+    if (!supabaseUrl || !isValidUrl(supabaseUrl)) {
+      console.error('=== API: Supabase URL not configured ===');
       return NextResponse.json([], { status: 200 });
     }
 
-    // Get query parameters for location filtering
+    // Use service role if available, otherwise fall back to anon key
+    const keyToUse = serviceRoleKey || anonKey;
+    if (!keyToUse) {
+      console.error('=== API: No Supabase key configured ===');
+      return NextResponse.json([], { status: 200 });
+    }
+
     const { searchParams } = new URL(request.url);
     const state = searchParams.get('state');
     const city = searchParams.get('city');
-    const country = searchParams.get('country'); // Don't default to 'NG' - show all braiders
+    const country = searchParams.get('country');
 
-    // Use service role client to bypass RLS
-    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+    const serviceSupabase = createClient(supabaseUrl, keyToUse, {
       auth: { persistSession: false },
     });
 
-    console.log('=== API: Fetching braiders from braider_profiles table ===');
-    console.log('=== API: Filters - state:', state, 'city:', city, 'country:', country);
+    console.log('=== API: Fetching braiders ===', { state, city, country, usingServiceRole: !!serviceRoleKey });
 
-    // Fetch braiders from braider_profiles table - Show ALL braiders (pending, verified, approved)
-    // Don't filter by verification status - let users see all professionals
-    let query = serviceSupabase
-      .from('braider_profiles')
-      .select('*');
+    // ── Primary: query braider_profiles ──────────────────────────────────
+    let query = serviceSupabase.from('braider_profiles').select('*');
 
-    // Apply location filters only if explicitly provided
-    if (state) {
-      query = query.ilike('state', `%${state}%`);
+    if (state) query = query.ilike('state', `%${state}%`);
+    if (city) query = query.ilike('city', `%${city}%`);
+    if (country) query = query.eq('country', country);
+
+    const { data: braiderData, error: braiderError } = await query
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    console.log('=== API: braider_profiles result ===', {
+      count: braiderData?.length,
+      error: braiderError?.message,
+    });
+
+    // ── Fallback: if braider_profiles is empty, try profiles table ────────
+    let rawData = braiderData || [];
+
+    if ((!rawData || rawData.length === 0) && !braiderError) {
+      console.log('=== API: braider_profiles empty, trying profiles table fallback ===');
+      const { data: profilesData, error: profilesError } = await serviceSupabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'braider')
+        .limit(100);
+
+      if (!profilesError && profilesData && profilesData.length > 0) {
+        console.log(`=== API: Found ${profilesData.length} braiders in profiles table ===`);
+        rawData = profilesData.map((p: any) => ({
+          ...p,
+          user_id: p.id,
+          profession_type: p.profession_type || 'braider',
+          country: p.country || 'NG',
+          verification_status: p.verification_status || 'pending',
+          rating_avg: p.rating_avg || null,
+          rating_count: p.rating_count || 0,
+          bio: p.bio || '',
+          experience_years: p.experience_years || 0,
+          travel_radius_miles: p.travel_radius_miles || 10,
+          is_mobile: p.is_mobile || false,
+          specialties: p.specialties || [],
+          total_earnings: p.total_earnings || 0,
+          available_balance: p.available_balance || 0,
+          total_bookings: p.total_bookings || 0,
+        }));
+      }
     }
-    if (city) {
-      query = query.ilike('city', `%${city}%`);
-    }
-    if (country) {
-      // Only filter by country if explicitly requested
-      query = query.eq('country', country);
-    }
 
-    const { data, error } = await query
-      .order('rating_avg', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    console.log('=== API: Braiders fetch result ===', { dataCount: data?.length, hasError: !!error });
-
-    if (error) {
-      console.error('=== API: Error fetching braiders ===', error);
-      return NextResponse.json([], { status: 200 });
+    if (!rawData || rawData.length === 0) {
+      console.warn('=== API: No braiders found in any table ===');
+      return NextResponse.json([], {
+        status: 200,
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
+      });
     }
 
-    if (!data || data.length === 0) {
-      console.warn('=== API: WARNING - No braiders found in database ===');
-      return NextResponse.json([], { status: 200 });
-    }
-
-    // Map data to include all fields
-    const braiders = (data || []).map((b: any) => {
-      // CRITICAL: Detect profession_type correctly
-      let professionType = 'braider'; // Default to braider
-      
-      // Check profession_type column first
+    // ── Map to consistent shape ───────────────────────────────────────────
+    const braiders = rawData.map((b: any) => {
+      let professionType = 'braider';
       if (b.profession_type && b.profession_type.toLowerCase() === 'barber') {
         professionType = 'barber';
-      }
-      // Only check specialization if profession_type is not set
-      else if (!b.profession_type && b.specialization?.startsWith('barber:')) {
+      } else if (!b.profession_type && b.specialization?.startsWith('barber:')) {
         professionType = 'barber';
       }
-      // Otherwise default to braider
-      
+
       let specialization = b.specialization || '';
       if (specialization.startsWith('barber:')) {
         specialization = specialization.substring(7);
       }
-      
+
+      const braiderCountry = b.country || 'NG';
+      const paymentProvider = braiderCountry === 'US' || braiderCountry === 'USA' ? 'stripe' : 'paystack';
+
       return {
         id: b.id || b.user_id,
-        user_id: b.user_id,
+        user_id: b.user_id || b.id,
         full_name: b.full_name || '',
         email: b.email || '',
         avatar_url: b.avatar_url || null,
@@ -109,16 +126,17 @@ export async function GET(request: NextRequest) {
         experience_years: b.experience_years || 0,
         rating_avg: b.rating_avg || null,
         rating_count: b.rating_count || 0,
-        verification_status: b.verification_status || 'unverified',
+        verification_status: b.verification_status || 'pending',
         travel_radius_miles: b.travel_radius_miles || 10,
-        is_mobile: b.is_mobile || false,
+        is_mobile: b.is_mobile !== undefined ? b.is_mobile : true,
         salon_address: b.salon_address || '',
         specialties: b.specialties || [],
         specialization,
         profession_type: professionType,
         state: b.state || '',
         city: b.city || '',
-        country: b.country || 'NG',
+        country: braiderCountry,
+        payment_provider: paymentProvider,
         latitude: b.latitude || null,
         longitude: b.longitude || null,
         is_premium: b.is_premium || false,
