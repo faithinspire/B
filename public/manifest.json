@@ -8,6 +8,7 @@
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#9333ea",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/favicon.svg",
@@ -38,6 +39,12 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "categories": ["shopping", "lifestyle"],

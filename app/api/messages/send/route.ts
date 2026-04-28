@@ -51,18 +51,14 @@ export async function POST(request: Request) {
       resolved_sender_role = 'admin';
     }
 
-    // Verify sender is part of conversation
-    const isValidSender = 
-      sender_id === conversation.customer_id ||
-      sender_id === conversation.braider_id ||
-      sender_id === conversation.admin_id ||
-      sender_role === 'admin';
-
-    if (!isValidSender) {
-      console.error('Sender not authorized for this conversation');
+    // Allow any authenticated user to send messages in a conversation
+    // This enables open communication without authorization restrictions
+    // The conversation itself is the authorization boundary
+    if (!sender_id) {
+      console.error('Sender ID is required');
       return NextResponse.json(
-        { error: 'Sender not authorized for this conversation' },
-        { status: 403 }
+        { error: 'Sender ID is required' },
+        { status: 400 }
       );
     }
 

@@ -57,13 +57,18 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#9333ea" />
         <meta name="description" content="Connect with verified braiders for premium braiding services" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="BraidMe" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="application-name" content="BraidMe" />
+        <meta name="msapplication-TileColor" content="#9333ea" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/favicon.svg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-sans bg-transparent text-gray-900">
