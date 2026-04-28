@@ -26,10 +26,11 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // Start with base query — no is_active filter to show all products
+    // Start with base query — ONLY show active products
     let query = supabase
       .from('marketplace_products')
       .select('*', { count: 'exact' })
+      .eq('is_active', true) // CRITICAL: Only show active products
       .order('created_at', { ascending: false });
 
     if (country_code && country_code !== '') {

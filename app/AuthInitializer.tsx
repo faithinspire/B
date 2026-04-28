@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
+import { useSupabaseAuthStore, initializeAuthStore } from '@/store/supabaseAuthStore';
 import { useSupabaseBraiderStore } from '@/store/supabaseBraiderStore';
 import { useRoleVerification } from '@/app/hooks/useRoleVerification';
 
@@ -14,8 +14,8 @@ export function AuthInitializer() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const authStore = useSupabaseAuthStore.getState();
-        await authStore.initializeSession();
+        // PHASE 2: Initialize auth store with session recovery
+        await initializeAuthStore();
 
         const user = useSupabaseAuthStore.getState().user;
 

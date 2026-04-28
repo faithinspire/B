@@ -61,13 +61,35 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating payment intent for amount:', amount, 'booking:', bookingId);
 
+    // CRITICAL FIX: Use correct currency based on braider country
+    // Fetch braider to determine currency
+    const { data: braiderProfile } = await supabase
+      .from('braider_profiles')
+      .select('country')
+      .eq('user_id', booking.braider_id)
+      .single();
+
+    const braiderCountry = braiderProfile?.country || 'US';
+    const currencyMap: { [key: string]: string } = {
+      'NG': 'ngn',
+      'US': 'usd',
+    };
+    const currency = currencyMap[braiderCountry] || 'usd';
+
+    // For NGN, Stripe requires amount in kobo (1 NGN = 100 kobo)
+    // For USD, Stripe requires amount in cents (1 USD = 100 cents)
+    const amountInSmallestUnit = currency === 'ngn' 
+      ? Math.round(amount * 100) // kobo
+      : Math.round(amount * 100); // cents
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // convert to cents
-      currency: 'usd',
+      amount: amountInSmallestUnit,
+      currency: currency,
       payment_method_types: ['card'],
       metadata: {
         bookingId,
         customerId: customerId || booking.customer_id || '',
+        braiderCountry,
         braiderId: braiderId || booking.braider_id || '',
       },
     });

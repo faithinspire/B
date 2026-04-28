@@ -35,29 +35,38 @@ export async function GET(request: Request) {
 
     const db = makeClient();
 
-    // Try new schema first (customer_id / braider_id columns)
+    // FIXED: Use ONLY new schema (customer_id / braider_id columns)
+    // No fallback to old schema - ensures consistent data structure
     let conversations: any[] = [];
 
-    const newQuery = db.from('conversations').select('*');
+    let query = db.from('conversations').select('*');
+    
+    // Apply role-based filter
     if (role === 'customer') {
-      newQuery.eq('customer_id', userId);
+      query = query.eq('customer_id', userId);
     } else if (role === 'braider') {
-      newQuery.eq('braider_id', userId);
+      query = query.eq('braider_id', userId);
     } else if (role === 'admin') {
-      newQuery.eq('admin_id', userId);
+      query = query.eq('admin_id', userId);
     } else {
-      newQuery.or(`customer_id.eq.${userId},braider_id.eq.${userId},admin_id.eq.${userId}`);
+      // If no role specified, get all conversations where user is involved
+      query = query.or(`customer_id.eq.${userId},braider_id.eq.${userId},admin_id.eq.${userId}`);
     }
-    newQuery.order('updated_at', { ascending: false });
+    
+    query = query.order('updated_at', { ascending: false });
 
-    const { data: newData, error: newError } = await newQuery;
+    const { data: data, error: error } = await query;
 
-    if (!newError && newData && newData.length > 0) {
-      conversations = newData.map(normalize);
+    if (error) {
+      console.error('Conversation fetch error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (data && data.length > 0) {
+      conversations = data.map(normalize);
     } else {
-      // Fallback: old schema with participant1_id / participant2_id
-      const { data: oldData, error: oldError } = await db
-        .from('conversations')
+      // No conversations found - return empty array, not error
+      conversations = [];
         .select('*')
         .or(`participant1_id.eq.${userId},participant2_id.eq.${userId}`)
         .order('created_at', { ascending: false });

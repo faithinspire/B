@@ -1,222 +1,231 @@
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface User {
   id: string;
   email: string;
-  role: 'customer' | 'braider' | 'admin';
   full_name: string;
+  role: 'customer' | 'braider' | 'admin';
   avatar_url?: string;
-  country?: string; // 'NG' | 'US' — used for payment routing
+  country?: string;
+  phone?: string;
+  phone_country?: string;
 }
 
-interface AuthStore {
+interface AuthState {
   user: User | null;
-  accessToken: string | null;
+  session: any | null;
   loading: boolean;
   error: string | null;
-  signUp: (email: string, password: string, fullName: string, role: 'customer' | 'braider' | 'admin') => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  fetchUser: () => Promise<void>;
-  initializeSession: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updatePassword: (newPassword: string) => Promise<void>;
+  setUser: (user: User | null) => void;
+  setSession: (session: any | null) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  logout: () => void;
+  recoverSession: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
-export const useSupabaseAuthStore = create<AuthStore>((set) => ({
+const STORAGE_KEY = 'braidmee_auth_session';
+const USER_STORAGE_KEY = 'braidmee_user';
+
+export const useSupabaseAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  accessToken: null,
-  loading: false,
+  session: null,
+  loading: true,
   error: null,
 
-  initializeSession: async () => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
+  setUser: (user) => {
+    set({ user });
+    // PHASE 2: Persist user to localStorage
+    if (user) {
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      } catch (e) {
+        console.error('Failed to persist user to localStorage:', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(USER_STORAGE_KEY);
+      } catch (e) {
+        console.error('Failed to remove user from localStorage:', e);
+      }
+    }
+  },
+
+  setSession: (session) => {
+    set({ session });
+    // PHASE 2: Persist session to localStorage
+    if (session) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      } catch (e) {
+        console.error('Failed to persist session to localStorage:', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.error('Failed to remove session from localStorage:', e);
+      }
+    }
+  },
+
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
+
+  logout: () => {
+    set({ user: null, session: null, error: null });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { set({ user: null, accessToken: null }); return; }
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to clear localStorage on logout:', e);
+    }
+  },
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, avatar_url, country')
-        .eq('id', session.user.id)
-        .single();
+  /**
+   * PHASE 2: Recover session from localStorage on app load
+   * This prevents users from being logged out when page refreshes
+   */
+  recoverSession: async () => {
+    try {
+      set({ loading: true });
 
-      if (!profile) { set({ user: null, accessToken: null }); return; }
+      // Try to recover from localStorage first
+      const storedSession = localStorage.getItem(STORAGE_KEY);
+      const storedUser = localStorage.getItem(USER_STORAGE_KEY);
 
-      set({
-        user: {
+      if (storedSession && storedUser) {
+        try {
+          const session = JSON.parse(storedSession);
+          const user = JSON.parse(storedUser);
+
+          // Verify session is still valid
+          if (session && session.access_token) {
+            set({ session, user, loading: false, error: null });
+            console.log('✅ Session recovered from localStorage');
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse stored session:', e);
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(USER_STORAGE_KEY);
+        }
+      }
+
+      // If no stored session, try to get from Supabase
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Failed to get session from Supabase:', error);
+        set({ loading: false, error: error.message });
+        return;
+      }
+
+      if (session && session.user) {
+        // Fetch user profile to get role and other data
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Failed to fetch profile:', profileError);
+          set({ loading: false, error: profileError.message });
+          return;
+        }
+
+        const user: User = {
           id: session.user.id,
-          email: profile.email || '',
-          role: (profile.role || 'customer') as 'customer' | 'braider' | 'admin',
-          full_name: profile.full_name || '',
-          avatar_url: profile.avatar_url || undefined,
-          country: profile.country || undefined,
-        },
-        accessToken: session.access_token,
-      });
-    } catch (error) {
-      console.error('Failed to initialize session:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to initialize session' });
-    } finally {
-      set({ loading: false });
-    }
-  },
+          email: session.user.email || '',
+          full_name: profile?.full_name || '',
+          role: profile?.role || 'customer',
+          avatar_url: profile?.avatar_url,
+          country: profile?.country,
+          phone: profile?.phone,
+          phone_country: profile?.phone_country,
+        };
 
-  signUp: async (email, password, fullName, role) => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
-    try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, role }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Signup failed');
+        set({ session, user, loading: false, error: null });
+        // Persist to localStorage
+        get().setSession(session);
+        get().setUser(user);
+        console.log('✅ Session recovered from Supabase');
+      } else {
+        set({ loading: false, error: null });
+        console.log('No active session found');
       }
-      const data = await response.json();
-
-      // Sign in via supabase client to persist session in browser
-      const { data: authData } = await supabase.auth.signInWithPassword({ email, password });
-
-      set({
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          full_name: data.user.full_name,
-        },
-        accessToken: authData.session?.access_token || null,
-      });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to sign up';
-      set({ error: msg });
-      throw error;
-    } finally {
-      set({ loading: false });
+      console.error('Session recovery error:', error);
+      set({ loading: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   },
 
-  signIn: async (email, password) => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
+  /**
+   * PHASE 2: Refresh session to keep user logged in
+   * Called periodically or when session is about to expire
+   */
+  refreshSession: async () => {
     try {
-      // Sign in via supabase client first — this persists the session cookie in the browser
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError || !authData.user) {
-        throw new Error(authError?.message || 'Invalid credentials');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+
+      if (error) {
+        console.error('Failed to refresh session:', error);
+        get().logout();
+        return;
       }
 
-      // Call backend to get the correct role from profiles table
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Login failed');
+      if (session) {
+        get().setSession(session);
+        console.log('✅ Session refreshed');
       }
-      const data = await response.json();
-
-      set({
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          full_name: data.user.full_name,
-          avatar_url: data.user.avatar_url,
-          country: data.user.country || undefined,
-        },
-        accessToken: authData.session?.access_token || data.session?.access_token || null,
-      });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to sign in';
-      set({ error: msg });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  signOut: async () => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
-    try {
-      set({ user: null, accessToken: null });
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Signout error:', error);
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  fetchUser: async () => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true });
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { set({ user: null, accessToken: null }); return; }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, avatar_url, country')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!profile) { set({ user: null, accessToken: null }); return; }
-
-      set({
-        user: {
-          id: session.user.id,
-          email: profile.email || '',
-          role: (profile.role || 'customer') as 'customer' | 'braider' | 'admin',
-          full_name: profile.full_name || '',
-          avatar_url: profile.avatar_url || undefined,
-          country: profile.country || undefined,
-        },
-        accessToken: session.access_token,
-      });
-    } catch (error) {
-      console.error('Failed to fetch user:', error);
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  resetPassword: async (email) => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      });
-      if (error) throw error;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to reset password';
-      set({ error: msg });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  updatePassword: async (newPassword) => {
-    if (!supabase) { set({ error: 'Supabase not configured' }); return; }
-    set({ loading: true, error: null });
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to update password';
-      set({ error: msg });
-      throw error;
-    } finally {
-      set({ loading: false });
+      console.error('Session refresh error:', error);
+      get().logout();
     }
   },
 }));
+
+/**
+ * PHASE 2: Initialize auth store on app load
+ * Recovers session from localStorage and sets up refresh interval
+ */
+export async function initializeAuthStore() {
+  const store = useSupabaseAuthStore.getState();
+  
+  // Recover session from localStorage
+  await store.recoverSession();
+
+  // Set up session refresh interval (every 50 minutes)
+  // Supabase sessions expire after 1 hour, so refresh before expiry
+  const refreshInterval = setInterval(() => {
+    store.refreshSession();
+  }, 50 * 60 * 1000);
+
+  // Clean up interval on logout
+  const unsubscribe = useSupabaseAuthStore.subscribe(
+    (state) => state.user,
+    (user) => {
+      if (!user) {
+        clearInterval(refreshInterval);
+      }
+    }
+  );
+
+  return () => {
+    clearInterval(refreshInterval);
+    unsubscribe();
+  };
+}

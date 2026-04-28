@@ -45,11 +45,11 @@ export async function GET(request: NextRequest) {
     console.log('=== API: Fetching braiders from braider_profiles table ===');
     console.log('=== API: Filters - state:', state, 'city:', city, 'country:', country);
 
-    // Fetch braiders from braider_profiles table - include all statuses except rejected
+    // Fetch braiders from braider_profiles table - ONLY verified braiders
     let query = serviceSupabase
       .from('braider_profiles')
       .select('*')
-      .neq('verification_status', 'rejected'); // Exclude only rejected braiders
+      .eq('verification_status', 'verified'); // CRITICAL: Only show verified braiders
 
     // Apply location filters only if explicitly provided
     if (state) {

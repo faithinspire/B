@@ -96,14 +96,44 @@ export async function POST(request: Request) {
       );
     }
 
+    // CRITICAL FIX: Fetch actual braider country from database - NEVER default to 'NG'
+    const { data: braiderProfile, error: braiderError } = await serviceSupabase
+      .from('braider_profiles')
+      .select('country')
+      .eq('user_id', body.braider_id)
+      .single();
+
+    if (braiderError || !braiderProfile) {
+      console.error('Failed to fetch braider country:', braiderError);
+      return NextResponse.json(
+        { error: 'Braider not found or country not set' },
+        { status: 400 }
+      );
+    }
+
+    const braiderCountry = braiderProfile.country;
+    if (!braiderCountry) {
+      return NextResponse.json(
+        { error: 'Braider country is not set. Cannot create booking.' },
+        { status: 400 }
+      );
+    }
+
+    // Determine currency based on country
+    const currencyMap: { [key: string]: string } = {
+      'NG': 'NGN',
+      'US': 'USD',
+    };
+    const currency = currencyMap[braiderCountry] || 'USD';
+
     // Create booking object
     const booking = {
-      id: `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `booking_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       customer_id: body.customer_id,
       customer_name: body.customer_name,
       braider_id: body.braider_id,
       braider_name: body.braider_name,
-      braider_country: body.braider_country || 'NG', // Default to Nigeria
+      braider_country: braiderCountry, // Use actual braider country from database
       service_id: body.service_id,
       service_name: body.service_name,
       service_price: parseFloat(body.service_price),
@@ -115,7 +145,7 @@ export async function POST(request: Request) {
       total_amount: parseFloat(body.total_amount),
       platform_fee: parseFloat(body.platform_fee),
       braider_payout: parseFloat(body.braider_payout),
-      currency: body.currency || 'NGN', // Default to Nigerian Naira
+      currency: currency, // Use currency based on braider country
       escrow_released: body.escrow_released || false,
       stripe_payment_intent_id: body.stripe_payment_intent_id || null,
       stripe_charge_id: body.stripe_charge_id || null,
