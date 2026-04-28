@@ -66,22 +66,22 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id
 
     // 2. Create profile record with EXPLICIT role - CRITICAL for auth
+    // Only include columns that are guaranteed to exist in the profiles table
     const profileData: any = {
       id: userId,
       email,
       full_name,
       role, // EXPLICIT role - MUST be set here, not defaulting to customer
-      phone,
-      country: resolvedCountry, // CRITICAL: save actual country, never default
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
 
-    // Add phone_country if provided
-    if (phone_country) {
-      profileData.phone_country = phone_country;
-    }
+    // Add optional columns only if they have values
+    if (phone) profileData.phone = phone;
+    if (resolvedCountry) profileData.country = resolvedCountry;
+    if (phone_country) profileData.phone_country = phone_country;
+    
+    // Set timestamps
+    profileData.created_at = new Date().toISOString();
+    profileData.updated_at = new Date().toISOString();
 
     // HARD FIX: Use upsert from the start to ensure profile is created
     const { error: profileError, data: profileResult } = await serviceSupabase
@@ -117,82 +117,69 @@ export async function POST(request: NextRequest) {
       } = body
 
       // Create braider profile - CRITICAL: This MUST succeed for braider to be visible
-      // Only insert columns that are guaranteed to exist
+      // Build the data object with only columns that are likely to exist
       const braiderProfileData: any = {
         user_id: userId,
         full_name,
         email,
-        avatar_url: null,
-        bio: bio || '',
-        experience_years: years_experience || 0,
-        rating_avg: 5.0,
-        rating_count: 0,
-        verification_status: 'pending',
-        travel_radius_miles: 10,
-        is_mobile: true,
-        salon_address: address || null,
-        specialties: specialization ? [specialization] : [],
-        total_earnings: 0,
-        available_balance: 0,
         country: resolvedCountry, // Use resolved country — never hardcode 'NG'
       };
 
-      // Store profession_type safely — try to set it but don't fail if column doesn't exist
-      // We encode it in specialization prefix as fallback: "barber:skin-fade"
-      const isBarber = profession_type === 'barber';
-      if (isBarber && specialization) {
-        braiderProfileData.specialization = `barber:${specialization}`;
-      } else if (specialization) {
-        braiderProfileData.specialization = specialization;
-      }
-
-      // Add optional columns if they exist in the schema
-      if (phone) braiderProfileData.phone = phone;
+      // Add optional fields
+      if (bio) braiderProfileData.bio = bio;
+      if (years_experience) braiderProfileData.experience_years = years_experience;
       if (specialization) braiderProfileData.specialization = specialization;
-      if (services) braiderProfileData.services = services;
+      if (phone) braiderProfileData.phone = phone;
       if (state) braiderProfileData.state = state;
       if (city) braiderProfileData.city = city;
       if (address) braiderProfileData.address = address;
-      braiderProfileData.verified = false;
       if (next_of_kin_name) braiderProfileData.next_of_kin_name = next_of_kin_name;
       if (next_of_kin_phone) braiderProfileData.next_of_kin_phone = next_of_kin_phone;
       if (next_of_kin_relationship) braiderProfileData.next_of_kin_relationship = next_of_kin_relationship;
       if (id_type) braiderProfileData.id_type = id_type;
       if (id_number) braiderProfileData.id_number = id_number;
       if (id_document_url) braiderProfileData.id_document_url = id_document_url;
-      // Social media links
+      if (profession_type) braiderProfileData.profession_type = profession_type;
       if (body.instagram_url) braiderProfileData.instagram_url = body.instagram_url;
       if (body.tiktok_url) braiderProfileData.tiktok_url = body.tiktok_url;
+      if (services) braiderProfileData.services = services;
+
+      // Set defaults for required fields
+      braiderProfileData.avatar_url = null;
+      braiderProfileData.rating_avg = 5.0;
+      braiderProfileData.rating_count = 0;
+      braiderProfileData.verification_status = 'pending';
+      braiderProfileData.travel_radius_miles = 10;
+      braiderProfileData.is_mobile = true;
+      braiderProfileData.total_earnings = 0;
+      braiderProfileData.available_balance = 0;
+      braiderProfileData.verified = false;
 
       const { error: braiderError } = await serviceSupabase
         .from('braider_profiles')
         .insert(braiderProfileData)
 
       if (braiderError) {
-        // If it's a profession_type column error, retry without it
-        if (braiderError.message?.includes('profession_type')) {
-          delete braiderProfileData.profession_type;
-          const { error: retryError } = await serviceSupabase
+        console.error('Braider profile creation error:', braiderError);
+        // Try to insert with minimal fields if the full insert fails
+        if (braiderError.message?.includes('column')) {
+          const minimalData = {
+            user_id: userId,
+            full_name,
+            email,
+            country: resolvedCountry,
+          };
+          const { error: minimalError } = await serviceSupabase
             .from('braider_profiles')
-            .insert(braiderProfileData);
-          if (retryError) {
-            console.error('Braider profile creation error (retry):', retryError);
-            throw new Error(`Failed to create braider profile: ${retryError.message}`);
+            .insert(minimalData);
+          
+          if (minimalError) {
+            console.error('Minimal braider profile creation error:', minimalError);
+            throw new Error(`Failed to create braider profile: ${minimalError.message}`);
           }
         } else {
-          console.error('Braider profile creation error:', braiderError);
           throw new Error(`Failed to create braider profile: ${braiderError.message}`);
         }
-      }
-
-      // Try to add profession_type column value via update (non-fatal)
-      if (profession_type) {
-        await serviceSupabase
-          .from('braider_profiles')
-          .update({ profession_type })
-          .eq('user_id', userId)
-          .then(() => {}) // ignore errors — column may not exist yet
-          .catch(() => {});
       }
 
       // Create braider verification record in braider_verification table
