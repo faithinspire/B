@@ -18,10 +18,8 @@ export async function GET() {
 
     if (error) {
       console.error('Categories fetch error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+      // Return empty array instead of error — marketplace still works without categories
+      return NextResponse.json({ success: true, data: [] });
     }
 
     return NextResponse.json({

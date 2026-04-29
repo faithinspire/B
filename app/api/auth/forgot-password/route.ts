@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://braidmee.vercel.app';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL 
+      || request.headers.get('origin') 
+      || request.headers.get('referer')?.split('/').slice(0, 3).join('/')
+      || 'https://braidmee.vercel.app';
 
     if (!supabaseUrl || !anonKey) {
       return NextResponse.json(
