@@ -51,15 +51,24 @@ export async function POST(request: Request) {
       resolved_sender_role = 'admin';
     }
 
-    // Allow any authenticated user to send messages in a conversation
-    // This enables open communication without authorization restrictions
-    // The conversation itself is the authorization boundary
-    if (!sender_id) {
-      console.error('Sender ID is required');
-      return NextResponse.json(
-        { error: 'Sender ID is required' },
-        { status: 400 }
-      );
+    // Ensure receiver_id is always set — the DB has a NOT NULL constraint on it
+    // If we couldn't determine receiver from role, fall back to the other participant
+    if (!receiver_id) {
+      if (sender_id === conversation.customer_id) {
+        receiver_id = conversation.braider_id;
+      } else if (sender_id === conversation.braider_id) {
+        receiver_id = conversation.customer_id;
+      } else {
+        // Admin or unknown — pick whoever isn't the sender
+        receiver_id = conversation.customer_id !== sender_id
+          ? conversation.customer_id
+          : conversation.braider_id;
+      }
+    }
+
+    // Final safety check — if still null, use a placeholder from the conversation
+    if (!receiver_id) {
+      receiver_id = conversation.customer_id || conversation.braider_id || sender_id;
     }
 
     // Insert message with all required fields
@@ -67,9 +76,10 @@ export async function POST(request: Request) {
     let insertError: any = null;
     let message: any = null;
 
-    const messageData = {
+    const messageData: any = {
       conversation_id,
       sender_id,
+      receiver_id,
       sender_role: resolved_sender_role,
       content: content.trim(),
       created_at: new Date().toISOString(),

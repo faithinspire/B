@@ -6,8 +6,9 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Star, MapPin, Clock, Shield, ChevronRight, AlertCircle, Crown,
-  Instagram, Calendar, Bookmark, Play, Image as ImageIcon,
+  Instagram, Calendar, Bookmark, Play, Image as ImageIcon, Navigation,
 } from 'lucide-react';
+import { CustomerLocationMap } from '@/app/components/CustomerLocationMap';
 
 interface Service {
   id: string;
@@ -70,7 +71,7 @@ export default function BraiderProfilePage() {
   const [pro, setPro] = useState<BraiderProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'services' | 'portfolio' | 'reviews'>('services');
+  const [activeTab, setActiveTab] = useState<'services' | 'portfolio' | 'reviews' | 'location'>('services');
   const [lightboxMedia, setLightboxMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
@@ -326,15 +327,16 @@ export default function BraiderProfilePage() {
 
           {/* Tabs */}
           <div className="border-t border-gray-100">
-            <div className="flex">
-              {(['services', 'portfolio', 'reviews'] as const).map(tab => (
+            <div className="flex overflow-x-auto">
+              {(['services', 'portfolio', 'reviews', 'location'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-3.5 text-sm font-semibold capitalize transition-all border-b-2 ${
+                  className={`flex-1 min-w-[80px] py-3.5 text-sm font-semibold capitalize transition-all border-b-2 ${
                     activeTab === tab ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
                   {tab === 'services' && `Services (${pro.services.length})`}
                   {tab === 'portfolio' && `Portfolio (${pro.portfolio_media.length})`}
                   {tab === 'reviews' && `Reviews (${pro.rating_count})`}
+                  {tab === 'location' && '📍 Location'}
                 </button>
               ))}
             </div>
@@ -435,6 +437,36 @@ export default function BraiderProfilePage() {
                     <p>No reviews yet — be the first to book!</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'location' && (
+              <div>
+                <div className="mb-4">
+                  <h3 className="font-semibold text-gray-900 mb-1">
+                    {pro.full_name}&apos;s Service Area
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {pro.is_mobile
+                      ? `Mobile service — travels up to ${pro.travel_radius_miles} miles`
+                      : pro.salon_address || 'Salon-based service'}
+                    {locationStr && ` · ${locationStr}`}
+                  </p>
+                </div>
+                <div style={{ height: '380px' }} className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                  <CustomerLocationMap
+                    braiderName={pro.full_name}
+                  />
+                </div>
+                <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                  <a
+                    href={`/booking?braider_id=${pro.user_id}`}
+                    className={`flex-1 text-center py-3 rounded-xl font-bold text-white text-sm ${isBarber ? 'bg-blue-600' : 'bg-purple-600'}`}
+                  >
+                    <Navigation className="w-4 h-4 inline mr-1.5" />
+                    Book & Get Directions
+                  </a>
+                </div>
               </div>
             )}
           </div>

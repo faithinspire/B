@@ -24,6 +24,11 @@ const AppInitializer = dynamic(() => import('./components/AppInitializer').then(
   loading: () => null,
 });
 
+const PWAInstallPrompt = dynamic(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })), {
+  ssr: false,
+  loading: () => null,
+});
+
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-serif',
@@ -78,6 +83,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <AppInitializer />
         <AIAssistant />
+        <PWAInstallPrompt />
         
         {/* Fixed container that holds everything */}
         <div className="min-h-screen flex flex-col" style={{ margin: 0, padding: 0 }}>
