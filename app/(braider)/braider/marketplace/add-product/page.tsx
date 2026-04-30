@@ -42,7 +42,7 @@ const USA_STATES = [
 
 export default function AddProduct() {
   const router = useRouter();
-  const { user, accessToken, loading: authLoading } = useSupabaseAuthStore();
+  const { user, session, loading: authLoading } = useSupabaseAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -63,32 +63,33 @@ export default function AddProduct() {
     location_city: '',
   });
 
-  // Resolve the auth token - try store first, then supabase session
+  // Resolve the auth token — try store session first, then Supabase client
   useEffect(() => {
     const resolveToken = async () => {
-      // First try the stored token
-      if (accessToken) {
-        setResolvedToken(accessToken);
+      // Wait for auth to finish loading before making any decisions
+      if (authLoading) return;
+
+      // Try the session from the store first
+      if (session?.access_token) {
+        setResolvedToken(session.access_token);
         return;
       }
 
       // Fall back to getting session from supabase client
       if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          setResolvedToken(session.access_token);
+        const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+        if (supabaseSession?.access_token) {
+          setResolvedToken(supabaseSession.access_token);
           return;
         }
       }
 
-      // No token found - redirect to login
-      if (!authLoading) {
-        router.push('/login');
-      }
+      // Auth has finished loading and there's no session — redirect to login
+      router.push('/login?redirect=/braider/marketplace/add-product');
     };
 
     resolveToken();
-  }, [accessToken, authLoading, router]);
+  }, [session, authLoading, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -255,7 +256,19 @@ export default function AddProduct() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
-          <p className="text-gray-600 text-sm">Loading...</p>
+          <p className="text-gray-600 text-sm">Loading your store...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If auth loaded but no token and no error, still loading
+  if (!resolvedToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+          <p className="text-gray-600 text-sm">Verifying session...</p>
         </div>
       </div>
     );
