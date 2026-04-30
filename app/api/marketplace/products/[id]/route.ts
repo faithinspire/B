@@ -1,99 +1,85 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: Request,
+export async function DELETE(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const productId = params.id;
+    if (!productId) {
+      return NextResponse.json({ success: false, error: 'Product ID required' }, { status: 400 });
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       { auth: { persistSession: false } }
     );
 
-    const { data: product, error } = await supabase
+    const { error } = await supabase
       .from('marketplace_products')
-      .select('*')
-      .eq('id', params.id)
-      .single();
+      .delete()
+      .eq('id', productId);
 
-    if (error || !product) {
-      return NextResponse.json(
-        { success: false, error: 'Product not found' },
-        { status: 404 }
-      );
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    // Increment view count
-    await supabase
-      .from('marketplace_products')
-      .update({ view_count: (product.view_count || 0) + 1 })
-      .eq('id', params.id);
-
-    return NextResponse.json({
-      success: true,
-      data: product,
-    });
-  } catch (err) {
-    console.error('Product fetch error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
-export async function PUT(
-  request: Request,
+export async function GET(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const productId = params.id;
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
 
-    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
-      return NextResponse.json({ success: false, error: 'Server not configured' }, { status: 500 });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-
-    const body = await request.json();
-
-    // Accept auth via Authorization header or x-user-id header
-    const authHeader = request.headers.get('authorization');
-    const xUserId = request.headers.get('x-user-id');
-    let userId = xUserId;
-
-    if (authHeader && !userId) {
-      const anonClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await anonClient.auth.getUser(token);
-      userId = user?.id || null;
-    }
-
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify ownership
-    const { data: product } = await supabase
+    const { data, error } = await supabase
       .from('marketplace_products')
-      .select('braider_id')
-      .eq('id', params.id)
+      .select('*')
+      .eq('id', productId)
       .single();
 
-    if (!product || product.braider_id !== userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized - not your product' }, { status: 403 });
+    if (error || !data) {
+      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
     }
 
-    const { data: updated, error } = await supabase
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const productId = params.id;
+    const body = await request.json();
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { persistSession: false } }
+    );
+
+    const { data, error } = await supabase
       .from('marketplace_products')
-      .update({ ...body, updated_at: new Date().toISOString() })
-      .eq('id', params.id)
+      .update(body)
+      .eq('id', productId)
       .select()
       .single();
 
@@ -101,68 +87,8 @@ export async function PUT(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data: updated });
-  } catch (err) {
-    console.error('Product update error:', err);
-    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
-  }
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { persistSession: false } }
-    );
-
-    const userId = request.headers.get('x-user-id');
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Verify ownership
-    const { data: product } = await supabase
-      .from('marketplace_products')
-      .select('braider_id')
-      .eq('id', params.id)
-      .single();
-
-    if (!product || product.braider_id !== userId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-
-    const { error } = await supabase
-      .from('marketplace_products')
-      .delete()
-      .eq('id', params.id);
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Product deleted',
-    });
-  } catch (err) {
-    console.error('Product delete error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

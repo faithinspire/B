@@ -77,7 +77,16 @@ export default function BraiderMessagesPage() {
   if (!user || user.role !== 'braider') return null;
 
   const filtered = convs.filter(c => c.other_name.toLowerCase().includes(search.toLowerCase()));
-  const navTo = (c: Conv) => router.push('/braider/messages/' + (c.booking_id || c.id));
+  // Navigate to the correct chat page:
+  // - If conversation has a booking_id → /braider/messages/[booking_id]
+  // - Otherwise → /braider/messages/conv/[id] (direct chat, no booking)
+  const navTo = (c: Conv) => {
+    if (c.booking_id) {
+      router.push('/braider/messages/' + c.booking_id);
+    } else {
+      router.push('/braider/messages/conv/' + c.id);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,7 +114,7 @@ export default function BraiderMessagesPage() {
               <MessageCircle className="w-10 h-10 text-purple-500"/>
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">No messages yet</h3>
-            <p className="text-gray-500 text-sm">Accept a booking to start chatting</p>
+            <p className="text-gray-500 text-sm">Customers can message you directly from your profile</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">

@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Plus, Edit2, Trash2, Eye, TrendingUp, ShoppingBag, Star } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+import { Plus, Edit2, Trash2, Eye, TrendingUp, ShoppingBag, Star, Loader, AlertCircle } from 'lucide-react';
+import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 
 interface Product {
   id: string;
   name: string;
   price: number;
+  currency?: string;
+  country_code?: string;
   stock_quantity: number;
-  image_url: string;
+  image_url: string | null;
   rating_avg: number;
   rating_count: number;
   view_count: number;
@@ -18,258 +21,216 @@ interface Product {
   created_at: string;
 }
 
-interface SalesAnalytics {
-  total_sales: number;
-  total_orders: number;
-  total_revenue: number;
-  average_rating: number;
-}
-
 export default function BraiderMarketplace() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useSupabaseAuthStore();
   const [products, setProducts] = useState<Product[]>([]);
-  const [analytics, setAnalytics] = useState<SalesAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
+    if (!authLoading && (!user || user.role !== 'braider')) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
 
-    // Get current user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUserId(user.id);
-        fetchProducts(user.id);
-        fetchAnalytics(user.id);
-      }
-    });
-  }, []);
-
-  const fetchProducts = async (braider_id: string) => {
+  const fetchProducts = useCallback(async () => {
+    if (!user) return;
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-
-      const { data, error } = await supabase
-        .from('marketplace_products')
-        .select('*')
-        .eq('braider_id', braider_id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProducts(data || []);
+      setLoading(true);
+      setError('');
+      const res = await fetch(`/api/marketplace/products?braider_id=${user.id}&limit=50`);
+      if (!res.ok) throw new Error('Failed to load products');
+      const data = await res.json();
+      setProducts(data.data || []);
     } catch (err) {
-      console.error('Error fetching products:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load products');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchAnalytics = async (braider_id: string) => {
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-
-      const { data, error } = await supabase
-        .from('marketplace_sales_analytics')
-        .select('*')
-        .eq('braider_id', braider_id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setAnalytics(data || null);
-    } catch (err) {
-      console.error('Error fetching analytics:', err);
+  useEffect(() => {
+    if (!authLoading && user?.role === 'braider') {
+      fetchProducts();
     }
-  };
+  }, [user, authLoading, fetchProducts]);
 
   const deleteProduct = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-
+    if (!confirm('Delete this product? This cannot be undone.')) return;
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      );
-
-      const { error } = await supabase
-        .from('marketplace_products')
-        .delete()
-        .eq('id', productId);
-
-      if (error) throw error;
-      setProducts(products.filter(p => p.id !== productId));
+      setDeleting(productId);
+      // Use the API route with service role
+      const res = await fetch(`/api/marketplace/products/${productId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (err) {
-      console.error('Error deleting product:', err);
-      alert('Failed to delete product');
+      alert('Failed to delete product. Please try again.');
+    } finally {
+      setDeleting(null);
     }
   };
 
-  if (loading) {
+  const getCurrencySymbol = (product: Product) => {
+    if (product.country_code === 'US' || product.currency === 'USD') return '$';
+    return '₦';
+  };
+
+  if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="w-10 h-10 text-purple-600 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading your store...</p>
+        </div>
       </div>
     );
   }
 
+  if (!user || user.role !== 'braider') return null;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Marketplace</h1>
-              <p className="text-gray-600 mt-2">Sell products and accessories to customers</p>
-            </div>
-            <Link
-              href="/braider/marketplace/add-product"
-              className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Add Product
-            </Link>
+      <div className="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-4 py-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">🏪 My Store</h1>
+            <p className="text-purple-100 text-sm">{products.length} product{products.length !== 1 ? 's' : ''} listed</p>
           </div>
+          <Link
+            href="/braider/marketplace/add-product"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Link>
         </div>
       </div>
 
-      {/* Analytics Cards */}
-      {analytics && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">₦{analytics.total_revenue?.toLocaleString()}</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-green-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm">Total Orders</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.total_orders}</p>
-                </div>
-                <ShoppingBag className="w-8 h-8 text-blue-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm">Average Rating</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.average_rating?.toFixed(1)}</p>
-                </div>
-                <Star className="w-8 h-8 text-yellow-600" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm">Total Sales</p>
-                  <p className="text-2xl font-bold text-gray-900">{analytics.total_sales}</p>
-                </div>
-                <ShoppingBag className="w-8 h-8 text-purple-600" />
-              </div>
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Error */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-800 font-semibold text-sm">Failed to load products</p>
+              <p className="text-red-600 text-xs mt-1">{error}</p>
+              <button onClick={fetchProducts} className="mt-2 text-xs text-red-600 underline">Try again</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Products List */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {products.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No products yet</h3>
-            <p className="text-gray-600 mb-6">Start selling by adding your first product</p>
+        {/* Empty state */}
+        {!error && products.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center border border-gray-100">
+            <div className="text-5xl mb-4">🛍️</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No products yet</h3>
+            <p className="text-gray-500 text-sm mb-6">Start selling hair accessories, extensions, and more to customers worldwide</p>
             <Link
               href="/braider/marketplace/add-product"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
             >
               <Plus className="w-5 h-5" />
               Add Your First Product
             </Link>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow overflow-hidden hover:shadow-lg transition-shadow">
-                {/* Product Image */}
-                <div className="relative h-48 bg-gray-200 overflow-hidden">
+        )}
+
+        {/* Products grid */}
+        {products.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {products.map(product => (
+              <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                {/* Image */}
+                <div className="relative h-44 bg-gradient-to-br from-purple-100 to-pink-100 overflow-hidden">
                   {product.image_url ? (
                     <img
                       src={product.image_url}
                       alt={product.name}
                       className="w-full h-full object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <ShoppingBag className="w-12 h-12" />
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-4xl">🛍️</div>
                   )}
                   {!product.is_active && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white font-semibold">Inactive</span>
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="text-white font-bold text-sm bg-black/60 px-3 py-1 rounded-full">Inactive</span>
                     </div>
                   )}
+                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs font-bold text-gray-700">
+                    {product.country_code === 'US' ? '🇺🇸' : '🇳🇬'}
+                  </div>
                 </div>
 
-                {/* Product Info */}
+                {/* Info */}
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-lg font-bold text-primary-600">₦{product.price?.toLocaleString()}</span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm font-semibold">{product.rating_avg?.toFixed(1)}</span>
-                      <span className="text-xs text-gray-600">({product.rating_count})</span>
+                  <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 text-sm">{product.name}</h3>
+
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold text-purple-600">
+                      {getCurrencySymbol(product)}{(product.price || 0).toLocaleString()}
+                    </span>
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                      <span className="font-semibold">{(product.rating_avg || 0).toFixed(1)}</span>
+                      <span>({product.rating_count || 0})</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>{product.stock_quantity} in stock</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Eye className="w-4 h-4" />
-                      <span>{product.view_count} views</span>
-                    </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mb-4">
+                    <span className="flex items-center gap-1">
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      {product.stock_quantity} in stock
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5" />
+                      {product.view_count || 0} views
+                    </span>
                   </div>
 
                   {/* Actions */}
                   <div className="flex gap-2">
                     <Link
                       href={`/braider/marketplace/edit/${product.id}`}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-sm font-medium"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors text-xs font-semibold"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-3.5 h-3.5" />
                       Edit
                     </Link>
                     <button
                       onClick={() => deleteProduct(product.id)}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-sm font-medium"
+                      disabled={deleting === product.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors text-xs font-semibold disabled:opacity-50"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deleting === product.id ? (
+                        <Loader className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
                       Delete
                     </button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Add more CTA */}
+        {products.length > 0 && (
+          <div className="mt-6 text-center">
+            <Link
+              href="/braider/marketplace/add-product"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
+            >
+              <Plus className="w-5 h-5" />
+              Add Another Product
+            </Link>
           </div>
         )}
       </div>

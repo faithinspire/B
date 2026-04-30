@@ -1,75 +1,77 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
+const BUCKET_NAME = 'braider-uploads';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { file, media_type, braider_id } = body;
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
 
-    if (!file || !media_type || !braider_id) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    if (!file) {
+      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
+    }
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      return NextResponse.json({ success: false, error: 'File must be an image or video' }, { status: 400 });
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: 'File must be less than 50MB' }, { status: 400 });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    // Convert base64 to buffer
-    const base64Data = file.split(',')[1] || file;
-    const buffer = Buffer.from(base64Data, 'base64');
+    // Ensure bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
 
-    // Generate unique filename
+    if (!bucketExists) {
+      await supabase.storage.createBucket(BUCKET_NAME, {
+        public: true,
+        fileSizeLimit: 52428800, // 50MB
+      });
+    }
+
+    const buffer = await file.arrayBuffer();
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const ext = media_type === 'video' ? 'mp4' : 'jpg';
-    const filename = `${braider_id}/${timestamp}-${random}.${ext}`;
+    const ext = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+    const fileName = `status/${timestamp}-${random}.${ext}`;
 
-    // Upload to Supabase storage
-    const { data, error } = await supabase.storage
-      .from('braider-status')
-      .upload(filename, buffer, {
-        contentType: media_type === 'video' ? 'video/mp4' : 'image/jpeg',
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(fileName, buffer, {
+        contentType: file.type,
+        cacheControl: '86400', // 24 hours (matches status expiry)
         upsert: false,
       });
 
-    if (error) {
-      console.error('Upload error:', error);
-      return NextResponse.json(
-        { error: 'Upload failed' },
-        { status: 400 }
-      );
+    if (uploadError) {
+      console.error('Status upload error:', uploadError);
+      return NextResponse.json({ success: false, error: uploadError.message }, { status: 500 });
     }
 
-    // Get public URL
-    const { data: publicData } = supabase.storage
-      .from('braider-status')
-      .getPublicUrl(filename);
+    const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
 
     return NextResponse.json({
       success: true,
-      url: publicData.publicUrl,
-      filename,
+      url: publicUrl,
+      fileName,
+      type: isVideo ? 'video' : 'image',
     });
   } catch (error: any) {
     console.error('Status upload error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Upload failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

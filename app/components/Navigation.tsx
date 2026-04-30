@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuthStore } from '@/store/supabaseAuthStore';
 import { BraidMeLogo } from './BraidMeLogo';
-import { Menu, X, LogOut, Home, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users, LayoutDashboard } from 'lucide-react';
+import { Menu, X, LogOut, Home, MessageSquare, Zap, ShoppingBag, DollarSign, MessageCircle, Users, LayoutDashboard, Camera } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 const BACKGROUND_IMAGES = [
@@ -55,11 +55,11 @@ export function Navigation() {
 
     if (user.role === 'braider') {
       return [
-        { href: '/', icon: Home, label: 'Home', emoji: '🏠' },
         { href: '/braider/dashboard', icon: LayoutDashboard, label: 'Dashboard', emoji: '📊' },
         { href: '/braider/bookings', icon: Zap, label: 'Bookings', emoji: '📅' },
         { href: '/braider/messages', icon: MessageSquare, label: 'Messages', emoji: '💬' },
         { href: '/braider/marketplace', icon: ShoppingBag, label: 'Store', emoji: '🏪' },
+        { href: '/braider/status', icon: Camera, label: 'Status', emoji: '📸' },
       ];
     }
 

@@ -93,13 +93,37 @@ export default function BraiderStatusPage() {
       setUploading(true);
       setError(null);
 
-      // Create status directly with the base64 URL (for demo - in production upload to storage first)
+      // Upload the file to storage first, then create the status record
+      const fileInput = fileInputRef.current;
+      const file = fileInput?.files?.[0];
+
+      let mediaUrl = preview;
+
+      // If we have an actual file, upload it to storage
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadRes = await fetch('/api/upload/status', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            mediaUrl = uploadData.url;
+          }
+        }
+        // If upload fails, fall back to base64 (works for small images)
+      }
+
       const res = await fetch('/api/braider/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           braider_id: user.id,
-          media_url: preview,
+          media_url: mediaUrl,
           media_type: mediaType,
           caption: caption || null,
         }),
