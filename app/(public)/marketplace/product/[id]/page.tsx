@@ -36,7 +36,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const productId = params?.id as string;
-  const { user, accessToken } = useSupabaseAuthStore();
+  const { user, session } = useSupabaseAuthStore();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,17 +56,22 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [resolvedToken, setResolvedToken] = useState<string | null>(null);
 
-  // Resolve auth token
+  // Resolve auth token — use session.access_token (not accessToken which doesn't exist)
   useEffect(() => {
     const resolve = async () => {
-      if (accessToken) { setResolvedToken(accessToken); return; }
+      // Try store session first
+      if (session?.access_token) {
+        setResolvedToken(session.access_token);
+        return;
+      }
+      // Fall back to Supabase client session
       if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) setResolvedToken(session.access_token);
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s?.access_token) setResolvedToken(s.access_token);
       }
     };
     resolve();
-  }, [accessToken]);
+  }, [session]);
 
   useEffect(() => {
     if (!productId) return;

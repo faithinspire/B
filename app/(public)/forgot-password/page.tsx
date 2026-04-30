@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 function ForgotPasswordContent() {
   const searchParams = useSearchParams();
@@ -29,23 +30,41 @@ function ForgotPasswordContent() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      // Use Supabase client directly — most reliable approach.
+      // The redirectTo must be the exact URL Supabase will redirect to after
+      // the user clicks the link. It must be in your Supabase allowed redirect URLs.
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } }
+      );
 
-      const data = await response.json();
+      // Determine the app URL — use window.location.origin for accuracy
+      const appUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL || 'https://braidmee.vercel.app');
 
-      if (!response.ok) {
-        setError(data.error || 'Failed to send reset email');
-        return;
+      const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        {
+          redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
+        }
+      );
+
+      if (supabaseError) {
+        console.error('Supabase resetPasswordForEmail error:', supabaseError.message);
+        // Don't expose whether email exists — always show success
+        // But log the error for debugging
       }
 
+      // Always show success to prevent email enumeration
       setSuccess(true);
       setEmail('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Forgot password error:', err);
+      // Still show success to prevent email enumeration
+      setSuccess(true);
+      setEmail('');
     } finally {
       setLoading(false);
     }
@@ -63,13 +82,19 @@ function ForgotPasswordContent() {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-green-900 font-semibold">Check your email</p>
+              <p className="text-green-900 font-semibold">Check your email! 📧</p>
               <p className="text-green-700 text-sm mt-1">
-                We've sent a password reset link to your email. Click the link in the email to set a new password.
+                If an account exists with that email, we've sent a password reset link. Click the link to set a new password.
               </p>
-              <p className="text-green-600 text-xs mt-2">
-                Don't see it? Check your spam/junk folder.
+              <p className="text-green-600 text-xs mt-2 font-medium">
+                ⚠️ Don't see it? Check your spam/junk folder. The link expires in 1 hour.
               </p>
+              <button
+                onClick={() => { setSuccess(false); setEmail(''); }}
+                className="mt-3 text-xs text-green-700 underline hover:text-green-800"
+              >
+                Send another link
+              </button>
             </div>
           </div>
         )}
@@ -93,7 +118,7 @@ function ForgotPasswordContent() {
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="john@example.com"
+                  placeholder="your@email.com"
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
                   disabled={loading}
                   autoFocus
@@ -103,7 +128,7 @@ function ForgotPasswordContent() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !email.trim()}
               className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
@@ -112,7 +137,7 @@ function ForgotPasswordContent() {
 
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900">
-                <strong>How it works:</strong> You'll receive an email with a secure link. Click it to set a new password. The link expires after 1 hour.
+                <strong>How it works:</strong> Enter your email and we'll send a secure reset link. Click it to set a new password. The link expires after 1 hour.
               </p>
             </div>
           </form>
