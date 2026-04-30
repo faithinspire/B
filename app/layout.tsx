@@ -72,8 +72,10 @@ export default function RootLayout({
         <meta name="msapplication-config" content="/browserconfig.xml" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/favicon.svg" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-sans bg-transparent text-gray-900">
