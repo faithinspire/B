@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
         // Try Resend fallback if API key is configured
         const resendKey = process.env.RESEND_API_KEY;
         if (resendKey && resendKey !== 're_your_resend_api_key_here') {
-          await sendResetEmailViaResend(email, redirectTo, resendKey);
+          try {
+            await sendResetEmailViaResend(email, redirectTo, resendKey);
+          } catch (resendErr) {
+            console.error('[forgot-password] Resend fallback also failed:', resendErr);
+          }
         }
       }
     }
@@ -95,56 +99,61 @@ async function sendResetEmailViaResend(
   apiKey: string
 ): Promise<void> {
   try {
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidmee.com';
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
 
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `BraidMe <${fromEmail}>`,
-        to: [email],
-        subject: 'Reset your BraidMe password',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">✂️ BraidMe</h1>
-            </div>
-            
-            <h2 style="color: #1f2937; margin-bottom: 16px;">Reset Your Password</h2>
-            
-            <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
-              We received a request to reset your password. Click the button below to create a new password.
-              This link expires in 1 hour.
-            </p>
-            
-            <div style="text-align: center; margin: 32px 0;">
-              <a href="${resetUrl}" 
-                 style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
-                Reset Password
-              </a>
-            </div>
-            
-            <p style="color: #9ca3af; font-size: 14px; margin-top: 24px;">
-              If you didn't request this, you can safely ignore this email. Your password won't change.
-            </p>
-            
-            <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">
-              Or copy this link: <a href="${resetUrl}" style="color: #9333ea;">${resetUrl}</a>
-            </p>
-            
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-            <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-              © 2026 BraidMe. All rights reserved.
-            </p>
+    // Import Resend SDK
+    const { Resend } = await import('resend');
+    const resend = new Resend(apiKey);
+
+    // Send email using Resend SDK
+    const result = await resend.emails.send({
+      from: `BraidMe <${fromEmail}>`,
+      to: email,
+      subject: 'Reset your BraidMe password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">✂️ BraidMe</h1>
           </div>
-        `,
-      }),
+          
+          <h2 style="color: #1f2937; margin-bottom: 16px;">Reset Your Password</h2>
+          
+          <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
+            We received a request to reset your password. Click the button below to create a new password.
+            This link expires in 1 hour.
+          </p>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${resetUrl}" 
+               style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+          
+          <p style="color: #9ca3af; font-size: 14px; margin-top: 24px;">
+            If you didn't request this, you can safely ignore this email. Your password won't change.
+          </p>
+          
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">
+            Or copy this link: <a href="${resetUrl}" style="color: #9333ea;">${resetUrl}</a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            © 2026 BraidMe. All rights reserved.
+          </p>
+        </div>
+      `,
     });
-    console.log('[forgot-password] Resend fallback email sent to:', email);
+
+    if (result.error) {
+      console.error('[forgot-password] Resend API error:', result.error);
+      throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
+    }
+
+    console.log('[forgot-password] Resend email sent successfully to:', email, 'ID:', result.id);
   } catch (err) {
     console.error('[forgot-password] Resend fallback failed:', err);
+    throw err;
   }
 }

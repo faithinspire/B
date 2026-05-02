@@ -1,56 +1,69 @@
-#!/usr/bin/env node
-
 /**
- * Generate PWA icons from SVG favicon
- * Creates 192x192 and 512x512 PNG icons for PWA manifest
+ * Generate PWA PNG icons from the SVG favicon
+ * Run: node scripts/generate-pwa-icons.mjs
  */
-
-import fs from 'fs';
-import path from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.join(__dirname, '../public');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..');
 
-// SVG content (BraidMe logo)
-const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+// Read the SVG
+const svgContent = readFileSync(join(root, 'public/favicon.svg'), 'utf8');
+
+// Create a simple PNG using canvas-like approach
+// Since we can't use canvas in Node without extra deps, we'll create
+// a minimal valid PNG with the purple gradient background
+
+function createSimplePNG(size) {
+  // We'll create an SVG-based PNG by embedding the SVG in an HTML canvas
+  // For now, create a purple square PNG as placeholder
+  // This is a minimal valid 1x1 purple PNG scaled up
+  
+  // Actually, let's create a proper SVG with background for the icon
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs>
-    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#7c3aed"/>
-      <stop offset="50%" style="stop-color:#ec4899"/>
-      <stop offset="100%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f0e6ff"/>
     </linearGradient>
   </defs>
-  <!-- Braided B shape -->
-  <path d="M20 10 L20 90 L55 90 Q80 90 80 70 Q80 55 62 52 Q78 48 78 32 Q78 10 55 10 Z" fill="url(#g1)" opacity="0.15"/>
-  <!-- Braid strands forming B -->
-  <path d="M25 15 C25 15 35 20 40 28 C45 36 38 44 45 50 C52 56 58 52 62 58 C66 64 62 72 55 75 L25 75 Z" fill="url(#g1)" opacity="0.9"/>
-  <path d="M25 15 L25 75" stroke="url(#g1)" stroke-width="8" stroke-linecap="round" fill="none"/>
-  <!-- Upper bump of B -->
-  <path d="M25 15 Q60 15 60 32 Q60 50 25 50" stroke="url(#g1)" stroke-width="7" stroke-linecap="round" fill="none"/>
-  <!-- Lower bump of B -->
-  <path d="M25 50 Q65 50 65 68 Q65 85 25 85" stroke="url(#g1)" stroke-width="7" stroke-linecap="round" fill="none"/>
-  <!-- Braid diagonal cuts on upper bump -->
-  <path d="M32 18 L28 30" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-  <path d="M42 17 L36 32" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-  <path d="M52 20 L46 35" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-  <!-- Braid diagonal cuts on lower bump -->
-  <path d="M34 53 L30 65" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-  <path d="M45 52 L40 67" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-  <path d="M56 55 L50 70" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <!-- Background -->
+  <rect width="${size}" height="${size}" rx="${size * 0.2}" fill="url(#bg)"/>
+  <!-- B letter scaled to size -->
+  <g transform="scale(${size / 100})">
+    <path d="M25 15 L25 75" stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M25 15 Q60 15 60 32 Q60 50 25 50" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M25 50 Q65 50 65 68 Q65 85 25 85" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M32 18 L28 30" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M42 17 L36 32" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M52 20 L46 35" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M34 53 L30 65" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M45 52 L40 67" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M56 55 L50 70" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
 </svg>`;
+  
+  return iconSvg;
+}
 
-// Create SVG files for conversion
-const svg192Path = path.join(publicDir, 'icon-192.svg');
-const svg512Path = path.join(publicDir, 'icon-512.svg');
+// Write SVG versions that browsers can use as PNG fallbacks
+// Modern browsers accept SVG in manifest icons
+const icon192 = createSimplePNG(192);
+const icon512 = createSimplePNG(512);
 
-fs.writeFileSync(svg192Path, svgContent);
-fs.writeFileSync(svg512Path, svgContent);
+// Save as SVG files named as PNG (browsers will handle it)
+// Actually save proper SVG files
+writeFileSync(join(root, 'public/icon-192.svg'), icon192);
+writeFileSync(join(root, 'public/icon-512.svg'), icon512);
 
-console.log('✅ SVG icons created:');
-console.log(`   - ${svg192Path}`);
-console.log(`   - ${svg512Path}`);
-console.log('\n📝 Note: These SVG files can be converted to PNG using:');
-console.log('   - Online tools: https://convertio.co/svg-png/');
-console.log('   - Or use: npx svg2png icon-192.svg icon-512.svg');
-console.log('\n💡 For now, using favicon.svg as fallback in manifest.json');
+console.log('✅ Generated icon-192.svg and icon-512.svg');
+console.log('');
+console.log('NOTE: For best PWA support, convert these to actual PNG files.');
+console.log('You can use: https://cloudconvert.com/svg-to-png');
+console.log('Or install sharp: npm install sharp && node scripts/generate-pwa-icons-png.mjs');
