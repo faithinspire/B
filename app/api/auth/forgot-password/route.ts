@@ -117,13 +117,19 @@ async function sendResetEmailViaResend(
   try {
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
 
+    console.log('[forgot-password] Resend sending:', {
+      from: fromEmail,
+      to: email,
+      apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 10),
+    });
+
     // Import Resend SDK
     const { Resend } = await import('resend');
     const resend = new Resend(apiKey);
 
     // Send email using Resend SDK
     const result = await resend.emails.send({
-      from: `BraidMe <${fromEmail}>`,
+      from: fromEmail,  // Use plain email without "BraidMe <>" wrapper
       to: email,
       subject: 'Reset your BraidMe password',
       html: `
