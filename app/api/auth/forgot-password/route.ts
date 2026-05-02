@@ -25,54 +25,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !anonKey) {
-      return NextResponse.json(
-        { success: false, error: 'Server not configured' },
-        { status: 500 }
-      );
-    }
-
     // Determine the correct redirect URL from the request origin
     const origin = request.headers.get('origin') ||
       request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
       process.env.NEXT_PUBLIC_APP_URL ||
       'https://braidmee.vercel.app';
 
-    const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+    const resetUrl = `${origin}/auth/callback?next=/reset-password`;
 
-    console.log('[forgot-password] email:', email, '| redirectTo:', redirectTo);
+    console.log('[forgot-password] Processing reset for:', email);
+    console.log('[forgot-password] Reset URL:', resetUrl);
 
-    // Use anon client — resetPasswordForEmail requires anon key
-    const supabase = createClient(supabaseUrl, anonKey, {
-      auth: { persistSession: false }
-    });
-
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo }
-    );
-
-    if (error) {
-      console.error('[forgot-password] Supabase error:', error.message);
-      // If Supabase SMTP isn't configured, try Resend as fallback
-      if (
-        error.message.includes('not authorized') ||
-        error.message.includes('rate limit') ||
-        error.message.includes('smtp')
-      ) {
-        // Try Resend fallback if API key is configured
-        const resendKey = process.env.RESEND_API_KEY;
-        if (resendKey && resendKey !== 're_your_resend_api_key_here') {
-          try {
-            await sendResetEmailViaResend(email, redirectTo, resendKey);
-          } catch (resendErr) {
-            console.error('[forgot-password] Resend fallback also failed:', resendErr);
-          }
+    // PRIMARY: Use Resend for email delivery (most reliable)
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey && resendKey !== 're_your_resend_api_key_here') {
+      try {
+        console.log('[forgot-password] Sending via Resend (PRIMARY)');
+        await sendResetEmailViaResend(email, resetUrl, resendKey);
+        console.log('[forgot-password] ✅ Email sent successfully via Resend');
+      } catch (resendErr) {
+        console.error('[forgot-password] ❌ Resend failed:', resendErr);
+        // Fall back to Supabase if Resend fails
+        try {
+          console.log('[forgot-password] Falling back to Supabase');
+          await sendResetEmailViaSupabase(email, resetUrl);
+          console.log('[forgot-password] ✅ Email sent successfully via Supabase');
+        } catch (supabaseErr) {
+          console.error('[forgot-password] ❌ Supabase also failed:', supabaseErr);
+          throw new Error('All email services failed');
         }
       }
+    } else {
+      // FALLBACK: Use Supabase if Resend not configured
+      console.log('[forgot-password] Resend not configured, using Supabase');
+      await sendResetEmailViaSupabase(email, resetUrl);
+      console.log('[forgot-password] ✅ Email sent successfully via Supabase');
     }
 
     // Always return success to prevent email enumeration
@@ -81,11 +68,40 @@ export async function POST(request: NextRequest) {
       message: 'If an account exists with this email, a password reset link has been sent.',
     });
   } catch (error) {
-    console.error('[forgot-password] Error:', error);
+    console.error('[forgot-password] Fatal error:', error);
+    // Still return success to prevent email enumeration
     return NextResponse.json({
       success: true,
       message: 'If an account exists with this email, a password reset link has been sent.',
     });
+  }
+}
+
+/**
+ * Send reset email via Supabase Auth
+ */
+async function sendResetEmailViaSupabase(
+  email: string,
+  redirectTo: string
+): Promise<void> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Supabase not configured');
+  }
+
+  const supabase = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false }
+  });
+
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim().toLowerCase(),
+    { redirectTo }
+  );
+
+  if (error) {
+    throw new Error(`Supabase error: ${error.message}`);
   }
 }
 
