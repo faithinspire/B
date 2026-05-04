@@ -10,7 +10,7 @@
  *          custom install button
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { X, Download, Share, Plus } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -18,24 +18,16 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-// Keep the deferred prompt globally — the event fires once and won't repeat
-let _deferredPrompt: BeforeInstallPromptEvent | null = null;
-
-// Register the listener immediately at module load time (before React renders)
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    _deferredPrompt = e as BeforeInstallPromptEvent;
-  });
-}
-
 export function PWAInstallPrompt() {
   const [show, setShow] = useState(false);
   const [platform, setPlatform] = useState<'ios' | 'android' | null>(null);
   const [installing, setInstalling] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const promptListenerRef = useRef(false);
 
   const shouldShow = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+
     // Already running as installed PWA
     if (
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -50,9 +42,11 @@ export function PWAInstallPrompt() {
   }, []);
 
   useEffect(() => {
-    const ua = navigator.userAgent;
-    const isIOS = /iphone|ipad|ipod/i.test(ua);
-    const isAndroid = /android/i.test(ua);
+    if (typeof window === 'undefined') return;
+
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
 
     if (!isIOS && !isAndroid) return; // Desktop — skip
 
@@ -60,26 +54,37 @@ export function PWAInstallPrompt() {
 
     if (isIOS) {
       // iOS Safari only — Chrome/Firefox on iOS don't support PWA install
-      const isSafari = /safari/i.test(ua) && !/crios|fxios|opios|chrome/i.test(ua);
+      const isSafari = /safari/.test(ua) && !/crios|fxios|opios|chrome/.test(ua);
       if (!isSafari) return;
       setPlatform('ios');
-      setTimeout(() => setShow(true), 3000);
+      // Show after a short delay to let page load
+      const timer = setTimeout(() => setShow(true), 2000);
+      return () => clearTimeout(timer);
     } else if (isAndroid) {
       setPlatform('android');
-      // Check if we already captured the event
-      if (_deferredPrompt) {
-        setDeferredPrompt(_deferredPrompt);
-        setTimeout(() => setShow(true), 3000);
-      } else {
-        // Listen for it (may still fire)
-        const handler = (e: Event) => {
+      
+      // Set up listener for beforeinstallprompt event
+      if (!promptListenerRef.current) {
+        promptListenerRef.current = true;
+        
+        const handleBeforeInstallPrompt = (e: Event) => {
+          console.log('[PWA] beforeinstallprompt event fired');
           e.preventDefault();
-          _deferredPrompt = e as BeforeInstallPromptEvent;
-          setDeferredPrompt(e as BeforeInstallPromptEvent);
-          if (shouldShow()) setTimeout(() => setShow(true), 1000);
+          const event = e as BeforeInstallPromptEvent;
+          setDeferredPrompt(event);
+          // Show prompt after a short delay
+          setTimeout(() => {
+            if (shouldShow()) {
+              setShow(true);
+            }
+          }, 1000);
         };
-        window.addEventListener('beforeinstallprompt', handler);
-        return () => window.removeEventListener('beforeinstallprompt', handler);
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        
+        return () => {
+          window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
       }
     }
   }, [shouldShow]);
@@ -96,10 +101,13 @@ export function PWAInstallPrompt() {
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        _deferredPrompt = null;
+        setDeferredPrompt(null);
         setShow(false);
+        localStorage.setItem('pwa_dismissed', String(Date.now()));
       }
-    } catch {}
+    } catch (err) {
+      console.error('[PWA] Install error:', err);
+    }
     setInstalling(false);
   };
 
@@ -110,7 +118,14 @@ export function PWAInstallPrompt() {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[99999]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Semi-transparent backdrop */}
-        <div className="absolute inset-0 bg-black/50" style={{ top: '-200vh' }} onClick={dismiss} />
+        <div 
+          className="absolute inset-0 bg-black/50 cursor-pointer" 
+          style={{ top: '-200vh' }} 
+          onClick={dismiss}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && dismiss()}
+        />
 
         <div className="relative bg-white rounded-t-3xl shadow-2xl">
           {/* Drag handle */}
@@ -121,7 +136,7 @@ export function PWAInstallPrompt() {
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-lg flex-shrink-0">
                 <span className="text-3xl">✂️</span>
               </div>
               <div>
@@ -129,7 +144,11 @@ export function PWAInstallPrompt() {
                 <p className="text-gray-500 text-xs">Free • Works offline • No App Store</p>
               </div>
             </div>
-            <button onClick={dismiss} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+            <button 
+              onClick={dismiss} 
+              className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 active:bg-gray-200 transition-colors"
+              aria-label="Close"
+            >
               <X className="w-4 h-4 text-gray-500" />
             </button>
           </div>
@@ -167,7 +186,10 @@ export function PWAInstallPrompt() {
           </div>
 
           <div className="px-5 pb-6">
-            <button onClick={dismiss} className="w-full py-2.5 text-gray-400 text-sm">
+            <button 
+              onClick={dismiss} 
+              className="w-full py-2.5 text-gray-400 text-sm active:text-gray-600 transition-colors"
+            >
               Maybe later
             </button>
           </div>
@@ -183,7 +205,7 @@ export function PWAInstallPrompt() {
         {/* Gradient header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow flex-shrink-0">
               <span className="text-2xl">✂️</span>
             </div>
             <div>
@@ -191,7 +213,11 @@ export function PWAInstallPrompt() {
               <p className="text-white/80 text-xs">Free app • Works offline</p>
             </div>
           </div>
-          <button onClick={dismiss} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <button 
+            onClick={dismiss} 
+            className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 active:bg-white/30 transition-colors"
+            aria-label="Close"
+          >
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
@@ -206,16 +232,25 @@ export function PWAInstallPrompt() {
           <button
             onClick={install}
             disabled={installing || !deferredPrompt}
-            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-60"
+            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-lg active:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {installing ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Installing...</>
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Installing...
+              </>
             ) : (
-              <><Download className="w-4 h-4" />Install App — Free</>
+              <>
+                <Download className="w-4 h-4" />
+                Install App — Free
+              </>
             )}
           </button>
 
-          <button onClick={dismiss} className="w-full mt-2 py-2 text-gray-400 text-xs">
+          <button 
+            onClick={dismiss} 
+            className="w-full mt-2 py-2 text-gray-400 text-xs active:text-gray-600 transition-colors"
+          >
             Not now
           </button>
         </div>

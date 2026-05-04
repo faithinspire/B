@@ -120,8 +120,13 @@ async function sendResetEmailViaResend(
     console.log('[forgot-password] Resend sending:', {
       from: fromEmail,
       to: email,
-      apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 10),
+      apiKeyPrefix: apiKey?.substring(0, 10),
     });
+
+    // Validate API key
+    if (!apiKey || apiKey.length < 10) {
+      throw new Error('Invalid Resend API key');
+    }
 
     // Import Resend SDK
     const { Resend } = await import('resend');
@@ -130,7 +135,7 @@ async function sendResetEmailViaResend(
     // Send email using Resend SDK
     const result = await resend.emails.send({
       from: fromEmail,  // Use plain email without "BraidMe <>" wrapper
-      to: email,
+      to: email.trim().toLowerCase(),
       subject: 'Reset your BraidMe password',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -173,9 +178,9 @@ async function sendResetEmailViaResend(
       throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
     }
 
-    console.log('[forgot-password] Resend email sent successfully to:', email, 'ID:', result.id);
+    console.log('[forgot-password] ✅ Resend email sent successfully to:', email, 'ID:', result.id);
   } catch (err) {
-    console.error('[forgot-password] Resend fallback failed:', err);
+    console.error('[forgot-password] ❌ Resend fallback failed:', err);
     throw err;
   }
 }
