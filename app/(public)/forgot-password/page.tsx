@@ -4,7 +4,6 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
 function ForgotPasswordContent() {
   const searchParams = useSearchParams();
@@ -30,38 +29,26 @@ function ForgotPasswordContent() {
     setLoading(true);
 
     try {
-      // Use Supabase client directly — most reliable approach.
-      // The redirectTo must be the exact URL Supabase will redirect to after
-      // the user clicks the link. It must be in your Supabase allowed redirect URLs.
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { auth: { persistSession: false } }
-      );
+      // Call our API endpoint which uses Resend for email delivery
+      // (Supabase's built-in email only works for project team members)
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
 
-      // Determine the app URL — use window.location.origin for accuracy
-      const appUrl = typeof window !== 'undefined'
-        ? window.location.origin
-        : (process.env.NEXT_PUBLIC_APP_URL || 'https://braidmee.vercel.app');
+      const data = await response.json();
 
-      const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(
-        email.trim().toLowerCase(),
-        {
-          redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
-        }
-      );
-
-      if (supabaseError) {
-        console.error('Supabase resetPasswordForEmail error:', supabaseError.message);
+      if (!response.ok) {
+        console.error('[forgot-password] API error:', data);
         // Don't expose whether email exists — always show success
-        // But log the error for debugging
       }
 
       // Always show success to prevent email enumeration
       setSuccess(true);
       setEmail('');
     } catch (err) {
-      console.error('Forgot password error:', err);
+      console.error('[forgot-password] Request error:', err);
       // Still show success to prevent email enumeration
       setSuccess(true);
       setEmail('');
