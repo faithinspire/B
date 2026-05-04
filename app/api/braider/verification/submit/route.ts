@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { sendEmail, buildVerificationSubmittedEmail } from '@/app/lib/emailService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,6 +34,18 @@ export async function POST(request: NextRequest) {
     if (!full_name || !phone || !id_document_type || !id_number || !id_document_url) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Get user email for sending confirmation
+    const { data: { user } } = await supabase.auth.admin.getUserById(session.user.id);
+    const userEmail = user?.email;
+
+    if (!userEmail) {
+      console.error('[verification-submit] ❌ User email not found');
+      return NextResponse.json(
+        { error: 'User email not found' },
         { status: 400 }
       );
     }
@@ -86,13 +99,29 @@ export async function POST(request: NextRequest) {
         reason: 'Braider submitted verification documents',
       });
 
+    // Send confirmation email via Resend
+    console.log('[verification-submit] Sending confirmation email to:', userEmail);
+    const emailResult = await sendEmail({
+      to: userEmail,
+      subject: 'Verification Submitted - BraidMe',
+      html: buildVerificationSubmittedEmail(full_name),
+    });
+
+    if (!emailResult.success) {
+      console.error('[verification-submit] ⚠️ Failed to send confirmation email:', emailResult.error);
+      // Don't fail the request if email fails - verification was still submitted
+    } else {
+      console.log('[verification-submit] ✅ Confirmation email sent:', emailResult.id);
+    }
+
     return NextResponse.json({
       success: true,
       verification,
       message: 'Verification submitted successfully',
+      emailSent: emailResult.success,
     });
   } catch (error) {
-    console.error('Verification submit error:', error);
+    console.error('[verification-submit] ❌ Error:', error);
     return NextResponse.json(
       { error: 'Failed to submit verification' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { sendEmail, buildVerificationApprovedEmail } from '@/app/lib/emailService';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,11 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // Get braider's user info for email
+    const { data: { user } } = await supabase.auth.admin.getUserById(profile.user_id);
+    const userEmail = user?.email;
+    const userName = user?.user_metadata?.full_name || 'Braider';
+
     // Try updating with 'approved' — if ENUM error, try 'tier1_verified'
     const statusesToTry = ['approved', 'tier1_verified', 'verified'];
     let updated = false;
@@ -58,11 +64,11 @@ export async function POST(request: NextRequest) {
 
       if (!error) {
         updated = true;
-        console.log(`Braider approved with status: ${status}`);
+        console.log(`[verification-approve] Braider approved with status: ${status}`);
         break;
       }
       lastError = error.message;
-      console.log(`Status "${status}" failed: ${error.message}`);
+      console.log(`[verification-approve] Status "${status}" failed: ${error.message}`);
     }
 
     if (!updated) {
@@ -81,9 +87,28 @@ export async function POST(request: NextRequest) {
         .eq('id', userId);
     }
 
+    // Send approval email via Resend
+    if (userEmail) {
+      console.log('[verification-approve] Sending approval email to:', userEmail);
+      const emailResult = await sendEmail({
+        to: userEmail,
+        subject: 'Verification Approved - BraidMe 🎉',
+        html: buildVerificationApprovedEmail(userName),
+      });
+
+      if (!emailResult.success) {
+        console.error('[verification-approve] ⚠️ Failed to send approval email:', emailResult.error);
+        // Don't fail the request if email fails - verification was still approved
+      } else {
+        console.log('[verification-approve] ✅ Approval email sent:', emailResult.id);
+      }
+    } else {
+      console.warn('[verification-approve] ⚠️ User email not found for braider:', profile.user_id);
+    }
+
     return NextResponse.json({ success: true, message: 'Braider approved successfully' });
   } catch (error) {
-    console.error('Approve error:', error);
+    console.error('[verification-approve] ❌ Error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }
 }

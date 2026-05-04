@@ -96,7 +96,7 @@ async function sendResetEmailViaResend(
   apiKey: string
 ): Promise<void> {
   try {
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
     console.log('[forgot-password] Resend config:', {
       from: fromEmail,
@@ -123,47 +123,14 @@ async function sendResetEmailViaResend(
     const { Resend } = await import('resend');
     const resend = new Resend(apiKey);
 
-    console.log('[forgot-password] Sending email via Resend...');
+    console.log('[forgot-password] Sending email via Resend to:', email);
     
-    // Send email using Resend SDK
+    // Send email to the requested email address with the reset link
     const result = await resend.emails.send({
       from: fromEmail,
       to: email,
       subject: 'Reset your BraidMe password',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">✂️ BraidMe</h1>
-          </div>
-          
-          <h2 style="color: #1f2937; margin-bottom: 16px;">Reset Your Password</h2>
-          
-          <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
-            We received a request to reset your password. Click the button below to create a new password.
-            This link expires in 1 hour.
-          </p>
-          
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${resetUrl}" 
-               style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
-              Reset Password
-            </a>
-          </div>
-          
-          <p style="color: #9ca3af; font-size: 14px; margin-top: 24px;">
-            If you didn't request this, you can safely ignore this email. Your password won't change.
-          </p>
-          
-          <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">
-            Or copy this link: <a href="${resetUrl}" style="color: #9333ea;">${resetUrl}</a>
-          </p>
-          
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-            © 2026 BraidMe. All rights reserved.
-          </p>
-        </div>
-      `,
+      html: buildPasswordResetEmail(resetUrl),
     });
 
     console.log('[forgot-password] Resend response received:', {
@@ -193,4 +160,44 @@ async function sendResetEmailViaResend(
     });
     throw err;
   }
+}
+
+/**
+ * Build the password reset email HTML
+ */
+function buildPasswordResetEmail(resetUrl: string): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+        <h1 style="color: white; margin: 0; font-size: 28px;">✂️ BraidMe</h1>
+      </div>
+      
+      <h2 style="color: #1f2937; margin-bottom: 16px;">Reset Your Password</h2>
+      
+      <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
+        We received a request to reset your password. Click the button below to create a new password.
+        This link expires in 1 hour.
+      </p>
+      
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetUrl}" 
+           style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+          Reset Password
+        </a>
+      </div>
+      
+      <p style="color: #9ca3af; font-size: 14px; margin-top: 24px;">
+        If you didn't request this, you can safely ignore this email. Your password won't change.
+      </p>
+      
+      <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">
+        Or copy this link: <a href="${resetUrl}" style="color: #9333ea;">${resetUrl}</a>
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+      <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+        © 2026 BraidMe. All rights reserved.
+      </p>
+    </div>
+  `;
 }
