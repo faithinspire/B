@@ -1,0 +1,9 @@
+*.md
+*.sql
+*.txt
+install.sh
+.kiro/
+.vscode/
+.git/
+node_modules/
+.next/

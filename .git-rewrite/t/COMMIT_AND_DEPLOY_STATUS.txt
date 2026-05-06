@@ -1,0 +1,51 @@
+MESSAGING SYSTEM FIXES - DEPLOYMENT STATUS
+==========================================
+
+STATUS: ✓ CODE MODIFIED | ⏳ NOT YET COMMITTED TO GIT
+
+FILES MODIFIED (Verified):
+✓ app/api/messages/send/route.ts - 3-tier fallback for message insert
+✓ app/api/messages/conversation/[id]/route.ts - Dual-schema read/is_read support
+✓ app/api/bookings/route.ts - Added GET endpoint
+✓ app/(braider)/braider/messages/[booking_id]/page.tsx - Resilient conversation fetch
+✓ app/(customer)/messages/[booking_id]/page.tsx - Resilient conversation fetch
+
+NEXT STEPS TO DEPLOY:
+
+1. COMMIT TO GIT (from your terminal):
+   git add -A
+   git commit -m "Fix messaging system: dual-schema support, resilient conversation fetch, GET bookings endpoint"
+   git push origin master
+
+2. NETLIFY WILL AUTO-DEPLOY when you push to master
+
+3. THEN RUN SQL IN SUPABASE:
+   - Go to Supabase Dashboard → SQL Editor
+   - New Query
+   - Copy entire content from: CRITICAL_DB_FIX_RUN_NOW.sql
+   - Click Run
+
+4. TEST:
+   - Send message (braider → customer)
+   - Send message (customer → braider)
+   - Share location (braider)
+   - See location update (customer)
+
+WHAT'S READY:
+✓ Message send API with 3-tier fallback
+✓ Chat detail pages with resilient conversation fetch
+✓ Bookings GET endpoint
+✓ Dual-schema support in all APIs
+✓ Real-time subscriptions for messages and location
+
+WHAT'S STILL NEEDED:
+⏳ Git commit and push to master
+⏳ SQL execution in Supabase
+⏳ Testing
+
+ESTIMATED TIME:
+- Commit: 1 minute
+- Netlify deploy: 2-3 minutes
+- SQL execution: 1 minute
+- Testing: 10 minutes
+TOTAL: ~15 minutes
