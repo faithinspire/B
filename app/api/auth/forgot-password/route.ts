@@ -1,17 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Forgot password endpoint.
- *
- * IMPORTANT: Supabase's built-in email only sends to project team members.
- * For production, you MUST configure custom SMTP in Supabase dashboard:
- * https://supabase.com/dashboard/project/[ref]/settings/auth
- *
- * This endpoint calls Supabase's resetPasswordForEmail which uses whatever
- * SMTP is configured (built-in or custom).
+ * Forgot password endpoint using Brevo (Sendinblue) for email delivery.
+ * 
+ * This uses Brevo's SMTP API which:
+ * - Works for ALL users (no restrictions)
+ * - Reliable email delivery
+ * - Professional email service
+ * - Sends to any registered email address
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Normalize email
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Determine the correct redirect URL from the request origin
+    // Determine the correct redirect URL
     const origin = request.headers.get('origin') ||
       request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
       process.env.NEXT_PUBLIC_APP_URL ||
@@ -38,37 +36,23 @@ export async function POST(request: NextRequest) {
 
     console.log('[forgot-password] Processing reset for:', normalizedEmail);
     console.log('[forgot-password] Reset URL:', resetUrl);
-    console.log('[forgot-password] RESEND_API_KEY configured:', !!process.env.RESEND_API_KEY);
 
-    // PRIMARY: Use Resend for email delivery (ONLY method that works reliably)
-    // NOTE: Supabase's built-in email only works for project team members, so we skip it
-    const resendKey = process.env.RESEND_API_KEY;
-    
-    console.log('[forgot-password] Resend key check:', {
-      exists: !!resendKey,
-      length: resendKey?.length,
-      startsWithRe: resendKey?.startsWith('re_'),
-      isPlaceholder: resendKey?.includes('your_resend_api_key'),
-      actualKey: resendKey?.substring(0, 50), // Log first 50 chars
-    });
-    
-    if (!resendKey || resendKey.includes('your_resend_api_key')) {
-      console.error('[forgot-password] ❌ RESEND_API_KEY not configured or is placeholder');
+    // Send email via Brevo
+    const result = await sendPasswordResetEmailViaBrevo(
+      normalizedEmail,
+      resetUrl
+    );
+
+    if (!result.success) {
+      console.error('[forgot-password] Brevo error:', result.error);
+      // Still return success to prevent email enumeration
       return NextResponse.json({
         success: true,
         message: 'If an account exists with this email, a password reset link has been sent.',
       });
     }
 
-    try {
-      console.log('[forgot-password] Sending via Resend...');
-      await sendResetEmailViaResend(normalizedEmail, resetUrl, resendKey);
-      console.log('[forgot-password] ✅ Email sent successfully via Resend');
-    } catch (resendErr) {
-      console.error('[forgot-password] ❌ Resend failed:', resendErr);
-      // Don't try Supabase - it won't work for regular users
-      throw resendErr;
-    }
+    console.log('[forgot-password] ✅ Password reset email sent successfully via Brevo');
 
     // Always return success to prevent email enumeration
     return NextResponse.json({
@@ -86,27 +70,28 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Send reset email via Resend API
- * This is the ONLY reliable method for sending emails to regular users
- * (Supabase's built-in email only works for project team members)
+ * Send password reset email via Brevo SMTP API
+ * Works for ALL users - no restrictions
  */
-async function sendResetEmailViaResend(
+async function sendPasswordResetEmailViaBrevo(
   email: string,
-  resetUrl: string,
-  apiKey: string
-): Promise<void> {
+  resetUrl: string
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    const apiKey = process.env.BREVO_API_KEY;
+    const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@braidme.com';
+    const fromName = process.env.BREVO_FROM_NAME || 'BraidMe';
 
-    console.log('[forgot-password] Resend config:', {
+    console.log('[forgot-password] Brevo config:', {
       from: fromEmail,
+      fromName: fromName,
       to: email,
       apiKeyLength: apiKey?.length,
     });
 
     // Validate inputs
     if (!apiKey || apiKey.length < 10) {
-      throw new Error(`Invalid Resend API key: length=${apiKey?.length}`);
+      throw new Error(`Invalid Brevo API key: length=${apiKey?.length}`);
     }
 
     if (!email || !email.includes('@')) {
@@ -117,48 +102,74 @@ async function sendResetEmailViaResend(
       throw new Error(`Invalid from email: ${fromEmail}`);
     }
 
-    console.log('[forgot-password] Importing Resend SDK...');
-    
-    // Import Resend SDK
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
+    console.log('[forgot-password] Sending password reset email via Brevo...');
 
-    console.log('[forgot-password] Sending email via Resend to:', email);
-    
-    // Send email to the requested email address with the reset link
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: email,
-      subject: 'Reset your BraidMe password',
-      html: buildPasswordResetEmail(resetUrl),
+    // Send email via Brevo API
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: fromName,
+          email: fromEmail,
+        },
+        to: [
+          {
+            email: email,
+            name: email.split('@')[0], // Use part before @ as name
+          },
+        ],
+        subject: 'Reset your BraidMe password',
+        htmlContent: buildPasswordResetEmail(resetUrl),
+        replyTo: {
+          email: fromEmail,
+          name: fromName,
+        },
+      }),
     });
 
-    console.log('[forgot-password] Resend response received:', {
-      hasId: !!result.id || !!result.data?.id,
-      hasError: !!result.error,
-      fullResponse: JSON.stringify(result),
+    const responseData = await response.json();
+
+    console.log('[forgot-password] Brevo response:', {
+      status: response.status,
+      messageId: responseData.messageId,
+      hasError: !response.ok,
     });
 
-    if (result.error) {
-      console.error('[forgot-password] Resend API error:', result.error);
-      throw new Error(`Resend error: ${result.error.message || JSON.stringify(result.error)}`);
+    if (!response.ok) {
+      console.error('[forgot-password] Brevo API error:', responseData);
+      return {
+        success: false,
+        error: `Brevo error: ${responseData.message || JSON.stringify(responseData)}`,
+      };
     }
 
-    const emailId = result.id || result.data?.id;
-    if (!emailId) {
-      console.error('[forgot-password] Resend response missing ID:', JSON.stringify(result));
-      throw new Error('Resend did not return an email ID');
+    if (!responseData.messageId) {
+      console.error('[forgot-password] Brevo response missing messageId:', responseData);
+      return {
+        success: false,
+        error: 'Brevo did not return a message ID',
+      };
     }
 
-    console.log('[forgot-password] ✅ Resend email sent successfully:', {
-      id: emailId,
+    console.log('[forgot-password] ✅ Brevo email sent successfully:', {
+      messageId: responseData.messageId,
       to: email,
     });
+
+    return { success: true };
   } catch (err) {
-    console.error('[forgot-password] ❌ Resend error:', {
+    console.error('[forgot-password] ❌ Brevo error:', {
       message: err instanceof Error ? err.message : String(err),
     });
-    throw err;
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
