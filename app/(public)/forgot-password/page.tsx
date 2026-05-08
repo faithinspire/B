@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ export default function ForgotPasswordPage() {
     setError('');
     setSuccess(false);
 
+    // Validation
     if (!email.trim()) {
       setError('Email is required');
       return;
@@ -28,34 +30,28 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      console.log('[forgot-password-page] Sending reset request for:', email);
+      // Call Supabase to send password reset email
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        {
+          redirectTo: `${window.location.origin}/update-password`,
+        }
+      );
 
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-
-      const data = await response.json();
-
-      console.log('[forgot-password-page] Response:', {
-        status: response.status,
-        success: data.success,
-        message: data.message,
-      });
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to send reset email');
+      if (resetError) {
+        console.error('Reset password error:', resetError);
+        setError(resetError.message || 'Failed to send reset email');
         setLoading(false);
         return;
       }
 
+      // Success - show confirmation message
       setSuccess(true);
       setEmail('');
       setLoading(false);
     } catch (err) {
-      console.error('[forgot-password-page] Error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Unexpected error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setLoading(false);
     }
   };
