@@ -28,8 +28,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Never cache API calls or Supabase requests
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase')) return;
+  // Never cache API calls, Supabase requests, or auth pages
+  if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase') || 
+      url.pathname.includes('/forgot-password') || url.pathname.includes('/update-password') ||
+      url.pathname.includes('/login') || url.pathname.includes('/signup')) return;
 
   // Cache-first for static assets (images, fonts, js, css)
   if (
