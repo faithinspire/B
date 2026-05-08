@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Lock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-function ResetPasswordContent() {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
@@ -14,82 +14,81 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
-  const [checking, setChecking] = useState(true);
-
-  // Check if there's an error from the callback (e.g. expired link)
-  const callbackError = searchParams?.get('error');
+  const [validating, setValidating] = useState(true);
 
   useEffect(() => {
-    // After the /auth/callback route exchanges the code, Supabase sets a
-    // session cookie. We verify the session is active before showing the form.
+    // Check if user has a valid session from the reset link
     const checkSession = async () => {
-      if (!supabase) {
-        setError('Supabase not configured');
-        setChecking(false);
-        return;
-      }
-
-      if (callbackError === 'link_expired') {
-        setError('This reset link has expired or is invalid. Please request a new one.');
-        setChecking(false);
-        return;
-      }
-
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setSessionReady(true);
-        } else {
-          setError('Reset link is invalid or has expired. Please request a new one.');
+        if (!session) {
+          setError('Invalid or expired reset link. Please request a new one.');
         }
+        setValidating(false);
       } catch (err) {
-        setError('Could not verify reset link. Please request a new one.');
-      } finally {
-        setChecking(false);
+        console.error('Session check error:', err);
+        setError('Failed to validate reset link');
+        setValidating(false);
       }
     };
 
     checkSession();
-  }, [callbackError]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!password.trim()) { setError('Password is required'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-    if (!supabase) { setError('Supabase not configured'); return; }
+    if (!password.trim()) {
+      setError('Password is required');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      // Use Supabase's native updateUser — works because the session from the
-      // email link is active in the browser after /auth/callback ran.
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
 
       if (updateError) {
-        setError(updateError.message || 'Failed to reset password. Please try again.');
+        setError(updateError.message || 'Failed to reset password');
+        setLoading(false);
         return;
       }
 
       setSuccess(true);
-      // Sign out so the user logs in fresh with the new password
-      await supabase.auth.signOut();
+      setPassword('');
+      setConfirmPassword('');
 
-      setTimeout(() => router.push('/login'), 3000);
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
     } catch (err) {
+      console.error('Reset error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
       setLoading(false);
     }
   };
 
-  if (checking) {
+  if (validating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50">
-        <Loader className="w-8 h-8 animate-spin text-primary-600" />
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Validating reset link...</p>
+        </div>
       </div>
     );
   }
@@ -97,65 +96,77 @@ function ResetPasswordContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
       <div className="max-w-md mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Create New Password</h1>
-          <p className="text-gray-600">Enter your new password below</p>
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+              <Lock className="w-6 h-6 text-primary-600" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2 text-center">
+            Create New Password
+          </h1>
+          <p className="text-gray-600 text-center">
+            Enter a new password for your BraidMe account.
+          </p>
         </div>
 
+        {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-green-900 font-semibold">Password reset successful!</p>
-              <p className="text-green-700 text-sm mt-1">Redirecting to login...</p>
+              <p className="text-green-700 font-semibold text-sm">Password reset successful!</p>
+              <p className="text-green-600 text-sm mt-1">
+                Redirecting to login page...
+              </p>
             </div>
           </div>
         )}
 
+        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-red-700 text-sm">{error}</p>
-              <Link href="/forgot-password" className="text-red-600 hover:text-red-700 font-semibold text-sm mt-2 inline-block">
-                Request a new reset link →
-              </Link>
+              <p className="text-red-700 font-semibold text-sm">Error</p>
+              <p className="text-red-600 text-sm mt-1">{error}</p>
             </div>
           </div>
         )}
 
-        {!success && sessionReady && (
+        {/* Form */}
+        {!success && !error && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">New Password *</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                  disabled={loading}
-                  autoFocus
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Password *
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                At least 8 characters
+              </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password *</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                  disabled={loading}
-                />
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm Password *
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+                disabled={loading}
+              />
             </div>
 
             <button
@@ -166,33 +177,27 @@ function ResetPasswordContent() {
               {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Resetting...' : 'Reset Password'}
             </button>
-
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-900">
-                <strong>Tip:</strong> Use at least 8 characters with a mix of letters and numbers.
-              </p>
-            </div>
           </form>
         )}
 
-        <div className="mt-6 text-center">
-          <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold text-sm">
-            ← Back to Sign In
-          </Link>
+        {/* Back to Login */}
+        {!success && (
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 text-sm">
+              <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
+                Back to Login
+              </Link>
+            </p>
+          </div>
+        )}
+
+        {/* Info Box */}
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-900">
+            <strong>Security:</strong> Make sure to use a strong password with a mix of letters, numbers, and symbols.
+          </p>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    }>
-      <ResetPasswordContent />
-    </Suspense>
   );
 }

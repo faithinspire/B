@@ -77,64 +77,23 @@ Go back to the Users list and repeat steps 2-5 for two more users.
 
 ---
 
-## Method 2: Via SQL (If Dashboard Method Doesn't Work)
+## ⚠️ Important: SQL Method Not Available
 
-If you prefer using SQL or the dashboard method isn't working:
+**Note:** You cannot directly query or update `auth.users` table via SQL in Supabase due to security restrictions. You'll get a "permission denied" error.
 
-### Step 1: Get User IDs
-
-Go to **SQL Editor** in Supabase and run:
-
-```sql
-SELECT id, email FROM auth.users LIMIT 10;
-```
-
-This shows you the user IDs and emails. Copy the IDs of the 3 users you want to make admin.
-
----
-
-### Step 2: Make Each User Admin
-
-For each user, run this SQL query (replace `USER_ID_HERE` with actual ID):
-
-```sql
-UPDATE auth.users 
-SET raw_user_meta_data = jsonb_set(
-  COALESCE(raw_user_meta_data, '{}'::jsonb),
-  '{role}',
-  '"admin"'::jsonb
-)
-WHERE id = 'USER_ID_HERE';
-```
-
-**Example:**
-```sql
-UPDATE auth.users 
-SET raw_user_meta_data = jsonb_set(
-  COALESCE(raw_user_meta_data, '{}'::jsonb),
-  '{role}',
-  '"admin"'::jsonb
-)
-WHERE id = '550e8400-e29b-41d4-a716-446655440000';
-```
-
-Run this 3 times with 3 different user IDs.
+**The Dashboard method is the ONLY way to make users admins.**
 
 ---
 
 ## Verify Admins Were Created
 
 ### Via Dashboard:
-1. Go to **SQL Editor**
-2. Run this query:
+1. Go to **Authentication** → **Users**
+2. Click on each user you made admin
+3. Scroll to **raw_user_meta_data**
+4. Verify it shows: `{ "role": "admin" }`
 
-```sql
-SELECT id, email, raw_user_meta_data->>'role' as role, created_at
-FROM auth.users
-WHERE raw_user_meta_data->>'role' = 'admin';
-```
-
-You should see 3 users with `role = admin`
+That's it! No SQL verification needed.
 
 ---
 

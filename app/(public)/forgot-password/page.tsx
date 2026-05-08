@@ -1,21 +1,13 @@
 'use client';
 
-import { useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
 
-function ForgotPasswordContent() {
-  const searchParams = useSearchParams();
-  const callbackError = searchParams?.get('error');
-
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(
-    callbackError === 'link_expired'
-      ? 'Your reset link has expired. Enter your email to get a new one.'
-      : ''
-  );
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,14 +15,21 @@ function ForgotPasswordContent() {
     setError('');
     setSuccess(false);
 
-    if (!email.trim()) { setError('Email is required'); return; }
-    if (!email.includes('@')) { setError('Please enter a valid email address'); return; }
+    if (!email.trim()) {
+      setError('Email is required');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      // Call our API endpoint which uses Resend for email delivery
-      // (Supabase's built-in email only works for project team members)
+      console.log('[forgot-password-page] Sending reset request for:', email);
+
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,20 +38,24 @@ function ForgotPasswordContent() {
 
       const data = await response.json();
 
+      console.log('[forgot-password-page] Response:', {
+        status: response.status,
+        success: data.success,
+        message: data.message,
+      });
+
       if (!response.ok) {
-        console.error('[forgot-password] API error:', data);
-        // Don't expose whether email exists — always show success
+        setError(data.error || 'Failed to send reset email');
+        setLoading(false);
+        return;
       }
 
-      // Always show success to prevent email enumeration
       setSuccess(true);
       setEmail('');
+      setLoading(false);
     } catch (err) {
-      console.error('[forgot-password] Request error:', err);
-      // Still show success to prevent email enumeration
-      setSuccess(true);
-      setEmail('');
-    } finally {
+      console.error('[forgot-password-page] Error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
       setLoading(false);
     }
   };
@@ -60,32 +63,35 @@ function ForgotPasswordContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
       <div className="max-w-md mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Reset Password</h1>
-          <p className="text-gray-600">Enter your email to receive a password reset link</p>
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+              <Mail className="w-6 h-6 text-primary-600" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2 text-center">
+            Reset Password
+          </h1>
+          <p className="text-gray-600 text-center">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
         </div>
 
+        {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-green-900 font-semibold">Check your email! 📧</p>
-              <p className="text-green-700 text-sm mt-1">
-                If an account exists with that email, we've sent a password reset link. Click the link to set a new password.
+              <p className="text-green-700 font-semibold text-sm">Check your email</p>
+              <p className="text-green-600 text-sm mt-1">
+                If an account exists with this email, you'll receive a password reset link shortly.
               </p>
-              <p className="text-green-600 text-xs mt-2 font-medium">
-                ⚠️ Don't see it? Check your spam/junk folder. The link expires in 1 hour.
-              </p>
-              <button
-                onClick={() => { setSuccess(false); setEmail(''); }}
-                className="mt-3 text-xs text-green-700 underline hover:text-green-800"
-              >
-                Send another link
-              </button>
             </div>
           </div>
         )}
 
+        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -93,64 +99,66 @@ function ForgotPasswordContent() {
           </div>
         )}
 
-        {!success && (
+        {/* Form */}
+        {!success ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address *
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                  disabled={loading}
-                  autoFocus
-                />
-              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="john@example.com"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+                disabled={loading}
+              />
             </div>
 
             <button
               type="submit"
-              disabled={loading || !email.trim()}
+              disabled={loading}
               className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
-
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-900">
-                <strong>How it works:</strong> Enter your email and we'll send a secure reset link. Click it to set a new password. The link expires after 1 hour.
-              </p>
-            </div>
           </form>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-gray-600 text-center text-sm">
+              Didn't receive an email? Check your spam folder or try again with a different email address.
+            </p>
+            <button
+              onClick={() => {
+                setSuccess(false);
+                setEmail('');
+              }}
+              className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+            >
+              Try Another Email
+            </button>
+          </div>
         )}
 
+        {/* Back to Login */}
         <div className="mt-6 text-center">
           <p className="text-gray-600 text-sm">
             Remember your password?{' '}
             <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
-              Sign In
+              Back to Login
             </Link>
+          </p>
+        </div>
+
+        {/* Info Box */}
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-900">
+            <strong>Note:</strong> Password reset links expire after 1 hour for security reasons.
           </p>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function ForgotPasswordPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    }>
-      <ForgotPasswordContent />
-    </Suspense>
   );
 }
