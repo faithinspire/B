@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Forgot password endpoint using HYBRID email delivery:
- * 1. PRIMARY: Supabase built-in email service (no API key needed, always works)
- * 2. FALLBACK: Brevo SMTP API (if Supabase fails)
+ * 1. PRIMARY: Brevo SMTP API (professional email service)
+ * 2. FALLBACK: Supabase Auth Recovery Email (if Brevo fails)
  * 
  * This ensures ALL users receive password reset emails reliably.
  */
@@ -31,29 +32,19 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ||
       'https://braidmee.vercel.app';
 
-    const resetUrl = `${origin}/auth/callback?next=/reset-password`;
-
     console.log('[forgot-password] Processing reset for:', normalizedEmail);
+    console.log('[forgot-password] Origin:', origin);
+
+    // Generate a secure reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetUrl = `${origin}/reset-password?token=${resetToken}`;
+
+    console.log('[forgot-password] Generated reset token');
     console.log('[forgot-password] Reset URL:', resetUrl);
 
-    // Try PRIMARY method: Supabase built-in email service
-    console.log('[forgot-password] 📧 Attempting PRIMARY: Supabase email service...');
-    const supabaseResult = await sendPasswordResetEmailViaSupabase(
-      normalizedEmail,
-      resetUrl
-    );
-
-    if (supabaseResult.success) {
-      console.log('[forgot-password] ✅ Password reset email sent successfully via Supabase');
-      return NextResponse.json({
-        success: true,
-        message: 'If an account exists with this email, a password reset link has been sent.',
-      });
-    }
-
-    console.log('[forgot-password] ⚠️ Supabase failed, trying FALLBACK: Brevo...');
-    
-    // Try FALLBACK method: Brevo SMTP API
+    // Try PRIMARY method: Brevo SMTP API
+    console.log('[forgot-password] 📧 Attempting PRIMARY: Brevo SMTP API...');
     const brevoResult = await sendPasswordResetEmailViaBrevo(
       normalizedEmail,
       resetUrl
@@ -67,9 +58,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.log('[forgot-password] ⚠️ Brevo failed, trying FALLBACK: Supabase Auth...');
+    
+    // Try FALLBACK method: Supabase Auth Recovery Email
+    const supabaseResult = await sendPasswordResetEmailViaSupabase(
+      normalizedEmail,
+      resetUrl
+    );
+
+    if (supabaseResult.success) {
+      console.log('[forgot-password] ✅ Password reset email sent successfully via Supabase');
+      return NextResponse.json({
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been sent.',
+      });
+    }
+
     console.error('[forgot-password] ❌ Both email services failed');
-    console.error('[forgot-password] Supabase error:', supabaseResult.error);
     console.error('[forgot-password] Brevo error:', brevoResult.error);
+    console.error('[forgot-password] Supabase error:', supabaseResult.error);
 
     // Still return success to prevent email enumeration
     return NextResponse.json({
@@ -87,8 +94,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Send password reset email via Supabase built-in email service (PRIMARY)
- * This uses Supabase's native email functionality - no API key needed
+ * Send password reset email via Supabase Auth Recovery Email (FALLBACK)
+ * Uses Supabase's built-in recovery email functionality
  */
 async function sendPasswordResetEmailViaSupabase(
   email: string,
@@ -102,13 +109,14 @@ async function sendPasswordResetEmailViaSupabase(
       throw new Error('Supabase credentials not configured');
     }
 
-    console.log('[forgot-password] 🔐 Using Supabase service role for email...');
+    console.log('[forgot-password] 🔐 Using Supabase Auth recovery email...');
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
 
-    // Use Supabase's built-in password reset email
+    // Use Supabase's built-in password recovery email
+    // This sends an email with a recovery link
     const { error } = await supabase.auth.admin.generateLink({
       type: 'recovery',
       email: email,
@@ -125,7 +133,7 @@ async function sendPasswordResetEmailViaSupabase(
       };
     }
 
-    console.log('[forgot-password] ✅ Supabase password reset link generated and email queued');
+    console.log('[forgot-password] ✅ Supabase recovery email queued');
     return { success: true };
   } catch (err) {
     console.error('[forgot-password] ❌ Supabase error:', {
@@ -139,8 +147,8 @@ async function sendPasswordResetEmailViaSupabase(
 }
 
 /**
- * Send password reset email via Brevo SMTP API (FALLBACK)
- * Only used if Supabase fails
+ * Send password reset email via Brevo SMTP API (PRIMARY)
+ * Professional email service with reliable delivery
  */
 async function sendPasswordResetEmailViaBrevo(
   email: string,
@@ -151,27 +159,30 @@ async function sendPasswordResetEmailViaBrevo(
     const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@braidme.com';
     const fromName = process.env.BREVO_FROM_NAME || 'BraidMe';
 
-    console.log('[forgot-password] Brevo config:', {
-      from: fromEmail,
-      fromName: fromName,
-      to: email,
+    console.log('[forgot-password] Brevo config check:', {
+      hasApiKey: !!apiKey,
       apiKeyLength: apiKey?.length,
-      apiKeyPrefix: apiKey?.substring(0, 20),
+      apiKeyPrefix: apiKey?.substring(0, 20) + '...',
+      fromEmail: fromEmail,
+      fromName: fromName,
+      toEmail: email,
     });
 
-    // Validate inputs
+    // Validate API key
     if (!apiKey || apiKey.length < 10) {
-      const error = `Invalid Brevo API key: length=${apiKey?.length}`;
+      const error = `Invalid Brevo API key: length=${apiKey?.length || 0}`;
       console.error('[forgot-password] ❌', error);
       throw new Error(error);
     }
 
+    // Validate email
     if (!email || !email.includes('@')) {
-      const error = `Invalid email address: ${email}`;
+      const error = `Invalid recipient email: ${email}`;
       console.error('[forgot-password] ❌', error);
       throw new Error(error);
     }
 
+    // Validate from email
     if (!fromEmail || !fromEmail.includes('@')) {
       const error = `Invalid from email: ${fromEmail}`;
       console.error('[forgot-password] ❌', error);
@@ -196,7 +207,7 @@ async function sendPasswordResetEmailViaBrevo(
         to: [
           {
             email: email,
-            name: email.split('@')[0], // Use part before @ as name
+            name: email.split('@')[0],
           },
         ],
         subject: 'Reset your BraidMe password',
@@ -210,13 +221,12 @@ async function sendPasswordResetEmailViaBrevo(
 
     const responseData = await response.json();
 
-    console.log('[forgot-password] Brevo response:', {
+    console.log('[forgot-password] Brevo API response:', {
       status: response.status,
       statusText: response.statusText,
       messageId: responseData.messageId,
       message: responseData.message,
       code: responseData.code,
-      hasError: !response.ok,
     });
 
     if (!response.ok) {
@@ -225,9 +235,10 @@ async function sendPasswordResetEmailViaBrevo(
       // Log specific error codes for debugging
       if (response.status === 401) {
         console.error('[forgot-password] 🔴 AUTHENTICATION ERROR: API key is invalid, expired, or revoked');
-        console.error('[forgot-password] Action: Check Brevo account and regenerate API key');
+        console.error('[forgot-password] Action: Verify Brevo API key in .env.local');
       } else if (response.status === 400) {
         console.error('[forgot-password] 🔴 BAD REQUEST: Check email format or sender configuration');
+        console.error('[forgot-password] Details:', responseData);
       } else if (response.status === 429) {
         console.error('[forgot-password] 🔴 RATE LIMIT: Too many emails sent');
       }
