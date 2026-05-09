@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Forgot password endpoint using HYBRID email delivery:
- * 1. PRIMARY: Brevo SMTP API (professional email service)
- * 2. FALLBACK: Supabase Auth Recovery Email (if Brevo fails)
- * 
- * This ensures ALL users receive password reset emails reliably.
+ * Forgot password endpoint using MailerSend API
+ * Sends password reset emails via MailerSend
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error('[forgot-password] JSON parse error:', parseError);
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
     const { email } = body;
 
     if (!email || !email.includes('@')) {
@@ -32,145 +38,71 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ||
       'https://braidmee.vercel.app';
 
+    const resetUrl = `${origin}/update-password`;
+
     console.log('[forgot-password] Processing reset for:', normalizedEmail);
-    console.log('[forgot-password] Origin:', origin);
-
-    // Generate a secure reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const resetUrl = `${origin}/reset-password?token=${resetToken}`;
-
-    console.log('[forgot-password] Generated reset token');
     console.log('[forgot-password] Reset URL:', resetUrl);
 
-    // Try PRIMARY method: Brevo SMTP API
-    console.log('[forgot-password] 📧 Attempting PRIMARY: Brevo SMTP API...');
-    const brevoResult = await sendPasswordResetEmailViaBrevo(
+    // Send password reset email via MailerSend
+    console.log('[forgot-password] 📧 Sending password reset via MailerSend...');
+    const mailersendResult = await sendPasswordResetEmailViaMailerSend(
       normalizedEmail,
       resetUrl
     );
 
-    if (brevoResult.success) {
-      console.log('[forgot-password] ✅ Password reset email sent successfully via Brevo');
-      return NextResponse.json({
-        success: true,
-        message: 'If an account exists with this email, a password reset link has been sent.',
-      });
+    if (!mailersendResult.success) {
+      console.error('[forgot-password] ❌ MailerSend error:', mailersendResult.error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: mailersendResult.error || 'Failed to send password reset email'
+        },
+        { status: 500 }
+      );
     }
 
-    console.log('[forgot-password] ⚠️ Brevo failed, trying FALLBACK: Supabase Auth...');
-    
-    // Try FALLBACK method: Supabase Auth Recovery Email
-    const supabaseResult = await sendPasswordResetEmailViaSupabase(
-      normalizedEmail,
-      resetUrl
-    );
-
-    if (supabaseResult.success) {
-      console.log('[forgot-password] ✅ Password reset email sent successfully via Supabase');
-      return NextResponse.json({
-        success: true,
-        message: 'If an account exists with this email, a password reset link has been sent.',
-      });
-    }
-
-    console.error('[forgot-password] ❌ Both email services failed');
-    console.error('[forgot-password] Brevo error:', brevoResult.error);
-    console.error('[forgot-password] Supabase error:', supabaseResult.error);
-
-    // Still return success to prevent email enumeration
+    console.log('[forgot-password] ✅ Password reset email sent successfully via MailerSend');
     return NextResponse.json({
       success: true,
       message: 'If an account exists with this email, a password reset link has been sent.',
     });
   } catch (error) {
     console.error('[forgot-password] Fatal error:', error);
-    // Still return success to prevent email enumeration
-    return NextResponse.json({
-      success: true,
-      message: 'If an account exists with this email, a password reset link has been sent.',
-    });
-  }
-}
-
-/**
- * Send password reset email via Supabase Auth Recovery Email (FALLBACK)
- * Uses Supabase's built-in recovery email functionality
- */
-async function sendPasswordResetEmailViaSupabase(
-  email: string,
-  resetUrl: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error('Supabase credentials not configured');
-    }
-
-    console.log('[forgot-password] 🔐 Using Supabase Auth recovery email...');
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
-
-    // Use Supabase's built-in password recovery email
-    // This sends an email with a recovery link
-    const { error } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
-      email: email,
-      options: {
-        redirectTo: resetUrl,
+    console.error('[forgot-password] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred'
       },
-    });
-
-    if (error) {
-      console.error('[forgot-password] Supabase error:', error);
-      return {
-        success: false,
-        error: `Supabase error: ${error.message}`,
-      };
-    }
-
-    console.log('[forgot-password] ✅ Supabase recovery email queued');
-    return { success: true };
-  } catch (err) {
-    console.error('[forgot-password] ❌ Supabase error:', {
-      message: err instanceof Error ? err.message : String(err),
-    });
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+      { status: 500 }
+    );
   }
 }
 
 /**
- * Send password reset email via Brevo SMTP API (PRIMARY)
- * Professional email service with reliable delivery
+ * Send password reset email via MailerSend API
  */
-async function sendPasswordResetEmailViaBrevo(
+async function sendPasswordResetEmailViaMailerSend(
   email: string,
   resetUrl: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const apiKey = process.env.BREVO_API_KEY;
-    const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@braidme.com';
-    const fromName = process.env.BREVO_FROM_NAME || 'BraidMe';
+    const apiToken = process.env.MAILERSEND_API_TOKEN;
+    const fromEmail = process.env.MAILERSEND_FROM_EMAIL || 'noreply@braidme.com';
+    const fromName = process.env.MAILERSEND_FROM_NAME || 'BraidMe';
 
-    console.log('[forgot-password] Brevo config check:', {
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length,
-      apiKeyPrefix: apiKey?.substring(0, 20) + '...',
+    console.log('[forgot-password] MailerSend config check:', {
+      hasApiToken: !!apiToken,
+      apiTokenLength: apiToken?.length,
+      apiTokenPrefix: apiToken?.substring(0, 10),
       fromEmail: fromEmail,
       fromName: fromName,
       toEmail: email,
     });
 
-    // Validate API key
-    if (!apiKey || apiKey.length < 10) {
-      const error = `Invalid Brevo API key: length=${apiKey?.length || 0}`;
+    // Validate API token
+    if (!apiToken || apiToken.length < 10) {
+      const error = `Invalid MailerSend API token: length=${apiToken?.length || 0}`;
       console.error('[forgot-password] ❌', error);
       throw new Error(error);
     }
@@ -189,20 +121,20 @@ async function sendPasswordResetEmailViaBrevo(
       throw new Error(error);
     }
 
-    console.log('[forgot-password] 📤 Sending password reset email via Brevo...');
+    console.log('[forgot-password] 📤 Sending password reset email via MailerSend...');
 
-    // Send email via Brevo API
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    // Send email via MailerSend API
+    const response = await fetch('https://api.mailersend.com/v1/email', {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json',
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
       },
       body: JSON.stringify({
-        sender: {
-          name: fromName,
+        from: {
           email: fromEmail,
+          name: fromName,
         },
         to: [
           {
@@ -211,31 +143,41 @@ async function sendPasswordResetEmailViaBrevo(
           },
         ],
         subject: 'Reset your BraidMe password',
-        htmlContent: buildPasswordResetEmail(resetUrl),
-        replyTo: {
+        html: buildPasswordResetEmail(resetUrl),
+        reply_to: {
           email: fromEmail,
           name: fromName,
         },
       }),
     });
 
-    const responseData = await response.json();
+    let responseData;
+    try {
+      responseData = await response.json();
+    } catch (jsonError) {
+      console.error('[forgot-password] ❌ Failed to parse MailerSend response as JSON:', jsonError);
+      const text = await response.text();
+      console.error('[forgot-password] Response text:', text);
+      return {
+        success: false,
+        error: `MailerSend API error (${response.status}): Invalid response format`,
+      };
+    }
 
-    console.log('[forgot-password] Brevo API response:', {
+    console.log('[forgot-password] MailerSend API response:', {
       status: response.status,
       statusText: response.statusText,
-      messageId: responseData.messageId,
+      messageId: responseData.message_id,
       message: responseData.message,
-      code: responseData.code,
     });
 
     if (!response.ok) {
-      console.error('[forgot-password] ❌ Brevo API error (HTTP ' + response.status + '):', responseData);
+      console.error('[forgot-password] ❌ MailerSend API error (HTTP ' + response.status + '):', responseData);
       
       // Log specific error codes for debugging
       if (response.status === 401) {
-        console.error('[forgot-password] 🔴 AUTHENTICATION ERROR: API key is invalid, expired, or revoked');
-        console.error('[forgot-password] Action: Verify Brevo API key in .env.local');
+        console.error('[forgot-password] 🔴 AUTHENTICATION ERROR: API token is invalid, expired, or revoked');
+        console.error('[forgot-password] Action: Verify MailerSend API token in .env.local');
       } else if (response.status === 400) {
         console.error('[forgot-password] 🔴 BAD REQUEST: Check email format or sender configuration');
         console.error('[forgot-password] Details:', responseData);
@@ -245,26 +187,26 @@ async function sendPasswordResetEmailViaBrevo(
       
       return {
         success: false,
-        error: `Brevo error (${response.status}): ${responseData.message || JSON.stringify(responseData)}`,
+        error: `MailerSend error (${response.status}): ${responseData.message || JSON.stringify(responseData)}`,
       };
     }
 
-    if (!responseData.messageId) {
-      console.error('[forgot-password] ❌ Brevo response missing messageId:', responseData);
+    if (!responseData.message_id) {
+      console.error('[forgot-password] ❌ MailerSend response missing message_id:', responseData);
       return {
         success: false,
-        error: 'Brevo did not return a message ID',
+        error: 'MailerSend did not return a message ID',
       };
     }
 
-    console.log('[forgot-password] ✅ Brevo email sent successfully:', {
-      messageId: responseData.messageId,
+    console.log('[forgot-password] ✅ MailerSend email sent successfully:', {
+      messageId: responseData.message_id,
       to: email,
     });
 
     return { success: true };
   } catch (err) {
-    console.error('[forgot-password] ❌ Brevo error:', {
+    console.error('[forgot-password] ❌ MailerSend error:', {
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
     });
