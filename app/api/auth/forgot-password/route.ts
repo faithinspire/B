@@ -43,25 +43,35 @@ export async function POST(request: NextRequest) {
     console.log('[forgot-password] Processing reset for:', normalizedEmail);
     console.log('[forgot-password] Reset URL:', resetUrl);
 
-    // Send password reset email via MailerSend
-    console.log('[forgot-password] 📧 Sending password reset via MailerSend...');
-    const mailersendResult = await sendPasswordResetEmailViaMailerSend(
+    // Try MailerSend first, fallback to Supabase if needed
+    console.log('[forgot-password] 📧 Attempting to send password reset email...');
+    
+    let emailResult = await sendPasswordResetEmailViaMailerSend(
       normalizedEmail,
       resetUrl
     );
 
-    if (!mailersendResult.success) {
-      console.error('[forgot-password] ❌ MailerSend error:', mailersendResult.error);
+    // If MailerSend fails, try Supabase as fallback
+    if (!emailResult.success) {
+      console.log('[forgot-password] ⚠️  MailerSend failed, trying Supabase fallback...');
+      emailResult = await sendPasswordResetEmailViaSupabase(
+        normalizedEmail,
+        resetUrl
+      );
+    }
+
+    if (!emailResult.success) {
+      console.error('[forgot-password] ❌ All email methods failed:', emailResult.error);
       return NextResponse.json(
         { 
           success: false, 
-          error: mailersendResult.error || 'Failed to send password reset email'
+          error: emailResult.error || 'Failed to send password reset email'
         },
         { status: 500 }
       );
     }
 
-    console.log('[forgot-password] ✅ Password reset email sent successfully via MailerSend');
+    console.log('[forgot-password] ✅ Password reset email sent successfully');
     return NextResponse.json({
       success: true,
       message: 'If an account exists with this email, a password reset link has been sent.',
@@ -255,4 +265,63 @@ function buildPasswordResetEmail(resetUrl: string): string {
       </p>
     </div>
   `;
+}
+
+
+/**
+ * Send password reset email via Supabase Auth (Fallback method)
+ * This doesn't require an API key and uses Supabase's built-in email service
+ */
+async function sendPasswordResetEmailViaSupabase(
+  email: string,
+  resetUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log('[forgot-password] 📤 Sending password reset email via Supabase...');
+    
+    // Import Supabase client
+    const { createClient } = await import('@supabase/supabase-js');
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[forgot-password] ❌ Missing Supabase credentials');
+      return {
+        success: false,
+        error: 'Supabase credentials not configured',
+      };
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Use Supabase's password reset email function
+    const { error } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email: email,
+      options: {
+        redirectTo: resetUrl,
+      },
+    });
+
+    if (error) {
+      console.error('[forgot-password] ❌ Supabase error:', error);
+      return {
+        success: false,
+        error: `Supabase error: ${error.message}`,
+      };
+    }
+
+    console.log('[forgot-password] ✅ Supabase password reset email sent successfully');
+    return { success: true };
+  } catch (err) {
+    console.error('[forgot-password] ❌ Supabase fallback error:', {
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
