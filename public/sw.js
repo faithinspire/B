@@ -67,6 +67,53 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Handle push notifications on mobile
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body || 'New notification',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      tag: data.id || 'notification',
+      requireInteraction: false,
+      data: {
+        url: data.url || '/',
+        ...data,
+      },
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title || 'BraidMe', options)
+    );
+  } catch (error) {
+    console.error('[SW] Push notification error:', error);
+  }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      // Check if window already open
+      for (let client of clientList) {
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Open new window if not found
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
