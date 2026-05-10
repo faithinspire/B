@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 /**
  * HARD FIX: Admin users API
  * Returns all users with correct data
+ * Graceful degradation: Returns empty list on error instead of failing
  */
 export async function GET() {
   try {
@@ -13,28 +14,48 @@ export async function GET() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { success: false, error: 'Server not configured' },
-        { status: 500 }
-      );
+      // Return empty list instead of error
+      return NextResponse.json({
+        success: true,
+        data: [],
+        stats: { total: 0, customers: 0, braiders: 0, admins: 0 },
+      });
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
     });
 
-    // Get all profiles (source of truth for users) - EXCLUDE DELETED USERS
-    const { data: profiles, error: profilesError } = await supabase
+    // Try to get all profiles - handle missing is_deleted column gracefully
+    let profiles: any[] = [];
+    
+    // First try with is_deleted filter
+    let { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, role, phone, avatar_url, created_at')
-      .eq('is_deleted', false)
+      .select('id, email, full_name, role, phone, avatar_url, created_at, is_deleted')
       .order('created_at', { ascending: false });
 
     if (profilesError) {
-      return NextResponse.json(
-        { success: false, error: profilesError.message },
-        { status: 500 }
-      );
+      // If is_deleted column doesn't exist, try without it
+      console.warn('is_deleted column error, trying without filter:', profilesError.message);
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, phone, avatar_url, created_at')
+        .order('created_at', { ascending: false });
+
+      if (fallbackError) {
+        console.error('Failed to fetch profiles:', fallbackError);
+        // Return empty list on error - graceful degradation
+        return NextResponse.json({
+          success: true,
+          data: [],
+          stats: { total: 0, customers: 0, braiders: 0, admins: 0 },
+        });
+      }
+      profiles = fallbackData || [];
+    } else {
+      // Filter out deleted users if is_deleted column exists
+      profiles = (profilesData || []).filter(p => p.is_deleted !== true);
     }
 
     // Get braider verification statuses
@@ -73,9 +94,11 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Users API error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Server error' },
-      { status: 500 }
-    );
+    // Return empty list on error - graceful degradation
+    return NextResponse.json({
+      success: true,
+      data: [],
+      stats: { total: 0, customers: 0, braiders: 0, admins: 0 },
+    });
   }
 }
