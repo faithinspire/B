@@ -5,7 +5,7 @@ import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 
 /**
- * Verify password reset token
+ * Verify reset token endpoint
  * POST /api/auth/verify-reset-token
  * Body: { token: string, email: string }
  */
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Hash the token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Check if token exists and is not expired
+    // Verify token exists and is not expired
     const { data: tokenRecord, error: queryError } = await supabase
       .from('password_reset_tokens')
       .select('*')
@@ -46,19 +46,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (queryError || !tokenRecord) {
-      console.error('Token verification failed:', queryError);
+      console.log('Token verification failed:', queryError);
       return NextResponse.json({
         valid: false,
-        error: 'Invalid or expired token',
+        error: 'Invalid or expired reset token',
       });
     }
 
     return NextResponse.json({
       valid: true,
-      email: tokenRecord.email,
+      email: email,
     });
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('Verify reset token error:', error);
     return NextResponse.json(
       { valid: false, error: 'Server error' },
       { status: 500 }

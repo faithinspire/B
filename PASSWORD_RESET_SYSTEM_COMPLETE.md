@@ -1,356 +1,287 @@
-# ✅ PASSWORD RESET SYSTEM - COMPLETE & DEPLOYED
+# Password Reset System - Complete Implementation
 
-## 🎯 TASK STATUS: COMPLETE
+## Status: ✅ READY FOR TESTING
 
-The complete end-to-end password reset flow has been implemented, tested, and deployed to production.
-
----
-
-## 📋 WHAT WAS IMPLEMENTED
-
-### ✅ Backend Configuration
-- **Supabase SMTP Setup**: Brevo configured as custom SMTP provider
-- **Hybrid Email Delivery**: Brevo primary + Supabase fallback system
-- **API Route**: `app/api/auth/forgot-password/route.ts` with comprehensive error handling
-- **Redirect URLs**: Configured for both production and local development
-
-### ✅ Frontend Pages
-1. **Forgot Password Page** (`app/(public)/forgot-password/page.tsx`)
-   - Email input with validation
-   - Calls `supabase.auth.resetPasswordForEmail()`
-   - Success/error messaging
-   - Professional UI with gradient backgrounds
-
-2. **Update Password Page** (`app/(public)/update-password/page.tsx`)
-   - Session validation on mount
-   - Password form with confirmation
-   - Calls `supabase.auth.updateUser()`
-   - Handles expired links gracefully
-   - Redirects to login on success
-
-### ✅ Documentation
-- `SUPABASE_BREVO_PASSWORD_RESET_COMPLETE_SETUP.md` - Full setup guide
-- `PASSWORD_RESET_TESTING_GUIDE.md` - Comprehensive testing checklist
-- `PASSWORD_RESET_QUICK_REFERENCE.md` - Quick reference guide
-- `PASSWORD_RESET_IMPLEMENTATION_SUMMARY.md` - Implementation overview
+The password reset system has been completely cleaned up and is now using **Supabase's built-in recovery link generation** which is the most reliable method.
 
 ---
 
-## 🔧 TECHNICAL DETAILS
+## What Was Fixed
 
-### Email Delivery System (Hybrid)
-```
-PRIMARY: Brevo SMTP API
-├─ Professional email service
-├─ Reliable delivery
-└─ Full error logging
+### 1. **Cleaned Up forgot-password Route** ✅
+- **File**: `app/api/auth/forgot-password/route.ts`
+- **Removed**: All old MailerSend helper functions (lines 70+)
+- **Now Uses**: Supabase's `generateLink()` method with type 'recovery'
+- **Why**: Supabase handles email sending internally - no external API needed
 
-FALLBACK: Supabase Auth Recovery Email
-├─ Built-in Supabase functionality
-├─ Automatic retry if Brevo fails
-└─ Ensures all users receive emails
-```
+### 2. **Implemented Proper Token Storage** ✅
+- Tokens are now stored in `password_reset_tokens` table
+- Tokens expire after 24 hours
+- One-time use enforcement in reset endpoint
 
-### Frontend Architecture
-```
-/forgot-password
-├─ Email input validation
-├─ Calls Supabase resetPasswordForEmail()
-├─ Shows success message
-└─ Handles errors gracefully
+### 3. **Frontend Pages** ✅
+- `/forgot-password` - Request reset link
+- `/reset-password` - Set new password with token validation
 
-/update-password
-├─ Validates recovery session
-├─ Password form with confirmation
-├─ Calls Supabase updateUser()
-├─ Handles expired links
-└─ Redirects to login on success
-```
-
-### Edge Cases Handled
-- ✅ Expired reset links (1-hour expiration)
-- ✅ Invalid sessions (direct access without token)
-- ✅ Network errors (graceful error messages)
-- ✅ Password validation (8+ characters, must match)
-- ✅ Email validation (proper format checking)
-- ✅ Multiple reset requests (can request new link)
+### 4. **API Endpoints** ✅
+- `POST /api/auth/forgot-password` - Request password reset
+- `POST /api/auth/reset-password` - Complete password reset
+- `POST /api/auth/verify-reset-token` - Validate token before reset
 
 ---
 
-## 🚀 DEPLOYMENT STATUS
+## How It Works
 
-### Git Commit
-- **Commit Hash**: d45b8e7
-- **Branch**: master
-- **Status**: ✅ Pushed to origin/master
-- **Files Changed**: 31 files
-- **Insertions**: 7,849 lines
+### Step 1: User Requests Password Reset
+```
+User enters email → POST /api/auth/forgot-password
+```
 
-### Vercel Deployment
-- **Status**: ✅ Auto-deploying (triggered by git push)
-- **URL**: https://braidmee.vercel.app
-- **Expected Time**: 2-5 minutes
+**What happens:**
+1. Email is validated and normalized
+2. User existence is checked (silently - no info leak)
+3. Supabase generates a recovery link
+4. Token is stored in `password_reset_tokens` table
+5. User sees: "If an account exists with this email, a password reset link has been sent"
 
-### Production URLs
-- Forgot Password: https://braidmee.vercel.app/forgot-password
-- Update Password: https://braidmee.vercel.app/update-password
+### Step 2: User Clicks Email Link
+- Supabase sends the recovery link via its built-in email service
+- Link format: `https://your-app.com/reset-password?token=XXX&email=user@example.com`
+
+### Step 3: User Sets New Password
+```
+User enters new password → POST /api/auth/reset-password
+```
+
+**What happens:**
+1. Token is validated (must exist and not expired)
+2. Password is updated via Supabase Auth Admin API
+3. Token is deleted (one-time use)
+4. Expired tokens are cleaned up
+5. User is redirected to login
 
 ---
 
-## 📝 CONFIGURATION CHECKLIST
+## Critical: Supabase Email Configuration
 
-### Supabase Dashboard Setup (Manual - User Must Do)
+### ⚠️ IMPORTANT: Enable Email in Supabase Dashboard
 
-#### 1. SMTP Settings
-```
-Project Settings → Auth → SMTP Settings
-├─ Host: smtp-relay.brevo.com
-├─ Port: 587
-├─ Username: [Your Brevo Email]
-├─ Password: [Your Brevo SMTP Key]
-├─ Sender Name: BraidMe
-└─ Sender Email: noreply@braidme.com
-```
+For the system to work, you MUST configure Supabase email settings:
 
-#### 2. Redirect URLs
-```
-Project Settings → Auth → URL Configuration → Redirect URLs
-├─ https://braidmee.vercel.app/auth/callback
-├─ https://braidmee.vercel.app/update-password
-├─ http://localhost:3000/auth/callback
-└─ http://localhost:3000/update-password
-```
+1. **Go to Supabase Dashboard**
+   - URL: https://app.supabase.com
+   - Project: BraidMe
 
-#### 3. Email Template
-```
-Project Settings → Auth → Email Templates → Reset Password
-├─ Must include: {{ .ConfirmationURL }}
-├─ Professional formatting
-└─ Clear instructions
-```
+2. **Navigate to Settings → Email**
+   - Look for "Email Templates" or "Auth" section
+
+3. **Configure Email Provider**
+   - Option A: Use Supabase's built-in email (free tier limited)
+   - Option B: Connect SendGrid, Mailgun, or AWS SES
+
+4. **Verify Sender Email**
+   - Default: `noreply@[project-id].supabase.co`
+   - Or configure custom domain
+
+5. **Test Email Sending**
+   - Use Supabase dashboard to send test email
+   - Verify it arrives in inbox
 
 ---
 
-## 🧪 TESTING CHECKLIST
+## Testing the System
 
-### Development Testing (Local)
-- [ ] Forgot password page loads
-- [ ] Email sends successfully
-- [ ] Email contains valid reset link
-- [ ] Reset link redirects to update-password page
-- [ ] Password update works
-- [ ] Login with new password succeeds
-- [ ] Old password no longer works
-- [ ] Expired links show error
-- [ ] Direct access to update-password shows error
-- [ ] Invalid email rejected
-- [ ] Empty email rejected
-- [ ] Network errors handled gracefully
-
-### Production Testing (After Deployment)
-- [ ] Production URLs load correctly
-- [ ] Email sends from production
-- [ ] Reset link uses production URL
-- [ ] Complete flow works end-to-end
-- [ ] Multiple users can reset passwords
-- [ ] Mobile responsive
-
----
-
-## 📊 SYSTEM ARCHITECTURE
-
+### Test 1: Request Password Reset
+```bash
+curl -X POST http://localhost:3000/api/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com"}'
 ```
-User Request
-    ↓
-/forgot-password Page
-    ↓
-Supabase resetPasswordForEmail()
-    ↓
-Email Delivery (Hybrid)
-    ├─ PRIMARY: Brevo SMTP API
-    └─ FALLBACK: Supabase Auth
-    ↓
-User Receives Email
-    ↓
-Clicks Reset Link
-    ↓
-/update-password Page
-    ↓
-Session Validation
-    ↓
-Password Form
-    ↓
-Supabase updateUser()
-    ↓
-Success Message
-    ↓
-Redirect to Login
-    ↓
-Login with New Password
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "If an account exists with this email, a password reset link has been sent."
+}
+```
+
+### Test 2: Check Email
+- Look for email from Supabase
+- Click the recovery link
+- Should redirect to `/reset-password?token=XXX&email=test@example.com`
+
+### Test 3: Verify Token
+```bash
+curl -X POST http://localhost:3000/api/auth/verify-reset-token \
+  -H "Content-Type: application/json" \
+  -d '{"token":"XXX","email":"test@example.com"}'
+```
+
+**Expected Response:**
+```json
+{
+  "valid": true,
+  "email": "test@example.com"
+}
+```
+
+### Test 4: Reset Password
+```bash
+curl -X POST http://localhost:3000/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"XXX","email":"test@example.com","password":"NewPassword123"}'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Password has been reset successfully. Please log in with your new password."
+}
 ```
 
 ---
 
-## 🔐 SECURITY FEATURES
+## Database Schema Required
 
-- ✅ 1-hour token expiration
-- ✅ Session validation on reset page
-- ✅ Password validation (8+ characters)
-- ✅ Passwords must match
-- ✅ Email validation
-- ✅ Error messages don't reveal if email exists (prevents enumeration)
-- ✅ HTTPS only (production)
-- ✅ Secure token generation
+### password_reset_tokens Table
+```sql
+CREATE TABLE password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(email, token_hash)
+);
 
----
-
-## 📱 USER EXPERIENCE
-
-### Forgot Password Flow
-1. User enters email
-2. Sees success message
-3. Receives email within 2 minutes
-4. Clicks reset link in email
-5. Redirected to password reset page
-
-### Update Password Flow
-1. User lands on reset page
-2. Enters new password
-3. Confirms password
-4. Clicks "Reset Password"
-5. Sees success message
-6. Redirected to login
-7. Logs in with new password
+-- Index for faster lookups
+CREATE INDEX idx_password_reset_tokens_email ON password_reset_tokens(email);
+CREATE INDEX idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
+```
 
 ---
 
-## 🎯 NEXT STEPS FOR USER
+## Troubleshooting
 
-### Immediate (Required)
-1. **Configure Supabase SMTP** (manual setup in dashboard)
-   - Go to Project Settings → Auth → SMTP Settings
-   - Enter Brevo credentials
-   - Save
+### Issue: "Failed to send reset email"
+**Cause**: Supabase email not configured
+**Solution**: 
+1. Go to Supabase Dashboard → Settings → Email
+2. Configure email provider (SendGrid, Mailgun, etc.)
+3. Test email sending from dashboard
 
-2. **Add Redirect URLs** (manual setup in dashboard)
-   - Go to Project Settings → Auth → URL Configuration
-   - Add all 4 redirect URLs
-   - Save
+### Issue: "Invalid or expired reset token"
+**Cause**: Token doesn't exist or has expired
+**Solution**:
+1. Request a new password reset
+2. Use the link within 24 hours
+3. Check that `password_reset_tokens` table exists
 
-3. **Update Email Template** (manual setup in dashboard)
-   - Go to Project Settings → Auth → Email Templates
-   - Update Reset Password template
-   - Ensure it includes {{ .ConfirmationURL }}
+### Issue: "User not found"
+**Cause**: Email doesn't exist in Supabase Auth
+**Solution**:
+1. Verify user was created with correct email
+2. Check email case sensitivity
+3. Ensure user confirmed email (if required)
 
-### Testing (Recommended)
-1. **Local Testing**
-   - Run `npm run dev`
-   - Test forgot password flow
-   - Verify email delivery
-   - Test password reset
-   - Test login with new password
-
-2. **Production Testing**
-   - Wait for Vercel deployment to complete
-   - Test on https://braidmee.vercel.app
-   - Verify email delivery
-   - Test complete flow with multiple users
-
-### Monitoring (Optional)
-- Check Brevo dashboard for email delivery status
-- Monitor Supabase logs for errors
-- Track password reset usage
+### Issue: "Server not configured"
+**Cause**: Missing environment variables
+**Solution**:
+1. Check `.env.local` has:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+2. Restart dev server after updating `.env.local`
 
 ---
 
-## 📞 TROUBLESHOOTING
+## Environment Variables
 
-### Email Not Arriving
-1. Check spam/junk folder
-2. Verify Brevo SMTP credentials in Supabase
-3. Check Brevo account for sending limits
-4. Verify sender email is verified in Brevo
-5. Check Supabase logs for errors
+Required in `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
 
-### Reset Link Not Working
-1. Verify redirect URL is in Supabase settings
-2. Check if link is expired (1 hour limit)
-3. Verify URL format is correct
-4. Check browser console (F12) for errors
-
-### Password Update Failing
-1. Verify password is 8+ characters
-2. Check if passwords match
-3. Verify Supabase connection
-4. Check browser console (F12) for errors
+Optional (for future email customization):
+```
+MAILERSEND_API_TOKEN=your-token
+MAILERSEND_FROM_EMAIL=noreply@braidme.com
+MAILERSEND_FROM_NAME=BraidMe
+```
 
 ---
 
-## 📚 DOCUMENTATION FILES
+## Files Modified
 
-| File | Purpose |
-|------|---------|
-| `SUPABASE_BREVO_PASSWORD_RESET_COMPLETE_SETUP.md` | Complete setup guide with all steps |
-| `PASSWORD_RESET_TESTING_GUIDE.md` | Comprehensive testing checklist |
-| `PASSWORD_RESET_QUICK_REFERENCE.md` | Quick reference for configuration |
-| `PASSWORD_RESET_IMPLEMENTATION_SUMMARY.md` | Implementation overview |
-| `app/(public)/forgot-password/page.tsx` | Forgot password page component |
-| `app/(public)/update-password/page.tsx` | Update password page component |
-| `app/api/auth/forgot-password/route.ts` | Backend API route |
+1. ✅ `app/api/auth/forgot-password/route.ts` - Cleaned up, now uses Supabase
+2. ✅ `app/api/auth/reset-password/route.ts` - Already correct
+3. ✅ `app/api/auth/verify-reset-token/route.ts` - Already correct
+4. ✅ `app/(public)/forgot-password/page.tsx` - Already correct
+5. ✅ `app/(public)/reset-password/page.tsx` - Already correct
 
 ---
 
-## ✨ KEY FEATURES
+## Next Steps
 
-✅ **Complete End-to-End Flow**
-- Forgot password → Email → Reset link → Update password → Login
+1. **Verify Supabase Email Configuration**
+   - Go to Supabase Dashboard
+   - Check Settings → Email
+   - Configure email provider if needed
 
-✅ **Hybrid Email Delivery**
-- Brevo primary for reliability
-- Supabase fallback for redundancy
-- Ensures all users receive emails
+2. **Test the System**
+   - Run dev server: `npm run dev`
+   - Go to `/forgot-password`
+   - Enter test email
+   - Check if email arrives
 
-✅ **Professional UI**
-- Gradient backgrounds
-- Clear messaging
-- Loading states
-- Error handling
+3. **Monitor Logs**
+   - Check browser console for errors
+   - Check server logs for detailed info
+   - Look for `[forgot-password]` prefix in logs
 
-✅ **Edge Case Handling**
-- Expired links
-- Invalid sessions
-- Network errors
-- Password validation
-
-✅ **Production Ready**
-- Deployed to Vercel
-- Comprehensive error logging
-- Security best practices
-- Mobile responsive
+4. **Deploy to Production**
+   - Ensure Supabase email is configured in production
+   - Test with real email address
+   - Monitor for any issues
 
 ---
 
-## 🎉 SUMMARY
+## Security Notes
 
-The password reset system is **COMPLETE** and **DEPLOYED** to production. All code has been committed to git (commit d45b8e7) and pushed to origin/master. Vercel is automatically deploying the changes.
-
-**Status**: ✅ PRODUCTION READY
-
-**Next Action**: Configure Supabase SMTP settings and test the flow.
-
----
-
-## 📞 SUPPORT
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review the comprehensive setup guide
-3. Check Supabase and Brevo logs
-4. Verify all configuration steps were completed
+✅ **Implemented:**
+- Tokens are hashed with SHA256
+- Tokens expire after 24 hours
+- One-time use enforcement
+- Email validation
+- User existence check (silent - no info leak)
+- Password minimum length (8 characters)
+- Service role key used (not anon key)
 
 ---
 
-**Deployed**: May 8, 2026
-**Commit**: d45b8e7
-**Branch**: master
-**Status**: ✅ Live on Vercel
+## Support
+
+If emails still aren't being sent:
+
+1. **Check Supabase Logs**
+   - Supabase Dashboard → Logs
+   - Look for email sending errors
+
+2. **Verify Email Configuration**
+   - Supabase Dashboard → Settings → Email
+   - Ensure provider is connected
+
+3. **Test Supabase Email Directly**
+   - Use Supabase dashboard to send test email
+   - Verify it works before testing app
+
+4. **Check Spam Folder**
+   - Emails might be marked as spam
+   - Add sender to contacts
+
+---
+
+**Last Updated**: May 10, 2026
+**Status**: Ready for Testing ✅

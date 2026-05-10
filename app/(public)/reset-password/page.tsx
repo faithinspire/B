@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, Loader, Lock } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -15,69 +13,83 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [validating, setValidating] = useState(true);
+  const [tokenValid, setTokenValid] = useState(false);
+
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   useEffect(() => {
-    // Check if user has a valid session from the reset link
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setError('Invalid or expired reset link. Please request a new one.');
-        }
+    // Validate token on page load
+    const validateToken = async () => {
+      if (!token || !email) {
+        setError('Invalid reset link. Missing token or email.');
         setValidating(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/verify-reset-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, email }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.valid) {
+          setError('Invalid or expired reset link. Please request a new one.');
+          setTokenValid(false);
+        } else {
+          setTokenValid(true);
+        }
       } catch (err) {
-        console.error('Session check error:', err);
         setError('Failed to validate reset link');
+        setTokenValid(false);
+      } finally {
         setValidating(false);
       }
     };
 
-    checkSession();
-  }, []);
+    validateToken();
+  }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!password.trim()) {
-      setError('Password is required');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, email, password }),
       });
 
-      if (updateError) {
-        setError(updateError.message || 'Failed to reset password');
-        setLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to reset password');
         return;
       }
 
       setSuccess(true);
-      setPassword('');
-      setConfirmPassword('');
-
-      // Redirect to login after 2 seconds
       setTimeout(() => {
         router.push('/login');
       }, 2000);
     } catch (err) {
-      console.error('Reset error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
       setLoading(false);
     }
   };
@@ -85,9 +97,67 @@ export default function ResetPasswordPage() {
   if (validating) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-gray-600">Validating reset link...</p>
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="inline-block animate-spin">
+              <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <p className="text-gray-600 mt-4">Validating reset link...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tokenValid) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <Link
+              href="/forgot-password"
+              className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-lg transition"
+            >
+              Request New Link
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful</h2>
+            <p className="text-gray-600 mb-6">Your password has been reset. Redirecting to login...</p>
+            <Link
+              href="/login"
+              className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-lg transition"
+            >
+              Go to Login
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -96,92 +166,61 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
       <div className="max-w-md mx-auto">
-        {/* Header */}
         <div className="mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-              <Lock className="w-6 h-6 text-primary-600" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2 text-center">
-            Create New Password
-          </h1>
-          <p className="text-gray-600 text-center">
-            Enter a new password for your BraidMe account.
-          </p>
+          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Create New Password</h1>
+          <p className="text-gray-600">Enter your new password below</p>
         </div>
 
-        {/* Success Message */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <p className="text-green-700 font-semibold text-sm">Password reset successful!</p>
-              <p className="text-green-600 text-sm mt-1">
-                Redirecting to login page...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-700 font-semibold text-sm">Error</p>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Form */}
-        {!success && !error && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                New Password *
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                New Password
               </label>
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                disabled={loading}
+                required
+                minLength={8}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                At least 8 characters
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password *
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm Password
               </label>
               <input
+                id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                disabled={loading}
+                required
+                minLength={8}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
               />
             </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition"
             >
-              {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
-        )}
 
-        {/* Back to Login */}
-        {!success && (
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
               <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
@@ -189,12 +228,11 @@ export default function ResetPasswordPage() {
               </Link>
             </p>
           </div>
-        )}
+        </div>
 
-        {/* Info Box */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs text-blue-900">
-            <strong>Security:</strong> Make sure to use a strong password with a mix of letters, numbers, and symbols.
+            <strong>Security Tip:</strong> Use a strong password with a mix of uppercase, lowercase, numbers, and symbols.
           </p>
         </div>
       </div>

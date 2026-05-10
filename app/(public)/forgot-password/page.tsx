@@ -2,156 +2,126 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, Loader, Mail } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess(false);
-
-    // Validation
-    if (!email.trim()) {
-      setError('Email is required');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      // Call Supabase to send password reset email
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email.trim().toLowerCase(),
-        {
-          redirectTo: `${window.location.origin}/update-password`,
-        }
-      );
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
 
-      if (resetError) {
-        console.error('Reset password error:', resetError);
-        setError(resetError.message || 'Failed to send reset email');
-        setLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to send reset email');
         return;
       }
 
-      // Success - show confirmation message
-      setSuccess(true);
-      setEmail('');
-      setLoading(false);
+      setSubmitted(true);
     } catch (err) {
-      console.error('Unexpected error:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
       setLoading(false);
     }
   };
 
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+            <p className="text-gray-600 mb-4">
+              We've sent a password reset link to <strong>{email}</strong>
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              The link will expire in 1 hour. If you don't see the email, check your spam folder.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-lg transition"
+            >
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
       <div className="max-w-md mx-auto">
-        {/* Header */}
         <div className="mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-              <Mail className="w-6 h-6 text-primary-600" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2 text-center">
-            Reset Password
-          </h1>
-          <p className="text-gray-600 text-center">
-            Enter your email address and we'll send you a link to reset your password.
-          </p>
+          <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">Reset Password</h1>
+          <p className="text-gray-600">Enter your email to receive a password reset link</p>
         </div>
 
-        {/* Success Message */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <p className="text-green-700 font-semibold text-sm">Check your email</p>
-              <p className="text-green-600 text-sm mt-1">
-                If an account exists with this email, you'll receive a password reset link shortly.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-red-700 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Form */}
-        {!success ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address *
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
               </label>
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="john@example.com"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
-                disabled={loading}
+                placeholder="you@example.com"
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
               />
             </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition"
             >
-              {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
           </form>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-gray-600 text-center text-sm">
-              Didn't receive an email? Check your spam folder or try again with a different email address.
-            </p>
-            <button
-              onClick={() => {
-                setSuccess(false);
-                setEmail('');
-              }}
-              className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
-            >
-              Try Another Email
-            </button>
-          </div>
-        )}
 
-        {/* Back to Login */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
-            Remember your password?{' '}
-            <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
-              Back to Login
-            </Link>
-          </p>
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 text-sm">
+              Remember your password?{' '}
+              <Link href="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
+                Back to Login
+              </Link>
+            </p>
+          </div>
         </div>
 
-        {/* Info Box */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs text-blue-900">
-            <strong>Note:</strong> Password reset links expire after 1 hour for security reasons.
+            <strong>Note:</strong> Password reset links expire after 1 hour. Check your spam folder if you don't receive the email.
           </p>
         </div>
       </div>
