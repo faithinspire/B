@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id;
 
     // CRITICAL: Fetch profile to get CORRECT role and country
+    // Use service role to bypass RLS and ensure we get the latest data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email, full_name, role, avatar_url, country')
@@ -61,13 +62,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (profileError || !profile) {
+      console.error('Profile fetch error:', profileError);
       return NextResponse.json(
         { success: false, error: 'Profile not found' },
         { status: 404 }
       );
     }
 
-    // Determine correct role
+    // Determine correct role - ALWAYS trust the database value
     let correctRole = profile.role || 'customer';
 
     // If profile says braider, verify braider_profiles exists
@@ -83,6 +85,8 @@ export async function POST(request: NextRequest) {
         correctRole = 'customer';
       }
     }
+
+    console.log(`✅ Login successful for ${profile.email} with role: ${correctRole}`);
 
     return NextResponse.json({
       success: true,

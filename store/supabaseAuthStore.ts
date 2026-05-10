@@ -25,6 +25,7 @@ interface AuthState {
   signOut: () => Promise<void>; // alias for logout, used by Navigation
   recoverSession: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  refreshRole: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
 }
 
@@ -213,6 +214,50 @@ export const useSupabaseAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Session refresh error:', error);
       get().logout();
+    }
+  },
+
+  /**
+   * Refresh user's role from database
+   * Called when admin role is assigned to user
+   */
+  refreshRole: async () => {
+    try {
+      const currentUser = get().user;
+      if (!currentUser) {
+        console.warn('No user to refresh role for');
+        return;
+      }
+
+      const response = await fetch('/api/auth/refresh-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to refresh role:', data.error);
+        return;
+      }
+
+      if (data.user) {
+        const updatedUser: User = {
+          id: data.user.id,
+          email: data.user.email,
+          full_name: data.user.full_name,
+          role: data.user.role || 'customer',
+          avatar_url: data.user.avatar_url,
+          country: data.user.country,
+        };
+
+        set({ user: updatedUser });
+        get().setUser(updatedUser);
+        console.log(`✅ Role refreshed: ${updatedUser.role}`);
+      }
+    } catch (error) {
+      console.error('Role refresh error:', error);
     }
   },
 

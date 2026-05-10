@@ -1,290 +1,155 @@
-# 📋 COPY-PASTE SQL SCRIPT
+# 📋 Copy-Paste SQL - Ready to Run
 
-## 🎯 What to Do
+## Instructions
 
-1. Open Supabase Dashboard
-2. Go to SQL Editor
-3. Click "New Query"
-4. **Copy everything below** (from "-- ====" to the end)
-5. Paste into SQL Editor
-6. Click "Run"
-7. Wait for completion
+1. Go to: **https://app.supabase.com/**
+2. Select **BRAID2** project
+3. Click **SQL Editor** → **New Query**
+4. **Copy everything below** (from "DROP TABLE" to the end)
+5. **Paste into SQL Editor**
+6. Click **Run**
+7. ✅ Done!
 
 ---
 
-## 📋 SQL Script to Copy
+## SQL to Copy & Paste
 
 ```sql
 -- ============================================================================
--- FIX BRAIDERS AND BOOKINGS - POPULATE MISSING DATA
+-- COMPLETE FIX: Password Reset Table + Make 3 Users Admin + RLS Bypass
 -- ============================================================================
 
+-- 1. CREATE PASSWORD_RESET_TOKENS TABLE WITH PROPER SCHEMA
 -- ============================================================================
--- STEP 1: ENSURE ALL BRAIDERS HAVE COMPLETE PROFILES
--- ============================================================================
+DROP TABLE IF EXISTS password_reset_tokens CASCADE;
 
-INSERT INTO public.braider_profiles (user_id, full_name, email, bio, verification_status, created_at, updated_at)
-SELECT 
-  p.id,
-  p.full_name,
-  p.email,
-  'Professional braider' as bio,
-  'unverified' as verification_status,
-  NOW(),
-  NOW()
-FROM public.profiles p
-WHERE p.role = 'braider'
-AND NOT EXISTS (
-  SELECT 1 FROM public.braider_profiles bp WHERE bp.user_id = p.id
-)
-ON CONFLICT (user_id) DO UPDATE SET
-  full_name = EXCLUDED.full_name,
-  email = EXCLUDED.email,
-  updated_at = NOW();
-
--- ============================================================================
--- STEP 2: CREATE SAMPLE SERVICES FOR BRAIDERS
--- ============================================================================
-
-INSERT INTO public.services (braider_id, name, description, category, duration_minutes, price, is_active, created_at, updated_at)
-SELECT 
-  bp.user_id,
-  'Box Braids' as name,
-  'Professional box braids' as description,
-  'box_braids' as category,
-  120 as duration_minutes,
-  80.00 as price,
-  true as is_active,
-  NOW(),
-  NOW()
-FROM public.braider_profiles bp
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.services s WHERE s.braider_id = bp.user_id AND s.name = 'Box Braids'
+CREATE TABLE password_reset_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(email, token_hash)
 );
 
-INSERT INTO public.services (braider_id, name, description, category, duration_minutes, price, is_active, created_at, updated_at)
-SELECT 
-  bp.user_id,
-  'Knotless Braids' as name,
-  'Knotless braiding service' as description,
-  'knotless' as category,
-  150 as duration_minutes,
-  100.00 as price,
-  true as is_active,
-  NOW(),
-  NOW()
-FROM public.braider_profiles bp
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.services s WHERE s.braider_id = bp.user_id AND s.name = 'Knotless Braids'
-);
+-- Create indexes for performance
+CREATE INDEX idx_password_reset_tokens_email ON password_reset_tokens(email);
+CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 
-INSERT INTO public.services (braider_id, name, description, category, duration_minutes, price, is_active, created_at, updated_at)
-SELECT 
-  bp.user_id,
-  'Cornrows' as name,
-  'Beautiful cornrow styles' as description,
-  'cornrows' as category,
-  90 as duration_minutes,
-  60.00 as price,
-  true as is_active,
-  NOW(),
-  NOW()
-FROM public.braider_profiles bp
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.services s WHERE s.braider_id = bp.user_id AND s.name = 'Cornrows'
+-- Disable RLS completely for this table
+ALTER TABLE password_reset_tokens DISABLE ROW LEVEL SECURITY;
+
+-- Grant all permissions
+GRANT ALL ON password_reset_tokens TO authenticated;
+GRANT ALL ON password_reset_tokens TO anon;
+GRANT ALL ON password_reset_tokens TO service_role;
+
+-- ============================================================================
+-- 2. MAKE 3 USERS ADMIN - UPDATE PROFILES TABLE
+-- ============================================================================
+-- Update the first 3 users to have admin role
+
+-- First, ensure profiles table has role column
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'customer';
+
+-- Make the first 3 users admin (by ID or email - adjust as needed)
+UPDATE profiles 
+SET role = 'admin' 
+WHERE id IN (
+  SELECT id FROM profiles 
+  ORDER BY created_at ASC 
+  LIMIT 3
 );
 
 -- ============================================================================
--- STEP 3: VERIFY RESULTS
+-- 3. DISABLE RLS ON PROFILES TABLE FOR API ACCESS
 -- ============================================================================
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 
-SELECT 
-  'Braider Profiles' as table_name,
-  COUNT(*) as total_records
-FROM public.braider_profiles
+-- Grant permissions
+GRANT ALL ON profiles TO authenticated;
+GRANT ALL ON profiles TO anon;
+GRANT ALL ON profiles TO service_role;
 
-UNION ALL
+-- ============================================================================
+-- 4. VERIFY CHANGES
+-- ============================================================================
+-- Check password_reset_tokens table exists
+SELECT 'password_reset_tokens table created' as status;
 
-SELECT 
-  'Services' as table_name,
-  COUNT(*) as total_records
-FROM public.services;
-
--- Show braiders with services
-SELECT 
-  bp.id,
-  bp.user_id,
-  bp.full_name,
-  bp.email,
-  COUNT(s.id) as service_count
-FROM public.braider_profiles bp
-LEFT JOIN public.services s ON s.braider_id = bp.user_id
-GROUP BY bp.id, bp.user_id, bp.full_name, bp.email
-ORDER BY bp.created_at DESC;
-
--- Show all services
-SELECT 
-  s.id,
-  s.braider_id,
-  s.name,
-  s.category,
-  s.price,
-  s.duration_minutes
-FROM public.services s
-ORDER BY s.created_at DESC;
+-- Check admin users
+SELECT email, role FROM profiles WHERE role = 'admin' LIMIT 3;
 ```
 
 ---
 
-## ✅ Expected Output
+## What This SQL Does
 
-After running the script, you should see:
+✅ **Creates password_reset_tokens table** with correct schema
+✅ **Makes first 3 users admin** 
+✅ **Disables RLS** on both tables
+✅ **Grants permissions** for API access
+✅ **Verifies changes** with SELECT statements
 
-### Result 1: Table Counts
-```
-table_name          | total_records
---------------------|---------------
-Braider Profiles    | X
-Services            | 3X (3 services per braider)
-```
+---
 
-### Result 2: Braiders with Services
-```
-id  | user_id | full_name | email | service_count
-----|---------|-----------|-------|---------------
-1   | uuid1   | Sarah J.  | ...   | 3
-2   | uuid2   | Amara W.  | ...   | 3
-3   | uuid3   | Bella M.  | ...   | 3
-...
-```
+## Expected Output
 
-### Result 3: All Services
+After running, you should see:
+
 ```
-id  | braider_id | name              | category      | price | duration_minutes
-----|------------|-------------------|---------------|-------|------------------
-1   | uuid1      | Box Braids        | box_braids    | 80.00 | 120
-2   | uuid1      | Knotless Braids   | knotless      | 100.00| 150
-3   | uuid1      | Cornrows          | cornrows      | 60.00 | 90
-4   | uuid2      | Box Braids        | box_braids    | 80.00 | 120
-...
+Query executed successfully
+
+password_reset_tokens table created
+
+email                    | role
+-------------------------|-------
+user1@example.com        | admin
+user2@example.com        | admin
+user3@example.com        | admin
 ```
 
 ---
 
-## 🚀 Step-by-Step Instructions
+## If You Get Errors
 
-### 1. Open Supabase Dashboard
-- Go to https://app.supabase.com
-- Select your project
+### Error: "Table already exists"
+**This is OK!** The `DROP TABLE IF EXISTS` handles it.
 
-### 2. Go to SQL Editor
-- Click "SQL Editor" in left sidebar
-- Click "New Query" button
+### Error: "Column already exists"
+**This is OK!** The `ADD COLUMN IF NOT EXISTS` handles it.
 
-### 3. Copy SQL Script
-- Select all text above (from "-- ====" to the end)
-- Copy to clipboard (Ctrl+C or Cmd+C)
+### Error: "Permission denied"
+**Solution**: Make sure you're using service role key, not anon key
 
-### 4. Paste into Editor
-- Click in the SQL editor area
-- Paste (Ctrl+V or Cmd+V)
-
-### 5. Run Query
-- Click "Run" button (or Ctrl+Enter)
-- Wait for completion
-
-### 6. Check Results
-- Should see 3 result sets
-- No errors
-- Braider profiles created
-- Services created
+### Error: "Relation does not exist"
+**Solution**: Make sure profiles table exists (it should)
 
 ---
 
-## ⏱️ Time
+## Next Steps After Running SQL
 
-- Copy SQL: 1 minute
-- Paste into editor: 1 minute
-- Run query: 1-2 minutes
-- **Total: 3-4 minutes**
-
----
-
-## ✅ Verification
-
-After running SQL:
-
-1. **Check Braider Profiles**
-   - Should see X braiders
-   - Each with full_name and email
-
-2. **Check Services**
-   - Should see 3X services (3 per braider)
-   - Box Braids, Knotless, Cornrows
-
-3. **Check Braiders with Services**
-   - Each braider should have 3 services
+1. ✅ SQL migration complete
+2. ⏳ Verify Resend domain (see RESEND_DOMAIN_VERIFICATION_GUIDE.md)
+3. ⏳ Test password reset
+4. ⏳ Test admin access
 
 ---
 
-## 🎯 Next Steps After SQL
+## Quick Checklist
 
-1. **Test in App**
-   - Homepage should show braiders
-   - Search should find braiders
-   - Booking should show services
-
-2. **Commit Changes**
-   ```bash
-   git add -A
-   git commit -m "Populate braider profiles and services"
-   git push origin master
-   ```
-
-3. **Deploy**
-   - Vercel auto-deploys on push
+- [ ] Opened Supabase
+- [ ] Selected BRAID2 project
+- [ ] Opened SQL Editor
+- [ ] Created new query
+- [ ] Copied SQL above
+- [ ] Pasted into editor
+- [ ] Clicked Run
+- [ ] Saw success messages
+- [ ] Saw admin users listed
+- [ ] ✅ SQL migration complete!
 
 ---
 
-## 📞 If It Fails
-
-### Error: "relation does not exist"
-- Check table names are correct
-- Verify tables exist in Supabase
-
-### Error: "duplicate key value"
-- Script handles this with ON CONFLICT
-- Safe to run multiple times
-
-### No results
-- Check if braiders exist in profiles table
-- Verify role='braider' for some users
-
----
-
-## 💡 What This Script Does
-
-### Step 1: Create Braider Profiles
-- For each user with role='braider'
-- Creates entry in braider_profiles table
-- Adds full_name, email, bio
-
-### Step 2: Create Services
-- For each braider profile
-- Creates 3 services:
-  - Box Braids: $80 (2 hours)
-  - Knotless Braids: $100 (2.5 hours)
-  - Cornrows: $60 (1.5 hours)
-
-### Step 3: Verify
-- Shows total braiders
-- Shows total services
-- Shows braiders with service counts
-- Shows all services
-
----
-
-## ✨ That's It!
-
-Copy, paste, run. Done!
+**Status**: Ready to copy and paste!
 
