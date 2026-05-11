@@ -13,6 +13,7 @@ export async function GET() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase credentials');
       return NextResponse.json({
         success: true,
         data: [],
@@ -27,7 +28,7 @@ export async function GET() {
     // Get all profiles - simple query without filters
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, email, full_name, role, phone, avatar_url, created_at')
       .order('created_at', { ascending: false });
 
     if (profilesError) {
@@ -49,25 +50,25 @@ export async function GET() {
         .from('braider_profiles')
         .select('user_id, verification_status');
 
-      if (braiderProfiles) {
+      if (braiderProfiles && Array.isArray(braiderProfiles)) {
         braiderMap = Object.fromEntries(
           braiderProfiles.map(bp => [bp.user_id, bp.verification_status])
         );
       }
     } catch (e) {
-      console.warn('Could not fetch braider verification statuses');
+      console.warn('Could not fetch braider verification statuses:', e);
     }
 
     // Map profiles to users
     const users = profileList.map(profile => ({
-      id: profile.id,
-      email: profile.email,
+      id: profile.id || '',
+      email: profile.email || '',
       full_name: profile.full_name || '',
       role: profile.role || 'customer',
       phone: profile.phone || '',
       avatar_url: profile.avatar_url || null,
       verification_status: braiderMap[profile.id] || null,
-      created_at: profile.created_at,
+      created_at: profile.created_at || new Date().toISOString(),
     }));
 
     // Calculate stats
