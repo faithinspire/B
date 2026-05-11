@@ -26,16 +26,15 @@ export async function GET(request: NextRequest) {
       auth: { persistSession: false }
     });
 
-    // Get braiders from braider_profiles - filter by profession_type = 'braider' or null (default)
-    // This excludes barbers which have profession_type = 'barber'
-    const { data: braiders, error } = await supabaseAdmin
+    // Get barbers from braider_profiles - filter by profession_type = 'barber'
+    const { data: barbers, error } = await supabaseAdmin
       .from('braider_profiles')
       .select('id, user_id, full_name, email, phone, specialization, verification_status, state, city, bio, avatar_url, experience_years, rating_avg, rating_count, profession_type, created_at')
-      .or('profession_type.is.null,profession_type.eq.braider')
+      .eq('profession_type', 'barber')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Braiders query error:', error);
+      console.error('Barbers query error:', error);
       // Return empty list on error
       return NextResponse.json({
         success: true,
@@ -50,17 +49,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure we have an array
-    const braiderList = Array.isArray(braiders) ? braiders : [];
+    const barberList = Array.isArray(barbers) ? barbers : [];
 
     // Get stats from the data we have
-    const total = braiderList.length;
-    const pending = braiderList.filter(b => b.verification_status === 'pending').length;
-    const approved = braiderList.filter(b => b.verification_status === 'approved').length;
-    const rejected = braiderList.filter(b => b.verification_status === 'rejected').length;
+    const total = barberList.length;
+    const pending = barberList.filter(b => b.verification_status === 'pending').length;
+    const approved = barberList.filter(b => b.verification_status === 'approved').length;
+    const rejected = barberList.filter(b => b.verification_status === 'rejected').length;
 
     return NextResponse.json({
       success: true,
-      data: braiderList,
+      data: barberList,
       stats: {
         total,
         pending,
@@ -69,7 +68,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.error('Braiders API error:', err);
+    console.error('Barbers API error:', err);
     // Return empty list on error - graceful degradation
     return NextResponse.json({
       success: true,
@@ -83,4 +82,3 @@ export async function GET(request: NextRequest) {
     });
   }
 }
-

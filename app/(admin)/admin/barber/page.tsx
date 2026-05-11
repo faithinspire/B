@@ -40,49 +40,27 @@ export default function BarberPage() {
       setLoading(true);
       setError(null);
 
-      // Get barbers from profiles table where profession_type = 'barber'
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('profession_type', 'barber')
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/admin/barbers');
 
-      if (profilesError) {
-        console.error('Barbers query error:', profilesError);
-        setError('Failed to load barbers');
-        setBarbers([]);
-        setStats({ total: 0, pending: 0, approved: 0, rejected: 0 });
-        return;
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}`);
       }
 
-      const barberList = Array.isArray(profiles) ? profiles : [];
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load');
 
-      // Get verification statuses from braider_profiles if available
-      let verificationMap: Record<string, string> = {};
-      try {
-        const { data: braiderProfiles } = await supabase
-          .from('braider_profiles')
-          .select('user_id, verification_status')
-          .eq('profession_type', 'barber');
-
-        if (braiderProfiles) {
-          verificationMap = Object.fromEntries(
-            braiderProfiles.map(bp => [bp.user_id, bp.verification_status])
-          );
-        }
-      } catch (e) {
-        console.warn('Could not fetch barber verification statuses');
-      }
+      const barberList = Array.isArray(data.data) ? data.data : [];
 
       // Map to barber interface
       const mappedBarbers: Barber[] = barberList.map(profile => ({
         id: profile.id,
-        user_id: profile.id,
+        user_id: profile.user_id,
         full_name: profile.full_name || '',
         email: profile.email || '',
         phone: profile.phone || '',
         avatar_url: profile.avatar_url || null,
-        verification_status: verificationMap[profile.id] || 'unverified',
+        verification_status: profile.verification_status || 'unverified',
         city: profile.city || '',
         state: profile.state || '',
         country: profile.country || '',
@@ -92,15 +70,7 @@ export default function BarberPage() {
       }));
 
       setBarbers(mappedBarbers);
-
-      // Calculate stats
-      const newStats = {
-        total: mappedBarbers.length,
-        pending: mappedBarbers.filter(b => b.verification_status === 'pending').length,
-        approved: mappedBarbers.filter(b => b.verification_status === 'approved').length,
-        rejected: mappedBarbers.filter(b => b.verification_status === 'rejected').length,
-      };
-      setStats(newStats);
+      setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 });
     } catch (err) {
       console.error('Barbers fetch error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load barbers');
@@ -118,7 +88,7 @@ export default function BarberPage() {
       subscription = supabase
         .channel('admin-barbers-changes')
         .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'profiles' },
+          { event: '*', schema: 'public', table: 'braider_profiles' },
           () => {
             fetchBarbers();
           }
