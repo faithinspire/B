@@ -4,9 +4,8 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * HARD FIX: Admin users API
- * Returns all users with correct data
- * Graceful degradation: Returns empty list on error instead of failing
+ * Admin users API - Returns all users
+ * Graceful degradation: Works even if database schema is incomplete
  */
 export async function GET() {
   try {
@@ -14,7 +13,6 @@ export async function GET() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      // Return empty list instead of error
       return NextResponse.json({
         success: true,
         data: [],
@@ -26,55 +24,48 @@ export async function GET() {
       auth: { persistSession: false }
     });
 
-    // Try to get all profiles - handle missing is_deleted column gracefully
-    let profiles: any[] = [];
-    
-    // First try with is_deleted filter
-    let { data: profilesData, error: profilesError } = await supabase
+    // Get all profiles - simple query without filters
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, role, phone, avatar_url, created_at, is_deleted')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (profilesError) {
-      // If is_deleted column doesn't exist, try without it
-      console.warn('is_deleted column error, trying without filter:', profilesError.message);
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, phone, avatar_url, created_at')
-        .order('created_at', { ascending: false });
-
-      if (fallbackError) {
-        console.error('Failed to fetch profiles:', fallbackError);
-        // Return empty list on error - graceful degradation
-        return NextResponse.json({
-          success: true,
-          data: [],
-          stats: { total: 0, customers: 0, braiders: 0, admins: 0 },
-        });
-      }
-      profiles = fallbackData || [];
-    } else {
-      // Filter out deleted users if is_deleted column exists
-      profiles = (profilesData || []).filter(p => p.is_deleted !== true);
+      console.error('Profiles query error:', profilesError);
+      return NextResponse.json({
+        success: true,
+        data: [],
+        stats: { total: 0, customers: 0, braiders: 0, admins: 0 },
+      });
     }
 
-    // Get braider verification statuses
-    const { data: braiderProfiles } = await supabase
-      .from('braider_profiles')
-      .select('user_id, verification_status');
+    // Ensure we have an array
+    const profileList = Array.isArray(profiles) ? profiles : [];
 
-    const braiderMap = Object.fromEntries(
-      (braiderProfiles || []).map(bp => [bp.user_id, bp.verification_status])
-    );
+    // Get braider verification statuses if available
+    let braiderMap: Record<string, string> = {};
+    try {
+      const { data: braiderProfiles } = await supabase
+        .from('braider_profiles')
+        .select('user_id, verification_status');
 
-    // Combine data
-    const users = (profiles || []).map(profile => ({
+      if (braiderProfiles) {
+        braiderMap = Object.fromEntries(
+          braiderProfiles.map(bp => [bp.user_id, bp.verification_status])
+        );
+      }
+    } catch (e) {
+      console.warn('Could not fetch braider verification statuses');
+    }
+
+    // Map profiles to users
+    const users = profileList.map(profile => ({
       id: profile.id,
       email: profile.email,
-      full_name: profile.full_name,
-      role: profile.role,
+      full_name: profile.full_name || '',
+      role: profile.role || 'customer',
       phone: profile.phone || '',
-      avatar_url: profile.avatar_url,
+      avatar_url: profile.avatar_url || null,
       verification_status: braiderMap[profile.id] || null,
       created_at: profile.created_at,
     }));
@@ -94,7 +85,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Users API error:', error);
-    // Return empty list on error - graceful degradation
     return NextResponse.json({
       success: true,
       data: [],
@@ -102,3 +92,4 @@ export async function GET() {
     });
   }
 }
+

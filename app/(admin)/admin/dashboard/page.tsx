@@ -76,10 +76,10 @@ export default function AdminDashboardPage() {
     { label: 'Dashboard', icon: BarChart3, href: '/admin', color: 'from-primary-600 to-primary-700' },
     { label: 'Verify', icon: CheckCircle, href: '/admin/verification', color: 'from-purple-600 to-purple-700' },
     { label: 'Users', icon: Users, href: '/admin/users', color: 'from-blue-600 to-blue-700' },
+    { label: 'Barber', icon: Users, href: '/admin/braiders', color: 'from-cyan-600 to-cyan-700' },
     { label: 'Conversations', icon: MessageSquare, href: '/admin/conversations', color: 'from-pink-600 to-pink-700' },
     { label: 'Bookings', icon: Calendar, href: '/admin/bookings', color: 'from-orange-600 to-orange-700' },
     { label: 'Payments', icon: DollarSign, href: '/admin/payments', color: 'from-green-600 to-green-700' },
-    { label: 'Braiders', icon: Users, href: '/admin/braiders', color: 'from-indigo-600 to-indigo-700' },
     { label: 'Disputes', icon: AlertTriangle, href: '/admin/disputes', color: 'from-red-600 to-red-700' },
   ];
 

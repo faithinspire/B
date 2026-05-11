@@ -11,16 +11,15 @@ export async function GET(request: NextRequest) {
       { auth: { persistSession: false } }
     );
 
-    // SIMPLE QUERY: Just get all braider_profiles without joins
-    // This avoids column errors and works with incomplete schema
+    // Try to get braider_profiles - this is the source of truth for braiders
     const { data: braiders, error } = await supabaseAdmin
       .from('braider_profiles')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching braiders:', error);
-      // Return empty list instead of error - graceful degradation
+      console.error('Braiders query error:', error);
+      // Return empty list on error
       return NextResponse.json({
         success: true,
         data: [],
@@ -33,15 +32,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Ensure we have an array
+    const braiderList = Array.isArray(braiders) ? braiders : [];
+
     // Get stats from the data we have
-    const total = braiders?.length || 0;
-    const pending = braiders?.filter(b => b.verification_status === 'pending').length || 0;
-    const approved = braiders?.filter(b => b.verification_status === 'approved').length || 0;
-    const rejected = braiders?.filter(b => b.verification_status === 'rejected').length || 0;
+    const total = braiderList.length;
+    const pending = braiderList.filter(b => b.verification_status === 'pending').length;
+    const approved = braiderList.filter(b => b.verification_status === 'approved').length;
+    const rejected = braiderList.filter(b => b.verification_status === 'rejected').length;
 
     return NextResponse.json({
       success: true,
-      data: braiders || [],
+      data: braiderList,
       stats: {
         total,
         pending,
@@ -64,3 +66,4 @@ export async function GET(request: NextRequest) {
     });
   }
 }
+
