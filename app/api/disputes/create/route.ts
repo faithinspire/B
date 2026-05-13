@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/mailtrap';
 
 export async function POST(request: NextRequest) {
   try {
@@ -129,13 +130,9 @@ export async function POST(request: NextRequest) {
       });
 
     // Send email to support team
-    if (process.env.RESEND_API_KEY) {
+    if (process.env.MAILTRAP_USER && process.env.MAILTRAP_PASS) {
       try {
-        const { Resend } = await import('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-
-        await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com',
+        await sendEmail({
           to: 'support@braidme.com',
           subject: `New Dispute - Booking ${booking_id}`,
           html: `

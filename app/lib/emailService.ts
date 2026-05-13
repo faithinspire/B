@@ -1,7 +1,9 @@
 /**
- * Email Service using Resend API
+ * Email Service using Mailtrap via Nodemailer
  * Handles all email communications for the BraidMe platform
  */
+
+import { sendEmail as mailtrapSendEmail } from '@/lib/mailtrap';
 
 interface EmailOptions {
   to: string;
@@ -10,18 +12,10 @@ interface EmailOptions {
 }
 
 /**
- * Send email via Resend API
+ * Send email via Mailtrap
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
-    const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com';
-
-    if (!apiKey || apiKey.includes('your_resend_api_key')) {
-      console.error('[emailService] ❌ RESEND_API_KEY not configured');
-      return { success: false, error: 'Email service not configured' };
-    }
-
     if (!options.to || !options.to.includes('@')) {
       console.error('[emailService] ❌ Invalid email address:', options.to);
       return { success: false, error: 'Invalid email address' };
@@ -29,29 +23,14 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
     console.log('[emailService] Sending email to:', options.to);
 
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
-
-    const result = await resend.emails.send({
-      from: fromEmail,
+    const result = await mailtrapSendEmail({
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    if (result.error) {
-      console.error('[emailService] ❌ Resend error:', result.error);
-      return { success: false, error: result.error.message };
-    }
-
-    const emailId = result.id || result.data?.id;
-    if (!emailId) {
-      console.error('[emailService] ❌ No email ID returned');
-      return { success: false, error: 'Failed to send email' };
-    }
-
-    console.log('[emailService] ✅ Email sent successfully:', emailId);
-    return { success: true, id: emailId };
+    console.log('[emailService] ✅ Email sent successfully:', result.messageId);
+    return { success: true, id: result.messageId };
   } catch (err) {
     console.error('[emailService] ❌ Error:', err);
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
