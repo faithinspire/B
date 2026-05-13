@@ -1,11 +1,12 @@
 import nodemailer from 'nodemailer';
 
+// Mailtrap configuration with API key
 const transporter = nodemailer.createTransport({
-  host: process.env.MAILTRAP_HOST,
+  host: process.env.MAILTRAP_HOST || 'smtp.mailtrap.io',
   port: parseInt(process.env.MAILTRAP_PORT || '2525'),
   auth: {
-    user: process.env.MAILTRAP_USER,
-    pass: process.env.MAILTRAP_PASS,
+    user: process.env.MAILTRAP_USER || 'ad4e934227c0808d8b8b029489fa0fa6',
+    pass: process.env.MAILTRAP_PASS || 'ad4e934227c0808d8b8b029489fa0fa6',
   },
 });
 
