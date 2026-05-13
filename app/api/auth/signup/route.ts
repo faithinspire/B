@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendEmail } from '@/lib/mailtrap'
 
 export async function POST(request: NextRequest) {
   try {
@@ -243,7 +244,72 @@ export async function POST(request: NextRequest) {
       console.error('Notification error:', notificationError)
     }
 
-    // 6. Return success - session will be created on next auth check
+    // 6. Send welcome email
+    try {
+      const userType = role === 'braider' ? 'Braider' : 'Customer';
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://braidme.com';
+      
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to BraidMe!',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; font-size: 28px;">Welcome to BraidMe!</h1>
+            </div>
+            <div style="background: #f8f9fa; padding: 40px; border-radius: 0 0 10px 10px;">
+              <p style="font-size: 16px; color: #333; margin-bottom: 20px;">Hi ${full_name},</p>
+              
+              <p style="font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 20px;">
+                Thank you for joining BraidMe! We're excited to have you as a ${userType}.
+              </p>
+              
+              ${role === 'braider' ? `
+                <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea;">
+                  <h3 style="margin-top: 0; color: #667eea;">Get Started as a Braider</h3>
+                  <ul style="color: #666; line-height: 1.8;">
+                    <li>Complete your profile with your services</li>
+                    <li>Upload your portfolio images</li>
+                    <li>Set your availability and pricing</li>
+                    <li>Start receiving bookings!</li>
+                  </ul>
+                </div>
+              ` : `
+                <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea;">
+                  <h3 style="margin-top: 0; color: #667eea;">Get Started as a Customer</h3>
+                  <ul style="color: #666; line-height: 1.8;">
+                    <li>Browse available braiders in your area</li>
+                    <li>View their portfolios and reviews</li>
+                    <li>Book your appointment</li>
+                    <li>Track your booking in real-time</li>
+                  </ul>
+                </div>
+              `}
+              
+              <p style="font-size: 14px; color: #666; line-height: 1.6; margin: 20px 0;">
+                If you have any questions, feel free to reach out to our support team.
+              </p>
+              
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${appUrl}/dashboard" 
+                   style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                  Go to Dashboard
+                </a>
+              </div>
+              
+              <p style="font-size: 12px; color: #999; text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                © 2024 BraidMe. All rights reserved.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the signup if email fails
+    }
+
+    // 7. Return success - session will be created on next auth check
     return NextResponse.json({
       success: true,
       user: {
