@@ -1,12 +1,14 @@
 import nodemailer from 'nodemailer';
 
-// Mailtrap configuration with API key
+// Mailtrap configuration - IMPORTANT: Use SMTP credentials, not API key
+// Get these from Mailtrap dashboard: Settings → SMTP Credentials
 const transporter = nodemailer.createTransport({
   host: process.env.MAILTRAP_HOST || 'smtp.mailtrap.io',
   port: parseInt(process.env.MAILTRAP_PORT || '2525'),
+  secure: false, // Use TLS (port 2525 requires secure: false)
   auth: {
-    user: process.env.MAILTRAP_USER || 'ad4e934227c0808d8b8b029489fa0fa6',
-    pass: process.env.MAILTRAP_PASS || 'ad4e934227c0808d8b8b029489fa0fa6',
+    user: process.env.MAILTRAP_USER || '',
+    pass: process.env.MAILTRAP_PASS || '',
   },
 });
 
