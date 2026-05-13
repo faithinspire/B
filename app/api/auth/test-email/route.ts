@@ -88,5 +88,14 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+  } catch (error) {
+    console.error('Request parsing error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to process request',
+      },
+      { status: 400 }
+    );
   }
 }
