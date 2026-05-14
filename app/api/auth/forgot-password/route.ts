@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/mailtrap';
+import { sendEmail } from '@/lib/resend';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
     const resetLink = `${appUrl}/update-password?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
     console.log('[forgot-password] ✅ Reset link generated');
 
-    // Send email via Mailtrap
-    console.log('[forgot-password] Sending password reset email via Mailtrap...');
+    // Send email via Resend
+    console.log('[forgot-password] Sending password reset email via Resend...');
     try {
       await sendEmail({
         to: normalizedEmail,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           </div>
         `,
       });
-      console.log('[forgot-password] ✅ Email sent via Mailtrap');
+      console.log('[forgot-password] ✅ Email sent via Resend');
     } catch (emailError) {
       console.error('[forgot-password] Email sending error:', emailError);
       // Continue - don't fail the request if email fails

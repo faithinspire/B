@@ -1,9 +1,9 @@
 /**
- * Email Service using Mailtrap via Nodemailer
+ * Email Service using Resend
  * Handles all email communications for the BraidMe platform
  */
 
-import { sendEmail as mailtrapSendEmail } from '@/lib/mailtrap';
+import { sendEmail as resendSendEmail } from '@/lib/resend';
 
 interface EmailOptions {
   to: string;
@@ -12,7 +12,7 @@ interface EmailOptions {
 }
 
 /**
- * Send email via Mailtrap
+ * Send email via Resend
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
@@ -23,7 +23,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
     console.log('[emailService] Sending email to:', options.to);
 
-    const result = await mailtrapSendEmail({
+    const result = await resendSendEmail({
       to: options.to,
       subject: options.subject,
       html: options.html,

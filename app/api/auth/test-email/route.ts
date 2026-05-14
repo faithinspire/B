@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/mailtrap';
+import { sendEmail } from '@/lib/resend';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,19 +20,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if Mailtrap credentials are configured
-    if (!process.env.MAILTRAP_USER || !process.env.MAILTRAP_PASS) {
+    // Check if Resend API key is configured
+    if (!process.env.RESEND_API_KEY) {
       return NextResponse.json(
         {
           success: false,
-          error: 'MAILTRAP credentials not configured',
-          message: 'Email service is not configured. Please add MAILTRAP_USER and MAILTRAP_PASS to environment variables.',
+          error: 'Resend API key not configured',
+          message: 'Email service is not configured. Please add RESEND_API_KEY to environment variables.',
         },
         { status: 500 }
       );
     }
 
-    console.log('Testing Mailtrap email service...');
+    console.log('Testing Resend email service...');
 
     // Send test email
     try {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
             <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 8px 8px;">
               <h2 style="color: #333; margin-top: 0;">Email Service Test</h2>
               <p style="color: #666; line-height: 1.6;">
-                ✅ If you received this email, the Mailtrap email service is working correctly!
+                ✅ If you received this email, the Resend email service is working correctly!
               </p>
               <p style="color: #666; line-height: 1.6;">
                 This is a test email to verify that password reset emails will be delivered successfully.
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
                 <p style="color: #0066cc; margin: 0;">
                   <strong>Test Details:</strong><br/>
                   Email sent to: ${email}<br/>
-                  Service: Mailtrap<br/>
+                  Service: Resend<br/>
                   Timestamp: ${new Date().toISOString()}
                 </p>
               </div>
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         result: {
           to: email,
           subject: 'BraidMe Email Service Test',
-          service: 'Mailtrap',
+          service: 'Resend',
         },
       });
     } catch (error) {
