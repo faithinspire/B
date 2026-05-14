@@ -12,8 +12,14 @@ export interface EmailOptions {
 
 export async function sendEmail(options: EmailOptions) {
   try {
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    const fromName = process.env.RESEND_FROM_NAME || 'BraidMe';
+    const from = `${fromName} <${fromEmail}>`;
+
+    console.log('[resend] Sending email from:', from);
+
     const result = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'noreply@braidme.com',
+      from,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -21,14 +27,14 @@ export async function sendEmail(options: EmailOptions) {
     });
 
     if (result.error) {
-      console.error('Failed to send email:', result.error);
+      console.error('[resend] ❌ Failed to send email:', result.error);
       throw new Error(result.error.message);
     }
 
-    console.log('Email sent successfully:', result.data?.id);
+    console.log('[resend] ✅ Email sent successfully:', result.data?.id);
     return { success: true, messageId: result.data?.id };
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error('[resend] ❌ Failed to send email:', error);
     throw error;
   }
 }

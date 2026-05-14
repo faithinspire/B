@@ -82,6 +82,7 @@ export function buildVerificationSubmittedEmail(braiderName: string): string {
  * Send verification approved email
  */
 export function buildVerificationApprovedEmail(braiderName: string): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
@@ -109,7 +110,7 @@ export function buildVerificationApprovedEmail(braiderName: string): string {
       </div>
       
       <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
-        <a href="https://braidmee.vercel.app/braider/dashboard" style="color: #9333ea; text-decoration: none; font-weight: bold;">
+        <a href="${appUrl}/braider/dashboard" style="color: #9333ea; text-decoration: none; font-weight: bold;">
           Go to your dashboard →
         </a>
       </p>
@@ -126,6 +127,7 @@ export function buildVerificationApprovedEmail(braiderName: string): string {
  * Send verification rejected email
  */
 export function buildVerificationRejectedEmail(braiderName: string, reason?: string): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #9333ea, #ec4899); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
@@ -158,7 +160,7 @@ export function buildVerificationRejectedEmail(braiderName: string, reason?: str
       </p>
       
       <p style="color: #6b7280; line-height: 1.6; margin-bottom: 24px;">
-        <a href="https://braidmee.vercel.app/braider/verify" style="color: #9333ea; text-decoration: none; font-weight: bold;">
+        <a href="${appUrl}/braider/verify" style="color: #9333ea; text-decoration: none; font-weight: bold;">
           Resubmit verification →
         </a>
       </p>
