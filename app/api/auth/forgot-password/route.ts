@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/resend';
+import { sendEmail } from '@/lib/brevo';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Forgot password endpoint
- * Generates a custom reset token and sends it via Resend email service
+ * Generates a custom reset token and sends it via Brevo email service
  */
 export async function POST(request: NextRequest) {
   try {
@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
     const resetLink = `${appUrl}/update-password?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
     console.log('[forgot-password] ✅ Reset link generated');
 
-    // Send email via Resend
-    console.log('[forgot-password] Sending password reset email via Resend...');
+    // Send email via Brevo
+    console.log('[forgot-password] Sending password reset email via Brevo...');
     try {
       await sendEmail({
         to: normalizedEmail,
@@ -83,11 +83,11 @@ export async function POST(request: NextRequest) {
             <p style="color: #666; font-size: 12px; word-break: break-all;">${resetLink}</p>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">This link will expire in 24 hours. If you didn't request this, please ignore this email.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">© 2024 BraidMe. All rights reserved.</p>
+            <p style="color: #999; font-size: 12px; text-align: center;">© 2026 BraidMe. All rights reserved.</p>
           </div>
         `,
       });
-      console.log('[forgot-password] ✅ Email sent via Resend');
+      console.log('[forgot-password] ✅ Email sent via Brevo');
     } catch (emailError) {
       console.error('[forgot-password] Email sending error:', emailError);
       // Continue - don't fail the request if email fails

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/resend';
+import { sendEmail } from '@/lib/brevo';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Test email endpoint - verifies Resend email service is working
+ * Test email endpoint - verifies Brevo email service is working
  * POST /api/auth/test-email
  * Body: { email: "test@example.com" }
  */
@@ -20,19 +20,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
+    // Check if Brevo API key is configured
+    if (!process.env.BREVO_API_KEY) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Resend API key not configured',
-          message: 'Email service is not configured. Please add RESEND_API_KEY to environment variables.',
+          error: 'Brevo API key not configured',
+          message: 'Email service is not configured. Please add BREVO_API_KEY to environment variables.',
         },
         { status: 500 }
       );
     }
 
-    console.log('Testing Resend email service...');
+    console.log('Testing Brevo email service...');
 
     // Send test email
     try {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
             <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 8px 8px;">
               <h2 style="color: #333; margin-top: 0;">Email Service Test</h2>
               <p style="color: #666; line-height: 1.6;">
-                ✅ If you received this email, the Resend email service is working correctly!
+                ✅ If you received this email, the Brevo email service is working correctly!
               </p>
               <p style="color: #666; line-height: 1.6;">
                 This is a test email to verify that password reset emails will be delivered successfully.
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
                 <p style="color: #0066cc; margin: 0;">
                   <strong>Test Details:</strong><br/>
                   Email sent to: ${email}<br/>
-                  Service: Resend<br/>
+                  Service: Brevo<br/>
                   Timestamp: ${new Date().toISOString()}
                 </p>
               </div>
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         result: {
           to: email,
           subject: 'BraidMe Email Service Test',
-          service: 'Resend',
+          service: 'Brevo',
         },
       });
     } catch (error) {

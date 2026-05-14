@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/resend';
+import { sendEmail } from '@/app/lib/emailService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       });
 
     // Send email to support team
-    if (process.env.RESEND_API_KEY) {
+    if (process.env.BREVO_API_KEY) {
       try {
         await sendEmail({
           to: 'support@braidme.com',

@@ -1,9 +1,9 @@
 /**
- * Email Service using Resend
+ * Email Service using Brevo
  * Handles all email communications for the BraidMe platform
  */
 
-import { sendEmail as resendSendEmail } from '@/lib/resend';
+import { sendEmail as brevoSendEmail } from '@/lib/brevo';
 
 interface EmailOptions {
   to: string;
@@ -12,7 +12,7 @@ interface EmailOptions {
 }
 
 /**
- * Send email via Resend
+ * Send email via Brevo
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
@@ -23,7 +23,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
     console.log('[emailService] Sending email to:', options.to);
 
-    const result = await resendSendEmail({
+    const result = await brevoSendEmail({
       to: options.to,
       subject: options.subject,
       html: options.html,

@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         .eq('id', userId);
     }
 
-    // Send approval email via Resend
+    // Send approval email via Brevo
     if (userEmail) {
       console.log('[verification-approve] Sending approval email to:', userEmail);
       const emailResult = await sendEmail({

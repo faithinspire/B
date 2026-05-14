@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { sendEmail } from '@/lib/resend'
+import { sendEmail } from '@/lib/brevo'
 
 export async function POST(request: NextRequest) {
   try {

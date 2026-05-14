@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         reason: 'Braider submitted verification documents',
       });
 
-    // Send confirmation email via Resend
+    // Send confirmation email via Brevo
     console.log('[verification-submit] Sending confirmation email to:', userEmail);
     const emailResult = await sendEmail({
       to: userEmail,

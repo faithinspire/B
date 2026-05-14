@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Send rejection email via Resend
+    // Send rejection email via Brevo
     if (userEmail) {
       console.log('[verification-reject] Sending rejection email to:', userEmail);
       const emailResult = await sendEmail({
