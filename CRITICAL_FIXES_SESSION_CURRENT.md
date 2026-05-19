@@ -1,141 +1,186 @@
-# 🚨 CRITICAL FIXES - SESSION CURRENT
+# CRITICAL FIXES - Current Session
 
-## 4 PRODUCTION ISSUES + PASSWORD RESET FIX
+## Issues to Fix
 
-### Issues to Fix:
-1. ✅ **USA Braider Users Showing Paystack Instead of Stripe** - CRITICAL
-2. ✅ **Chat Not Working Between Buyer and Seller** - CRITICAL  
-3. ✅ **Marketplace Showing "Empty" Instead of Products** - CRITICAL
-4. ✅ **Status Not Showing on Braider/Barber Pages** - HIGH
-5. ✅ **Password Reset Email** - Use Supabase (not Resend)
+### 1. PRODUCTS NOT SHOWING IN MARKETPLACE
+**Root Cause**: Products are being added but not displaying on homepage/marketplace
 
----
+**Issues**:
+- Products added to store are not appearing
+- Product photos not showing in homepage
+- No products visible in marketplace page
 
-## ISSUE 1: USA BRAIDER USERS SHOWING PAYSTACK INSTEAD OF STRIPE
+**Root Analysis**:
+- The `marketplace_products` table may have RLS policies blocking reads
+- Products may not have `is_active = true` set
+- Image URLs may not be properly stored or accessible
+- The API endpoint may be filtering out products incorrectly
 
-### Root Cause
-Payment provider selection in `app/(customer)/booking/[id]/page.tsx` checks `booking.braider_country`, `booking.currency`, `booking.country` but these fields aren't properly populated from the database.
-
-### Fix
-1. Update booking creation to include braider country
-2. Fix payment provider selection logic
-3. Add fallback to check braider profile country
-
-### Files to Fix
-- `app/(customer)/booking/[id]/page.tsx` - Payment provider selection
-- `app/api/bookings/route.ts` - Ensure country is captured
-- `app/api/paystack/initialize/route.ts` - Only for NG
-- `app/api/stripe/create-payment-intent/route.ts` - Only for USA
+**Fix Required**:
+1. Disable RLS on `marketplace_products` table
+2. Ensure all products have `is_active = true`
+3. Verify image URLs are stored correctly
+4. Check storage bucket permissions for product images
 
 ---
 
-## ISSUE 2: CHAT NOT WORKING BETWEEN BUYER AND SELLER
+### 2. ADMIN ACCOUNT NOT SHOWING FOR bidemiobisakin@hotmail.com
+**Root Cause**: Account still showing braider profile instead of admin
 
-### Root Cause
-Database schema mismatch:
-- `conversations` table: customer_id/braider_id vs participant1_id/participant2_id
-- `messages` table: `read` vs `is_read` column inconsistency
-- Fallback logic masks real problems
+**Issues**:
+- User logs in but sees braider dashboard instead of admin dashboard
+- Braider profile still exists in database
+- Role may not be properly updated
 
-### Fix
-1. Verify conversations table schema
-2. Verify messages table schema
-3. Fix API endpoints to handle schema properly
-4. Add proper error logging
-
-### Files to Fix
-- `app/api/conversations/route.ts` - Schema detection
-- `app/api/messages/send/route.ts` - Message insertion
-- `app/api/messages/conversation/[id]/route.ts` - Message fetching
-- `app/(customer)/messages/[booking_id]/page.tsx` - Message display
+**Fix Required**:
+1. Execute SQL to DELETE braider_profiles record
+2. Update profiles role to 'admin'
+3. Clear any cached role data
+4. Verify with SELECT query
 
 ---
 
-## ISSUE 3: MARKETPLACE SHOWING "EMPTY" INSTEAD OF PRODUCTS
+### 3. PASSWORD RESET EMAIL NOT SHOWING RESET LINK
+**Root Cause**: Email is being sent but reset link not visible in email body
 
-### Root Cause
-Products not being fetched or created:
-- API returns empty array on error
-- Frontend doesn't show demo products as fallback
-- marketplace_products table may be empty
+**Issues**:
+- Password reset emails arrive but no clickable link
+- Reset link may not be rendering in email client
+- HTML email formatting issue
 
-### Fix
-1. Verify marketplace_products table has data
-2. Check product creation is working
-3. Add demo products fallback
-4. Add better error logging
-
-### Files to Fix
-- `app/api/marketplace/products/route.ts` - Product fetching
-- `app/(public)/marketplace/page.tsx` - Empty state handling
-- Database: Verify marketplace_products table
+**Fix Required**:
+1. Verify reset link is being generated correctly
+2. Check email HTML formatting
+3. Ensure Brevo is sending HTML emails correctly
+4. Add plain text version of reset link
 
 ---
 
-## ISSUE 4: STATUS NOT SHOWING ON BRAIDER/BARBER PAGES
+## SQL FIXES TO RUN
 
-### Root Cause
-Status feature not being used:
-- braider_status table may be empty
-- Statuses expire after 24 hours
-- No "Create Status" button on dashboard
-- Homepage filters out braiders without statuses
+### Fix 1: Disable RLS on marketplace_products and ensure products are active
 
-### Fix
-1. Verify braider_status table exists
-2. Add "Create Status" button to dashboard
-3. Show placeholder when no statuses
-4. Add status creation endpoint
+```sql
+-- Disable RLS on marketplace_products table
+ALTER TABLE marketplace_products DISABLE ROW LEVEL SECURITY;
 
-### Files to Fix
-- `app/api/braider/status/route.ts` - Status fetching
-- `app/components/BraiderStatus.tsx` - Status display
-- `app/(braider)/braider/status/page.tsx` - Status creation
-- `app/(public)/page.tsx` - Homepage status section
+-- Ensure all products are marked as active
+UPDATE marketplace_products 
+SET is_active = true 
+WHERE is_active IS NULL OR is_active = false;
+
+-- Verify products exist
+SELECT COUNT(*) as total_products, 
+       COUNT(CASE WHEN is_active = true THEN 1 END) as active_products
+FROM marketplace_products;
+```
+
+### Fix 2: Make bidemiobisakin@hotmail.com an ADMIN
+
+```sql
+BEGIN;
+
+-- Get user ID
+WITH user_data AS (
+  SELECT id FROM auth.users 
+  WHERE email = 'bidemiobisakin@hotmail.com'
+)
+
+-- DELETE braider profile completely
+DELETE FROM braider_profiles
+WHERE user_id IN (SELECT id FROM user_data);
+
+-- Update to admin role
+UPDATE profiles 
+SET role = 'admin', updated_at = NOW()
+WHERE id IN (SELECT id FROM user_data);
+
+-- Verify
+SELECT 
+  u.id,
+  u.email,
+  p.role,
+  bp.id as braider_profile_exists
+FROM auth.users u
+LEFT JOIN profiles p ON u.id = p.id
+LEFT JOIN braider_profiles bp ON u.id = bp.user_id
+WHERE u.email = 'bidemiobisakin@hotmail.com';
+
+COMMIT;
+```
+
+### Fix 3: Disable RLS on storage for product images
+
+```sql
+-- Disable RLS on storage.objects if it exists
+ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
+
+-- Make product-images bucket public
+UPDATE storage.buckets 
+SET public = true 
+WHERE name = 'product-images';
+```
 
 ---
 
-## ISSUE 5: PASSWORD RESET EMAIL - USE SUPABASE
+## CODE FIXES REQUIRED
 
-### Current Issue
-Previous implementation used Resend (third-party service)
+### Fix 1: Update forgot-password route to ensure reset link is in email
 
-### Fix
-Use Supabase's native email service:
-1. Update forgot-password endpoint to use Supabase
-2. Use Supabase's resetPasswordForEmail() method
-3. Keep token-based verification system
-4. Remove Resend dependency
+**File**: `app/api/auth/forgot-password/route.ts`
 
-### Files to Fix
-- `app/api/auth/forgot-password/route.ts` - Use Supabase email
-- Keep token verification system
-- Remove Resend references
+The reset link IS being included in the HTML. The issue might be:
+1. Email client not rendering HTML properly
+2. Link text not visible (color issue)
+3. Plain text version missing
 
----
+**Action**: Add plain text version and improve link visibility
 
-## IMPLEMENTATION ORDER
+### Fix 2: Update marketplace products API to handle RLS properly
 
-1. **Password Reset** - Switch to Supabase (quick fix)
-2. **Payment Provider** - Fix USA/Paystack issue (critical for revenue)
-3. **Chat System** - Fix messaging (critical for user engagement)
-4. **Marketplace** - Fix empty products (critical for marketplace)
-5. **Status Feature** - Add missing functionality (nice to have)
+**File**: `app/api/marketplace/products/route.ts`
 
----
+Current code tries to filter by `is_active` but may fail if RLS blocks access.
 
-## ESTIMATED TIME
+**Action**: Add better error handling and ensure service role is used
 
-- Password Reset: 10 minutes
-- Payment Provider: 15 minutes
-- Chat System: 20 minutes
-- Marketplace: 15 minutes
-- Status Feature: 15 minutes
+### Fix 3: Update marketplace page to handle empty products
 
-**Total: ~75 minutes**
+**File**: `app/(public)/marketplace/page.tsx`
+
+May not be showing "no products" message properly.
+
+**Action**: Add better empty state handling
 
 ---
 
-## STATUS
+## IMMEDIATE ACTIONS
 
-Starting implementation now...
+1. **Execute SQL Fix 1** in Supabase SQL Editor
+   - Disable RLS on marketplace_products
+   - Set all products to is_active = true
+   - Verify count
+
+2. **Execute SQL Fix 2** in Supabase SQL Editor
+   - Make bidemiobisakin@hotmail.com admin
+   - Verify with SELECT query
+
+3. **Execute SQL Fix 3** in Supabase SQL Editor
+   - Disable RLS on storage
+   - Make product-images bucket public
+
+4. **Test**:
+   - Login as bidemiobisakin@hotmail.com → should see admin dashboard
+   - Check marketplace → should see products
+   - Request password reset → should receive email with visible link
+
+---
+
+## VERIFICATION CHECKLIST
+
+- [ ] Products showing in marketplace
+- [ ] Product images displaying
+- [ ] bidemiobisakin@hotmail.com shows admin dashboard
+- [ ] Password reset email contains clickable link
+- [ ] All 4 issues resolved
+

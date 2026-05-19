@@ -6,10 +6,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const user_id = searchParams.get('user_id');
     const role = searchParams.get('role'); // 'buyer' or 'seller'
+    const order_id = searchParams.get('order_id'); // For fetching specific order
 
-    if (!user_id || !role) {
+    // Allow fetching specific order without user_id/role
+    if (!order_id && (!user_id || !role)) {
       return NextResponse.json(
-        { error: 'Missing user_id or role' },
+        { error: 'Missing user_id/role or order_id' },
         { status: 400 }
       );
     }
@@ -22,7 +24,10 @@ export async function GET(request: Request) {
 
     let query = db.from('marketplace_orders').select('*');
 
-    if (role === 'buyer') {
+    // If fetching specific order, just get that order
+    if (order_id) {
+      query = query.eq('id', order_id);
+    } else if (role === 'buyer') {
       query = query.eq('buyer_id', user_id);
     } else if (role === 'seller') {
       query = query.eq('seller_id', user_id);
@@ -35,6 +40,11 @@ export async function GET(request: Request) {
         { error: error.message },
         { status: 400 }
       );
+    }
+
+    // If fetching specific order, return single object; otherwise return array
+    if (order_id) {
+      return NextResponse.json({ data: orders?.[0] || null }, { status: 200 });
     }
 
     return NextResponse.json({ data: orders }, { status: 200 });

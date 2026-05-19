@@ -70,22 +70,39 @@ export async function POST(request: NextRequest) {
         to: normalizedEmail,
         subject: 'Reset Your BraidMe Password',
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #9333ea;">Password Reset Request</h2>
-            <p>Hi there,</p>
-            <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetLink}" style="background-color: #9333ea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Reset Password
-              </a>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; padding: 20px;">
+            <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <h2 style="color: #9333ea; margin-top: 0; margin-bottom: 20px; font-size: 24px;">Password Reset Request</h2>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Hi there,</p>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">We received a request to reset your password. Click the button below to create a new password:</p>
+              
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${resetLink}" style="background-color: #9333ea; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px; border: 2px solid #9333ea;">
+                  Reset Password
+                </a>
+              </div>
+              
+              <p style="color: #666; font-size: 14px; margin-bottom: 10px; font-weight: bold;">Or copy and paste this link in your browser:</p>
+              <p style="color: #0066cc; font-size: 13px; word-break: break-all; background-color: #f3f4f6; padding: 12px; border-radius: 4px; border-left: 4px solid #9333ea;">
+                <a href="${resetLink}" style="color: #0066cc; text-decoration: underline;">${resetLink}</a>
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+              
+              <p style="color: #999; font-size: 12px; margin-bottom: 10px;">
+                <strong>Security Note:</strong> This link will expire in 24 hours. If you didn't request this password reset, please ignore this email and your password will remain unchanged.
+              </p>
+              
+              <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+                © 2026 BraidMe. All rights reserved.<br>
+                <a href="${appUrl}" style="color: #9333ea; text-decoration: none;">Visit BraidMe</a>
+              </p>
             </div>
-            <p style="color: #666; font-size: 14px;">Or copy and paste this link in your browser:</p>
-            <p style="color: #666; font-size: 12px; word-break: break-all;">${resetLink}</p>
-            <p style="color: #999; font-size: 12px; margin-top: 30px;">This link will expire in 24 hours. If you didn't request this, please ignore this email.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">© 2026 BraidMe. All rights reserved.</p>
           </div>
         `,
+        text: `Password Reset Request\n\nHi there,\n\nWe received a request to reset your password. Click the link below to create a new password:\n\n${resetLink}\n\nThis link will expire in 24 hours. If you didn't request this, please ignore this email.\n\n© 2026 BraidMe. All rights reserved.`,
       });
       console.log('[forgot-password] ✅ Email sent via Brevo');
     } catch (emailError) {

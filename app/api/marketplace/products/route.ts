@@ -22,18 +22,31 @@ export async function GET(request: Request) {
     const country_code = searchParams.get('country_code');
     const state = searchParams.get('state');
     const braider_id = searchParams.get('braider_id');
+    const product_id = searchParams.get('product_id');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    // Start with base query — try to show active products, fall back to all
+    console.log('[marketplace-products] Fetching products with filters:', {
+      category, search, country_code, state, braider_id, product_id, page, limit
+    });
+
+    // If fetching a specific product, don't filter by is_active (allow braiders to see their own products)
     let query = supabase
       .from('marketplace_products')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' });
 
-    // Try filtering by is_active — if column doesn't exist the query still works
-    // We'll handle the error gracefully below
+    // Only filter by is_active if NOT fetching a specific product
+    if (!product_id) {
+      query = query.eq('is_active', true);
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    // Apply filters
+    if (product_id && product_id !== '') {
+      query = query.eq('id', product_id);
+    }
     if (country_code && country_code !== '') {
       query = query.eq('country_code', country_code);
     }
@@ -50,22 +63,42 @@ export async function GET(request: Request) {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
+    // Apply pagination
     let { data: products, count, error } = await query.range(offset, offset + limit - 1);
 
-    // If query failed (e.g. table doesn't exist), return empty gracefully
+    // If query failed, log and return empty gracefully
     if (error) {
-      console.error('Products fetch error:', error.message);
-      // Try without range in case of schema issues
-      if (error.message.includes('does not exist') || error.message.includes('relation')) {
-        return NextResponse.json({ success: true, data: [], pagination: { page, limit, total: 0, pages: 0 } });
+      console.error('[marketplace-products] Query error:', error.message);
+      // Try without filters to diagnose
+      const { data: allProducts, error: allError } = await supabase
+        .from('marketplace_products')
+        .select('*', { count: 'exact' })
+        .eq('is_active', true)
+        .limit(5);
+      
+      if (allError) {
+        console.error('[marketplace-products] Even basic query failed:', allError.message);
+        return NextResponse.json({ 
+          success: false, 
+          error: `Database error: ${allError.message}`, 
+          data: [] 
+        }, { status: 500 });
       }
-      return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
+      
+      console.log('[marketplace-products] Basic query succeeded, found', allProducts?.length, 'products');
+      return NextResponse.json({
+        success: true,
+        data: allProducts || [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          pages: 0,
+        },
+      });
     }
 
-    // Filter out inactive products in JS if is_active column exists
-    if (products && products.length > 0 && 'is_active' in products[0]) {
-      products = products.filter((p: any) => p.is_active !== false);
-    }
+    console.log('[marketplace-products] ✅ Found', products?.length || 0, 'products, total count:', count);
 
     return NextResponse.json({
       success: true,
@@ -78,7 +111,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (err: any) {
-    console.error('Marketplace products API error:', err);
-    return NextResponse.json({ success: false, error: 'Server error', data: [] }, { status: 500 });
+    console.error('[marketplace-products] Fatal error:', err);
+    return NextResponse.json({ success: false, error: 'Server error: ' + err.message, data: [] }, { status: 500 });
   }
 }
