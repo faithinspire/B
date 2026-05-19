@@ -1,7 +1,72 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { sendSMS, isTwilioConfigured, formatPhoneNumber } from '@/lib/twilio';
+
+// Lazy import Twilio only when needed
+async function getTwilioClient() {
+  try {
+    const twilio = await import('twilio');
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!accountSid || !authToken) {
+      return null;
+    }
+    
+    return twilio.default(accountSid, authToken);
+  } catch (error) {
+    console.error('[Password Reset] ❌ Failed to load Twilio:', error);
+    return null;
+  }
+}
+
+// Send SMS via Twilio (lazy loaded)
+async function sendSMS(to: string, body: string) {
+  try {
+    const twilioClient = await getTwilioClient();
+    if (!twilioClient) {
+      throw new Error('Twilio client not available');
+    }
+
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!fromNumber) {
+      throw new Error('TWILIO_PHONE_NUMBER not configured');
+    }
+
+    console.log('[Password Reset] 📱 Sending SMS via Twilio to:', to);
+    const message = await twilioClient.messages.create({
+      body,
+      from: fromNumber,
+      to,
+    });
+
+    console.log('[Password Reset] ✅ SMS sent successfully:', message.sid);
+    return { success: true, messageSid: message.sid };
+  } catch (error) {
+    console.error('[Password Reset] ❌ SMS send error:', error);
+    throw error;
+  }
+}
+
+// Format phone number for Twilio
+function formatPhoneNumber(phone: string): string {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `+1${cleaned}`;
+  }
+  if (cleaned.length >= 11 && !phone.startsWith('+')) {
+    return `+${cleaned}`;
+  }
+  return phone.startsWith('+') ? phone : `+${phone}`;
+}
+
+// Check if Twilio is configured
+function isTwilioConfigured(): boolean {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  return !!(accountSid && authToken && fromNumber);
+}
 
 // Validate Brevo configuration
 function validateBrevoConfig() {
@@ -202,10 +267,7 @@ export async function POST(request: NextRequest) {
         const formattedPhone = formatPhoneNumber(phone);
         const smsBody = `Your BraidMe password reset link: ${resetLink}\n\nThis link expires in 1 hour.`;
         
-        await sendSMS({
-          to: formattedPhone,
-          body: smsBody,
-        });
+        await sendSMS(formattedPhone, smsBody);
 
         console.log('[Password Reset] ✅ SMS sent successfully to:', phone);
       } catch (smsError) {
