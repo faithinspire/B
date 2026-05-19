@@ -3,6 +3,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { sendSMS, isTwilioConfigured, formatPhoneNumber } from '@/lib/twilio';
 
+// Validate Brevo configuration
+function validateBrevoConfig() {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME;
+
+  if (!apiKey) {
+    console.error('[Password Reset] ❌ BREVO_API_KEY is not configured');
+    return false;
+  }
+  if (!fromEmail) {
+    console.error('[Password Reset] ❌ BREVO_FROM_EMAIL is not configured');
+    return false;
+  }
+  if (!fromName) {
+    console.error('[Password Reset] ❌ BREVO_FROM_NAME is not configured');
+    return false;
+  }
+
+  console.log('[Password Reset] ✅ Brevo configuration validated');
+  console.log('[Password Reset] From:', `${fromName} <${fromEmail}>`);
+  return true;
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -10,6 +34,14 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate Brevo configuration first
+    if (!validateBrevoConfig()) {
+      return NextResponse.json(
+        { success: false, error: 'Email service is not properly configured. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
     const { email, phone, method = 'email' } = await request.json();
 
     if (!email && !phone) {
@@ -36,13 +68,13 @@ export async function POST(request: NextRequest) {
     }
 
     const contactInfo = method === 'email' ? email : phone;
-    console.log(`[Password Reset] Request received for ${method}:`, contactInfo);
+    console.log(`[Password Reset] 📧 Request received for ${method}:`, contactInfo);
 
     // Check if user exists in auth.users
     const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
     
     if (authError) {
-      console.error('[Password Reset] Auth list error:', authError);
+      console.error('[Password Reset] ❌ Auth list error:', authError);
       return NextResponse.json(
         { success: true, message: `If an account exists with this ${method}, you will receive a password reset link.` },
         { status: 200 }
@@ -56,7 +88,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (!userExists) {
-      console.log(`[Password Reset] User not found for ${method}:`, contactInfo);
+      console.log(`[Password Reset] ℹ️ User not found for ${method}:`, contactInfo);
       // Don't reveal if account exists for security
       return NextResponse.json(
         { success: true, message: `If an account exists with this ${method}, you will receive a password reset link.` },
@@ -64,14 +96,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Password Reset] User found, generating token for ${method}:`, contactInfo);
+    console.log(`[Password Reset] ✅ User found, generating token for ${method}:`, contactInfo);
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    console.log('[Password Reset] Token generated, storing in database');
+    console.log('[Password Reset] 🔐 Token generated, storing in database');
 
     // Store token in database
     const { error: tokenError, data: insertedData } = await supabase
@@ -85,35 +117,40 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (tokenError) {
-      console.error('[Password Reset] Token storage error:', tokenError);
+      console.error('[Password Reset] ❌ Token storage error:', tokenError);
       return NextResponse.json(
         { success: false, error: 'Failed to generate reset token: ' + tokenError.message },
         { status: 500 }
       );
     }
 
-    console.log('[Password Reset] Token stored successfully:', insertedData);
+    console.log('[Password Reset] ✅ Token stored successfully');
 
     // Send reset link via email or SMS
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${resetToken}&${method === 'email' ? 'email' : 'phone'}=${encodeURIComponent(contactInfo)}`;
+    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/update-password?token=${resetToken}&${method === 'email' ? 'email' : 'phone'}=${encodeURIComponent(contactInfo)}`;
 
-    console.log(`[Password Reset] Sending ${method} to:`, contactInfo);
-    console.log('[Password Reset] Reset link:', resetLink);
+    console.log(`[Password Reset] 📤 Sending ${method} to:`, contactInfo);
 
     if (method === 'email') {
       // Send via Brevo email
       try {
+        const brevoApiKey = process.env.BREVO_API_KEY;
+        const brevoFromEmail = process.env.BREVO_FROM_EMAIL;
+        const brevoFromName = process.env.BREVO_FROM_NAME;
+
+        console.log('[Password Reset] 🔄 Calling Brevo API...');
+
         const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: {
             'accept': 'application/json',
-            'api-key': process.env.BREVO_API_KEY!,
+            'api-key': brevoApiKey!,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             sender: {
-              name: 'BraidMe',
-              email: process.env.BREVO_FROM_EMAIL || 'noreply@braidme.com',
+              name: brevoFromName || 'BraidMe',
+              email: brevoFromEmail || 'noreply@braidme.com',
             },
             to: [
               {
@@ -138,19 +175,22 @@ export async function POST(request: NextRequest) {
 
         const responseText = await brevoResponse.text();
         console.log('[Password Reset] Brevo response status:', brevoResponse.status);
-        console.log('[Password Reset] Brevo response:', responseText);
 
         if (!brevoResponse.ok) {
-          console.error('[Password Reset] Brevo email send failed:', responseText);
+          console.error('[Password Reset] ❌ Brevo API error:', responseText);
+          console.error('[Password Reset] ❌ Status:', brevoResponse.status);
+          console.error('[Password Reset] ❌ Headers:', Object.fromEntries(brevoResponse.headers));
+          
           return NextResponse.json(
-            { success: false, error: 'Failed to send reset email. Status: ' + brevoResponse.status },
+            { success: false, error: `Failed to send reset email. Brevo error: ${brevoResponse.status}` },
             { status: 500 }
           );
         }
 
-        console.log('[Password Reset] Email sent successfully to:', email);
+        console.log('[Password Reset] ✅ Email sent successfully to:', email);
+        console.log('[Password Reset] Brevo response:', responseText);
       } catch (emailError) {
-        console.error('[Password Reset] Email send error:', emailError);
+        console.error('[Password Reset] ❌ Email send error:', emailError);
         return NextResponse.json(
           { success: false, error: 'Failed to send reset email: ' + (emailError instanceof Error ? emailError.message : 'Unknown error') },
           { status: 500 }
@@ -167,9 +207,9 @@ export async function POST(request: NextRequest) {
           body: smsBody,
         });
 
-        console.log('[Password Reset] SMS sent successfully to:', phone);
+        console.log('[Password Reset] ✅ SMS sent successfully to:', phone);
       } catch (smsError) {
-        console.error('[Password Reset] SMS send error:', smsError);
+        console.error('[Password Reset] ❌ SMS send error:', smsError);
         return NextResponse.json(
           { success: false, error: 'Failed to send reset SMS: ' + (smsError instanceof Error ? smsError.message : 'Unknown error') },
           { status: 500 }
@@ -182,7 +222,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('[Password Reset] Request error:', error);
+    console.error('[Password Reset] ❌ Request error:', error);
     return NextResponse.json(
       { success: false, error: 'An error occurred: ' + (error instanceof Error ? error.message : 'Unknown error') },
       { status: 500 }
