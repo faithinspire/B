@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Loader, Lock } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,36 +15,21 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [validating, setValidating] = useState(true);
-  const [sessionValid, setSessionValid] = useState(false);
+  const [tokenValid, setTokenValid] = useState(false);
 
-  // Check if user has a valid recovery session
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
+
+  // Validate token and email from URL
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Get the current session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // Check if there's a recovery token in the URL
-        const hash = window.location.hash;
-        const hasRecoveryToken = hash.includes('type=recovery');
-        
-        if (!session && !hasRecoveryToken) {
-          setError('Invalid or expired reset link. Please request a new one.');
-          setSessionValid(false);
-        } else {
-          setSessionValid(true);
-        }
-      } catch (err) {
-        console.error('Session check error:', err);
-        setError('Failed to validate reset link');
-        setSessionValid(false);
-      } finally {
-        setValidating(false);
-      }
-    };
-
-    checkSession();
-  }, []);
+    if (!token || !email) {
+      setError('Invalid or missing reset link. Please request a new one.');
+      setTokenValid(false);
+    } else {
+      setTokenValid(true);
+    }
+    setValidating(false);
+  }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +42,7 @@ export default function UpdatePasswordPage() {
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -69,29 +54,33 @@ export default function UpdatePasswordPage() {
     setLoading(true);
 
     try {
-      // Update the user's password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
+      const response = await fetch('/api/auth/password-reset/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email?.toLowerCase(),
+          token,
+          newPassword: password,
+        }),
       });
 
-      if (updateError) {
-        setError(updateError.message || 'Failed to reset password');
-        setLoading(false);
-        return;
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess(true);
+        setPassword('');
+        setConfirmPassword('');
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      } else {
+        setError(data.error || 'Failed to reset password');
       }
-
-      // Success
-      setSuccess(true);
-      setPassword('');
-      setConfirmPassword('');
-
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
     } catch (err) {
       console.error('Update password error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };
@@ -107,7 +96,7 @@ export default function UpdatePasswordPage() {
     );
   }
 
-  if (!sessionValid) {
+  if (!tokenValid) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4">
         <div className="max-w-md mx-auto">
@@ -155,7 +144,7 @@ export default function UpdatePasswordPage() {
           <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2 text-center">
             Create New Password
           </h1>
-          <p className="text-gray-600 text-center">
+          <p className="text-gray-600 text-center text-sm">
             Enter a new password for your BraidMe account.
           </p>
         </div>
@@ -186,17 +175,17 @@ export default function UpdatePasswordPage() {
 
         {/* Form */}
         {!success && (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                New Password *
+                New Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors disabled:bg-gray-50"
                 disabled={loading}
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -206,14 +195,14 @@ export default function UpdatePasswordPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password *
+                Confirm Password
               </label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-600 transition-colors disabled:bg-gray-50"
                 disabled={loading}
               />
             </div>
@@ -221,11 +210,16 @@ export default function UpdatePasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Resetting...' : 'Reset Password'}
             </button>
+
+            {/* Info Box */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
+              <strong>Security:</strong> Use a strong password with letters, numbers, and symbols.
+            </div>
           </form>
         )}
 
@@ -239,13 +233,6 @@ export default function UpdatePasswordPage() {
             </p>
           </div>
         )}
-
-        {/* Info Box */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs text-blue-900">
-            <strong>Security:</strong> Make sure to use a strong password with a mix of letters, numbers, and symbols.
-          </p>
-        </div>
       </div>
     </div>
   );

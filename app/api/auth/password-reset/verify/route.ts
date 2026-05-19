@@ -16,24 +16,17 @@ export async function POST(request: NextRequest) {
     if (!email || !token || !newPassword) {
       console.error('[Password Reset Verify] ❌ Missing required fields');
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: email, token, and newPassword' },
+        { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Validate password strength
+    const normalizedEmail = email.toLowerCase();
+
+    // Validate password
     if (newPassword.length < 8) {
-      console.error('[Password Reset Verify] ❌ Password too short');
       return NextResponse.json(
         { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400 }
-      );
-    }
-
-    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
-      console.error('[Password Reset Verify] ❌ Password missing required character types');
-      return NextResponse.json(
-        { success: false, error: 'Password must contain uppercase, lowercase, and numbers' },
         { status: 400 }
       );
     }
@@ -41,14 +34,14 @@ export async function POST(request: NextRequest) {
     // Hash the token to compare with stored hash
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    console.log('[Password Reset Verify] 🔍 Looking up token for email:', email);
+    console.log('[Password Reset Verify] 🔍 Looking up token for email:', normalizedEmail);
 
     // Find the reset token
     const { data: resetToken, error: tokenError } = await supabase
       .from('password_reset_tokens')
       .select('id, email, expires_at')
       .eq('token_hash', tokenHash)
-      .eq('email', email.toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
     if (tokenError || !resetToken) {
@@ -71,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify email matches
-    if (resetToken.email !== email.toLowerCase()) {
+    if (resetToken.email !== normalizedEmail) {
       console.log('[Password Reset Verify] ❌ Email mismatch');
       return NextResponse.json(
         { success: false, error: 'Invalid email or token mismatch' },
@@ -79,7 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Password Reset Verify] 🔍 Finding user by email:', email);
+    console.log('[Password Reset Verify] 🔍 Finding user by email:', normalizedEmail);
 
     // Get user by email from auth.users
     const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
@@ -92,7 +85,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const user = users.find(u => u.email?.toLowerCase() === normalizedEmail);
 
     if (!user) {
       console.error('[Password Reset Verify] ❌ User not found in auth');
@@ -113,7 +106,7 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('[Password Reset Verify] ❌ Password update error:', updateError);
       return NextResponse.json(
-        { success: false, error: 'Failed to update password: ' + updateError.message },
+        { success: false, error: 'Failed to update password' },
         { status: 500 }
       );
     }
