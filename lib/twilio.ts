@@ -1,14 +1,25 @@
 import twilio from 'twilio';
 
-// Initialize Twilio client
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-
+// Lazy-load Twilio client to avoid initialization errors during build
 let twilioClient: ReturnType<typeof twilio> | null = null;
+let initialized = false;
 
-if (accountSid && authToken) {
-  twilioClient = twilio(accountSid, authToken);
+function initializeTwilio() {
+  if (initialized) return;
+  initialized = true;
+
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (accountSid && authToken) {
+    try {
+      twilioClient = twilio(accountSid, authToken);
+      console.log('[twilio] ✅ Client initialized successfully');
+    } catch (error) {
+      console.error('[twilio] ❌ Failed to initialize client:', error);
+      twilioClient = null;
+    }
+  }
 }
 
 export interface SMSOptions {
@@ -18,10 +29,13 @@ export interface SMSOptions {
 
 export async function sendSMS(options: SMSOptions) {
   try {
+    initializeTwilio();
+
     if (!twilioClient) {
       throw new Error('Twilio is not configured. Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN');
     }
 
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
     if (!fromNumber) {
       throw new Error('Twilio phone number not configured. Missing TWILIO_PHONE_NUMBER');
     }
@@ -43,6 +57,9 @@ export async function sendSMS(options: SMSOptions) {
 }
 
 export function isTwilioConfigured(): boolean {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
   return !!(accountSid && authToken && fromNumber);
 }
 
